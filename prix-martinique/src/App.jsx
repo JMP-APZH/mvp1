@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import Quagga from 'quagga';
 
 const PriceScannerApp = () => {
   const [activeTab, setActiveTab] = useState('scan');
   const [scanning, setScanning] = useState(false);
+  const [scanMethod, setScanMethod] = useState(null); // 'quagga' or 'barcode-api'
   const [searchQuery, setSearchQuery] = useState('');
   const [recentPrices, setRecentPrices] = useState([]);
   const [stores, setStores] = useState([]);
@@ -20,6 +22,7 @@ const PriceScannerApp = () => {
     userName: ''
   });
   const videoRef = useRef(null);
+  const scannerContainerRef = useRef(null);
 
   // PWA Install Prompt
   useEffect(() => {
@@ -144,20 +147,129 @@ const PriceScannerApp = () => {
     }
   };
 
+  const startQuaggaScan = () => {
+    setScanMethod('quagga');
+    setScanning(true);
+    
+    Quagga.init({
+      inputStream: {
+        name: "Live",
+        type: "LiveStream",
+        target: scannerContainerRef.current,
+        constraints: {
+          facingMode: "environment"
+        },
+      },
+      decoder: {
+        readers: [
+          "ean_reader",
+          "ean_8_reader",
+          "upc_reader",
+          "upc_e_reader",
+          "code_128_reader",
+          "code_39_reader"
+        ]
+      },
+      locate: true
+    }, (err) => {
+      if (err) {
+        console.error('Quagga init error:', err);
+        alert('Erreur d\'initialisation du scanner. Veuillez utiliser la saisie manuelle.');
+        setScanning(false);
+        return;
+      }
+      Quagga.start();
+    });
+
+    Quagga.onDetected((result) => {
+      const code = result.codeResult.code;
+      console.log('Barcode detected:', code);
+      
+      // Vibrate if supported
+      if (navigator.vibrate) {
+        navigator.vibrate(200);
+      }
+      
+      setManualEntry({ ...manualEntry, barcode: code });
+      stopScanning();
+      alert(`Code-barres détecté: ${code}\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
+    });
+  };
+
+  const startBarcodeAPIScan = async () => {
+    // Check if Barcode Detection API is supported
+    if (!('BarcodeDetector' in window)) {
+      alert('L\'API Barcode Detection n\'est pas supportée par votre navigateur. Essayez QuaggaJS ou utilisez Chrome/Edge.');
+      return;
+    }
+
+    setScanMethod('barcode-api');
+    setScanning(true);
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        
+        const barcodeDetector = new window.BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
+        });
+        
+        const detectBarcode = async () => {
+          if (!scanning) return;
+          
+          try {
+            const barcodes = await barcodeDetector.detect(videoRef.current);
+            
+            if (barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              console.log('Barcode detected:', code);
+              
+              // Vibrate if supported
+              if (navigator.vibrate) {
+                navigator.vibrate(200);
+              }
+              
+              setManualEntry({ ...manualEntry, barcode: code });
+              stopScanning();
+              alert(`Code-barres détecté: ${code}\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
+              return;
+            }
+          } catch (err) {
+            console.error('Detection error:', err);
+          }
+          
+          // Continue scanning
+          requestAnimationFrame(detectBarcode);
+        };
+        
+        detectBarcode();
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      alert('Accès caméra refusé. Veuillez utiliser la saisie manuelle.');
+      setScanning(false);
+    }
+  };
+
   const stopScanning = () => {
+    if (scanMethod === 'quagga') {
+      Quagga.stop();
+    }
+    
     if (videoRef.current && videoRef.current.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
     }
+    
     setScanning(false);
+    setScanMethod(null);
   };
 
-  const simulateScan = () => {
-    // Demo: Simulate barcode detection
-    const mockBarcode = '3254567890123';
-    setManualEntry({ ...manualEntry, barcode: mockBarcode, productName: 'Lait Lactel 1L' });
-    stopScanning();
-    alert(`Code-barres détecté: ${mockBarcode}\nVeuillez remplir le prix et sélectionner le magasin.`);
-  };
+
 
   const submitPrice = async () => {
     if (!manualEntry.productName || !manualEntry.price || !manualEntry.storeId) {
@@ -365,35 +477,62 @@ const PriceScannerApp = () => {
 
             {!scanning ? (
               <div>
-                <button
-                  onClick={startScanning}
-                  className="w-full bg-blue-600 text-white py-4 rounded-lg font-medium hover:bg-blue-700 transition-colors mb-4 shadow-md"
-                >
-                  <Camera className="inline w-5 h-5 mr-2" />
-                  Scanner un code-barres
-                </button>
+                <div className="space-y-3 mb-4">
+                  <button
+                    onClick={startQuaggaScan}
+                    className="w-full bg-blue-600 text-white py-4 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
+                  >
+                    <Camera className="inline w-5 h-5 mr-2" />
+                    Scanner avec QuaggaJS
+                  </button>
+                  
+                  <button
+                    onClick={startBarcodeAPIScan}
+                    className="w-full bg-purple-600 text-white py-4 rounded-lg font-medium hover:bg-purple-700 transition-colors shadow-md"
+                  >
+                    <Camera className="inline w-5 h-5 mr-2" />
+                    Scanner avec Barcode API
+                  </button>
+                  
+                  <p className="text-xs text-gray-500 text-center">
+                    Testez les deux méthodes pour voir laquelle fonctionne le mieux sur votre appareil
+                  </p>
+                </div>
                 <p className="text-center text-gray-500 text-sm mb-4">ou</p>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '300px' }}>
-                  <video ref={videoRef} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 border-2 border-white m-8 rounded-lg pointer-events-none"></div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={simulateScan}
-                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700"
-                  >
-                    Simuler scan (demo)
-                  </button>
-                  <button
-                    onClick={stopScanning}
-                    className="flex-1 bg-gray-600 text-white py-3 rounded-lg font-medium hover:bg-gray-700"
-                  >
-                    Annuler
-                  </button>
-                </div>
+                {scanMethod === 'quagga' ? (
+                  <div>
+                    <div 
+                      ref={scannerContainerRef}
+                      className="relative bg-black rounded-lg overflow-hidden"
+                      style={{ height: '300px' }}
+                    >
+                      <div className="absolute inset-0 border-2 border-green-400 m-8 rounded-lg pointer-events-none z-10">
+                        <div className="absolute top-0 left-0 right-0 bg-green-400 text-black text-xs py-1 px-2 text-center font-semibold">
+                          QuaggaJS Scanner - Alignez le code-barres
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '300px' }}>
+                    <video ref={videoRef} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 border-2 border-purple-400 m-8 rounded-lg pointer-events-none">
+                      <div className="absolute top-0 left-0 right-0 bg-purple-400 text-white text-xs py-1 px-2 text-center font-semibold">
+                        Barcode Detection API - Alignez le code-barres
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <button
+                  onClick={stopScanning}
+                  className="w-full bg-gray-600 text-white py-3 rounded-lg font-medium hover:bg-gray-700"
+                >
+                  Annuler le scan
+                </button>
               </div>
             )}
 
