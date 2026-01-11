@@ -10,6 +10,8 @@ const PriceScannerApp = () => {
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [manualEntry, setManualEntry] = useState({
     productName: '',
     barcode: '',
@@ -18,6 +20,32 @@ const PriceScannerApp = () => {
     userName: ''
   });
   const videoRef = useRef(null);
+
+  // PWA Install Prompt
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    };
+    
+    window.addEventListener('beforeinstallprompt', handler);
+    
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      setShowInstallPrompt(false);
+    }
+    
+    setDeferredPrompt(null);
+  };
 
   // Load stores from Supabase
   useEffect(() => {
@@ -254,6 +282,34 @@ const PriceScannerApp = () => {
             >
               Fermer
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* PWA Install Prompt */}
+      {showInstallPrompt && (
+        <div className="mx-4 mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-blue-900 mb-1">
+              📱 Installer l'application
+            </p>
+            <p className="text-xs text-blue-700 mb-3">
+              Ajoutez Prix Martinique à votre écran d'accueil pour un accès rapide !
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleInstallClick}
+                className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700"
+              >
+                Installer
+              </button>
+              <button
+                onClick={() => setShowInstallPrompt(false)}
+                className="text-xs text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-100"
+              >
+                Plus tard
+              </button>
+            </div>
           </div>
         </div>
       )}
