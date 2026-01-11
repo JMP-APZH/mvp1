@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import Quagga from 'quagga';
+import './quagga-styles.css';
 
 const PriceScannerApp = () => {
   const [activeTab, setActiveTab] = useState('scan');
@@ -151,49 +152,59 @@ const PriceScannerApp = () => {
     setScanMethod('quagga');
     setScanning(true);
     
-    Quagga.init({
-      inputStream: {
-        name: "Live",
-        type: "LiveStream",
-        target: scannerContainerRef.current,
-        constraints: {
-          facingMode: "environment"
+    // Give a brief delay for the DOM to update
+    setTimeout(() => {
+      Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: scannerContainerRef.current,
+          constraints: {
+            facingMode: "environment",
+            width: { min: 640, ideal: 1280 },
+            height: { min: 480, ideal: 720 }
+          },
         },
-      },
-      decoder: {
-        readers: [
-          "ean_reader",
-          "ean_8_reader",
-          "upc_reader",
-          "upc_e_reader",
-          "code_128_reader",
-          "code_39_reader"
-        ]
-      },
-      locate: true
-    }, (err) => {
-      if (err) {
-        console.error('Quagga init error:', err);
-        alert('Erreur d\'initialisation du scanner. Veuillez utiliser la saisie manuelle.');
-        setScanning(false);
-        return;
-      }
-      Quagga.start();
-    });
+        locator: {
+          patchSize: "medium",
+          halfSample: true
+        },
+        numOfWorkers: 2,
+        decoder: {
+          readers: [
+            "ean_reader",
+            "ean_8_reader",
+            "upc_reader",
+            "upc_e_reader"
+          ]
+        },
+        locate: true
+      }, (err) => {
+        if (err) {
+          console.error('Quagga init error:', err);
+          alert('Erreur d\'initialisation du scanner. Veuillez utiliser la saisie manuelle.');
+          setScanning(false);
+          setScanMethod(null);
+          return;
+        }
+        console.log('Quagga initialized successfully');
+        Quagga.start();
+      });
 
-    Quagga.onDetected((result) => {
-      const code = result.codeResult.code;
-      console.log('Barcode detected:', code);
-      
-      // Vibrate if supported
-      if (navigator.vibrate) {
-        navigator.vibrate(200);
-      }
-      
-      setManualEntry({ ...manualEntry, barcode: code });
-      stopScanning();
-      alert(`Code-barres détecté: ${code}\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
-    });
+      Quagga.onDetected((result) => {
+        const code = result.codeResult.code;
+        console.log('Barcode detected:', code);
+        
+        // Vibrate if supported
+        if (navigator.vibrate) {
+          navigator.vibrate(200);
+        }
+        
+        setManualEntry(prev => ({ ...prev, barcode: code }));
+        stopScanning();
+        alert(`Code-barres détecté: ${code}\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
+      });
+    }, 100);
   };
 
   const startBarcodeAPIScan = async () => {
@@ -208,7 +219,11 @@ const PriceScannerApp = () => {
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
       });
       
       if (videoRef.current) {
@@ -219,8 +234,10 @@ const PriceScannerApp = () => {
           formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39']
         });
         
+        let isScanning = true;
+        
         const detectBarcode = async () => {
-          if (!scanning) return;
+          if (!isScanning) return;
           
           try {
             const barcodes = await barcodeDetector.detect(videoRef.current);
@@ -229,12 +246,14 @@ const PriceScannerApp = () => {
               const code = barcodes[0].rawValue;
               console.log('Barcode detected:', code);
               
+              isScanning = false;
+              
               // Vibrate if supported
               if (navigator.vibrate) {
                 navigator.vibrate(200);
               }
               
-              setManualEntry({ ...manualEntry, barcode: code });
+              setManualEntry(prev => ({ ...prev, barcode: code }));
               stopScanning();
               alert(`Code-barres détecté: ${code}\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
               return;
@@ -507,18 +526,31 @@ const PriceScannerApp = () => {
                     <div 
                       ref={scannerContainerRef}
                       className="relative bg-black rounded-lg overflow-hidden"
-                      style={{ height: '300px' }}
+                      style={{ height: '300px', width: '100%' }}
                     >
                       <div className="absolute inset-0 border-2 border-green-400 m-8 rounded-lg pointer-events-none z-10">
                         <div className="absolute top-0 left-0 right-0 bg-green-400 text-black text-xs py-1 px-2 text-center font-semibold">
                           QuaggaJS Scanner - Alignez le code-barres
                         </div>
                       </div>
+                      <canvas className="drawingBuffer" style={{ 
+                        position: 'absolute', 
+                        top: 0, 
+                        left: 0,
+                        width: '100%',
+                        height: '100%'
+                      }} />
                     </div>
                   </div>
                 ) : (
                   <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '300px' }}>
-                    <video ref={videoRef} className="w-full h-full object-cover" />
+                    <video 
+                      ref={videoRef} 
+                      className="w-full h-full object-cover"
+                      playsInline
+                      autoPlay
+                      muted
+                    />
                     <div className="absolute inset-0 border-2 border-purple-400 m-8 rounded-lg pointer-events-none">
                       <div className="absolute top-0 left-0 right-0 bg-purple-400 text-white text-xs py-1 px-2 text-center font-semibold">
                         Barcode Detection API - Alignez le code-barres

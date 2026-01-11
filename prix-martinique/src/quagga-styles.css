@@ -1,0 +1,29 @@
+/* QuaggaJS Camera Styles */
+#interactive.viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#interactive.viewport canvas,
+#interactive.viewport video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#interactive.viewport canvas.drawingBuffer {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.drawingBuffer {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+}
