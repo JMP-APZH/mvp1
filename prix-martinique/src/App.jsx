@@ -161,24 +161,40 @@ const PriceScannerApp = () => {
           target: scannerContainerRef.current,
           constraints: {
             facingMode: "environment",
-            width: { min: 640, ideal: 1280 },
-            height: { min: 480, ideal: 720 }
+            width: { min: 640, ideal: 1920 },
+            height: { min: 480, ideal: 1080 }
           },
         },
         locator: {
           patchSize: "medium",
-          halfSample: true
+          halfSample: false
         },
-        numOfWorkers: 2,
+        frequency: 10,
+        numOfWorkers: 4,
         decoder: {
           readers: [
-            "ean_reader",
-            "ean_8_reader",
-            "upc_reader",
-            "upc_e_reader"
-          ]
+            {
+              format: "ean_reader",
+              config: {
+                supplements: []
+              }
+            },
+            {
+              format: "ean_8_reader",
+              config: {
+                supplements: []
+              }
+            }
+          ],
+          multiple: false
         },
-        locate: true
+        locate: true,
+        debug: {
+          drawBoundingBox: false,
+          showFrequency: false,
+          drawScanline: true,
+          showPattern: false
+        }
       }, (err) => {
         if (err) {
           console.error('Quagga init error:', err);
@@ -191,18 +207,32 @@ const PriceScannerApp = () => {
         Quagga.start();
       });
 
+      let lastDetectedCode = null;
+      let detectionCount = 0;
+
       Quagga.onDetected((result) => {
         const code = result.codeResult.code;
-        console.log('Barcode detected:', code);
+        const format = result.codeResult.format;
         
-        // Vibrate if supported
-        if (navigator.vibrate) {
-          navigator.vibrate(200);
+        // Require the same code to be detected 2 times for reliability
+        if (code === lastDetectedCode) {
+          detectionCount++;
+          if (detectionCount >= 2) {
+            console.log('QuaggaJS detected (confirmed):', code, 'Format:', format);
+            
+            // Vibrate if supported
+            if (navigator.vibrate) {
+              navigator.vibrate(200);
+            }
+            
+            setManualEntry(prev => ({ ...prev, barcode: code }));
+            stopScanning();
+            alert(`✅ QuaggaJS détecté:\nCode: ${code}\nFormat: ${format}\n\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
+          }
+        } else {
+          lastDetectedCode = code;
+          detectionCount = 1;
         }
-        
-        setManualEntry(prev => ({ ...prev, barcode: code }));
-        stopScanning();
-        alert(`Code-barres détecté: ${code}\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
       });
     }, 100);
   };
@@ -244,7 +274,8 @@ const PriceScannerApp = () => {
             
             if (barcodes.length > 0) {
               const code = barcodes[0].rawValue;
-              console.log('Barcode detected:', code);
+              const format = barcodes[0].format;
+              console.log('Barcode API detected:', code, 'Format:', format);
               
               isScanning = false;
               
@@ -255,7 +286,7 @@ const PriceScannerApp = () => {
               
               setManualEntry(prev => ({ ...prev, barcode: code }));
               stopScanning();
-              alert(`Code-barres détecté: ${code}\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
+              alert(`✅ Barcode API détecté:\nCode: ${code}\nFormat: ${format}\n\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
               return;
             }
           } catch (err) {
