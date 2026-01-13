@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X } from 'lucide-react';
+import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import Quagga from 'quagga';
+import './quagga-styles.css';
 
 const PriceScannerApp = () => {
   const [activeTab, setActiveTab] = useState('scan');
   const [scanning, setScanning] = useState(false);
+  const [scanMethod, setScanMethod] = useState(null); // 'quagga' or 'barcode-api'
   const [searchQuery, setSearchQuery] = useState('');
   const [recentPrices, setRecentPrices] = useState([]);
   const [stores, setStores] = useState([]);
@@ -17,13 +20,10 @@ const PriceScannerApp = () => {
     barcode: '',
     price: '',
     storeId: '',
-    userName: '',
-    productPhoto: null,
-    priceTagPhoto: null
+    userName: ''
   });
   const videoRef = useRef(null);
-  const productPhotoInputRef = useRef(null);
-  const priceTagPhotoInputRef = useRef(null);
+  const scannerContainerRef = useRef(null);
 
   // PWA Install Prompt
   useEffect(() => {
@@ -132,13 +132,103 @@ const PriceScannerApp = () => {
     }
   };
 
+  const startQuaggaScan = () => {
+    setScanMethod('quagga');
+    setScanning(true);
+    
+    // Give a brief delay for the DOM to update
+    setTimeout(() => {
+      Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: scannerContainerRef.current,
+          constraints: {
+            facingMode: "environment",
+            width: { min: 640, ideal: 1920 },
+            height: { min: 480, ideal: 1080 }
+          },
+        },
+        locator: {
+          patchSize: "medium",
+          halfSample: false
+        },
+        frequency: 10,
+        numOfWorkers: 4,
+        decoder: {
+          readers: [
+            {
+              format: "ean_reader",
+              config: {
+                supplements: []
+              }
+            },
+            {
+              format: "ean_8_reader",
+              config: {
+                supplements: []
+              }
+            }
+          ],
+          multiple: false
+        },
+        locate: true,
+        debug: {
+          drawBoundingBox: false,
+          showFrequency: false,
+          drawScanline: true,
+          showPattern: false
+        }
+      }, (err) => {
+        if (err) {
+          console.error('Quagga init error:', err);
+          alert('Erreur d\'initialisation du scanner. Veuillez utiliser la saisie manuelle.');
+          setScanning(false);
+          setScanMethod(null);
+          return;
+        }
+        console.log('Quagga initialized successfully');
+        Quagga.start();
+      });
+
+      let lastDetectedCode = null;
+      let detectionCount = 0;
+
+      Quagga.onDetected((result) => {
+        const code = result.codeResult.code;
+        const format = result.codeResult.format;
+        
+        // Require the same code to be detected 2 times for reliability
+        if (code === lastDetectedCode) {
+          detectionCount++;
+          if (detectionCount >= 2) {
+            console.log('QuaggaJS detected (confirmed):', code, 'Format:', format);
+            
+            // Vibrate if supported
+            if (navigator.vibrate) {
+              navigator.vibrate(200);
+            }
+            
+            setManualEntry(prev => ({ ...prev, barcode: code }));
+            stopScanning();
+            alert(`✅ QuaggaJS détecté:\nCode: ${code}\nFormat: ${format}\n\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
+          }
+        } else {
+          lastDetectedCode = code;
+          detectionCount = 1;
+        }
+      });
+    }, 100);
+  };
+
   const startBarcodeAPIScan = async () => {
     // Check if Barcode Detection API is supported
     if (!('BarcodeDetector' in window)) {
-      alert('Le scan de code-barres nécessite Chrome ou Edge. Veuillez utiliser la saisie manuelle.');
+      alert('L\'API Barcode Detection n\'est pas supportée par votre navigateur. Essayez QuaggaJS ou utilisez Chrome/Edge.');
       return;
     }
 
+    setScanMethod('barcode-api');
     setScanning(true);
     
     try {
@@ -169,7 +259,7 @@ const PriceScannerApp = () => {
             if (barcodes.length > 0) {
               const code = barcodes[0].rawValue;
               const format = barcodes[0].format;
-              console.log('Barcode detected:', code, 'Format:', format);
+              console.log('Barcode API detected:', code, 'Format:', format);
               
               isScanning = false;
               
@@ -180,7 +270,7 @@ const PriceScannerApp = () => {
               
               setManualEntry(prev => ({ ...prev, barcode: code }));
               stopScanning();
-              alert(`✅ Code-barres détecté:\nCode: ${code}\nFormat: ${format}\n\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
+              alert(`✅ Barcode API détecté:\nCode: ${code}\nFormat: ${format}\n\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
               return;
             }
           } catch (err) {
@@ -201,42 +291,16 @@ const PriceScannerApp = () => {
   };
 
   const stopScanning = () => {
+    if (scanMethod === 'quagga') {
+      Quagga.stop();
+    }
+    
     if (videoRef.current && videoRef.current.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
     }
     
     setScanning(false);
-  };
-
-  const handlePhotoCapture = (photoType) => {
-    if (photoType === 'product') {
-      productPhotoInputRef.current?.click();
-    } else {
-      priceTagPhotoInputRef.current?.click();
-    }
-  };
-
-  const handlePhotoChange = (e, photoType) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (photoType === 'product') {
-          setManualEntry(prev => ({ ...prev, productPhoto: reader.result }));
-        } else {
-          setManualEntry(prev => ({ ...prev, priceTagPhoto: reader.result }));
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removePhoto = (photoType) => {
-    if (photoType === 'product') {
-      setManualEntry(prev => ({ ...prev, productPhoto: null }));
-    } else {
-      setManualEntry(prev => ({ ...prev, priceTagPhoto: null }));
-    }
+    setScanMethod(null);
   };
 
   const submitPrice = async () => {
@@ -311,9 +375,7 @@ const PriceScannerApp = () => {
         barcode: '',
         price: '',
         storeId: '',
-        userName: manualEntry.userName, // Keep username for next entry
-        productPhoto: null,
-        priceTagPhoto: null
+        userName: manualEntry.userName // Keep username for next entry
       });
 
       // Reload prices
@@ -348,8 +410,8 @@ const PriceScannerApp = () => {
     <div className="max-w-2xl mx-auto bg-white min-h-screen">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 shadow-lg">
-        <h1 className="text-2xl font-bold mb-2">Prix Martinique</h1>
-        <p className="text-blue-100 text-sm">Ensemble contre la vie chère</p>
+        <h1 className="text-2xl font-bold mb-2">Vie chère en Martinique</h1>
+        <p className="text-blue-100 text-sm">Quid de votre pouvoir d'achat</p>
       </div>
 
       {/* Error Alert */}
@@ -396,46 +458,40 @@ const PriceScannerApp = () => {
         </div>
       )}
 
-      {/* Navigation - Fixed for mobile */}
+      {/* Navigation */}
       <div className="flex border-b bg-white sticky top-0 shadow-sm z-10">
         <button 
           onClick={() => setActiveTab('scan')}
-          className={`flex-1 py-3 px-2 font-medium transition-colors ${
+          className={`flex-1 py-3 px-4 font-medium transition-colors ${
             activeTab === 'scan' 
               ? 'border-b-2 border-blue-600 text-blue-600' 
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          <div className="flex flex-col items-center gap-1">
-            <Camera className="w-5 h-5" />
-            <span className="text-xs">Scanner</span>
-          </div>
+          <Camera className="inline w-5 h-5 mr-2" />
+          Scanner
         </button>
         <button 
           onClick={() => setActiveTab('search')}
-          className={`flex-1 py-3 px-2 font-medium transition-colors ${
+          className={`flex-1 py-3 px-4 font-medium transition-colors ${
             activeTab === 'search' 
               ? 'border-b-2 border-blue-600 text-blue-600' 
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          <div className="flex flex-col items-center gap-1">
-            <Search className="w-5 h-5" />
-            <span className="text-xs">Comparer</span>
-          </div>
+          <Search className="inline w-5 h-5 mr-2" />
+          Comparer
         </button>
         <button 
           onClick={() => setActiveTab('stats')}
-          className={`flex-1 py-3 px-2 font-medium transition-colors ${
+          className={`flex-1 py-3 px-4 font-medium transition-colors ${
             activeTab === 'stats' 
               ? 'border-b-2 border-blue-600 text-blue-600' 
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          <div className="flex flex-col items-center gap-1">
-            <BarChart3 className="w-5 h-5" />
-            <span className="text-xs">Stats</span>
-          </div>
+          <BarChart3 className="inline w-5 h-5 mr-2" />
+          Stats
         </button>
       </div>
 
@@ -453,31 +509,68 @@ const PriceScannerApp = () => {
 
             {!scanning ? (
               <div>
-                <button
-                  onClick={startBarcodeAPIScan}
-                  className="w-full bg-blue-600 text-white py-4 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md mb-4"
-                >
-                  <Camera className="inline w-5 h-5 mr-2" />
-                  Scanner un code-barres
-                </button>
+                <div className="space-y-3 mb-4">
+                  <button
+                    onClick={startQuaggaScan}
+                    className="w-full bg-blue-600 text-white py-4 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-md"
+                  >
+                    <Camera className="inline w-5 h-5 mr-2" />
+                    Scanner avec QuaggaJS
+                  </button>
+                  
+                  <button
+                    onClick={startBarcodeAPIScan}
+                    className="w-full bg-purple-600 text-white py-4 rounded-lg font-medium hover:bg-purple-700 transition-colors shadow-md"
+                  >
+                    <Camera className="inline w-5 h-5 mr-2" />
+                    Scanner avec Barcode API
+                  </button>
+                  
+                  <p className="text-xs text-gray-500 text-center">
+                    Testez les deux méthodes pour voir laquelle fonctionne le mieux sur votre appareil
+                  </p>
+                </div>
                 <p className="text-center text-gray-500 text-sm mb-4">ou</p>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '300px' }}>
-                  <video 
-                    ref={videoRef} 
-                    className="w-full h-full object-cover"
-                    playsInline
-                    autoPlay
-                    muted
-                  />
-                  <div className="absolute inset-0 border-2 border-blue-400 m-8 rounded-lg pointer-events-none">
-                    <div className="absolute top-0 left-0 right-0 bg-blue-400 text-white text-xs py-1 px-2 text-center font-semibold">
-                      Alignez le code-barres dans le cadre
+                {scanMethod === 'quagga' ? (
+                  <div>
+                    <div 
+                      ref={scannerContainerRef}
+                      className="relative bg-black rounded-lg overflow-hidden"
+                      style={{ height: '300px', width: '100%' }}
+                    >
+                      <div className="absolute inset-0 border-2 border-green-400 m-8 rounded-lg pointer-events-none z-10">
+                        <div className="absolute top-0 left-0 right-0 bg-green-400 text-black text-xs py-1 px-2 text-center font-semibold">
+                          QuaggaJS Scanner - Alignez le code-barres
+                        </div>
+                      </div>
+                      <canvas className="drawingBuffer" style={{ 
+                        position: 'absolute', 
+                        top: 0, 
+                        left: 0,
+                        width: '100%',
+                        height: '100%'
+                      }} />
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '300px' }}>
+                    <video 
+                      ref={videoRef} 
+                      className="w-full h-full object-cover"
+                      playsInline
+                      autoPlay
+                      muted
+                    />
+                    <div className="absolute inset-0 border-2 border-purple-400 m-8 rounded-lg pointer-events-none">
+                      <div className="absolute top-0 left-0 right-0 bg-purple-400 text-white text-xs py-1 px-2 text-center font-semibold">
+                        Barcode Detection API - Alignez le code-barres
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <button
                   onClick={stopScanning}
@@ -516,87 +609,6 @@ const PriceScannerApp = () => {
                   placeholder="Ex: 3254567890123"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-              </div>
-
-              {/* Photo Upload Section */}
-              <div className="space-y-3 pt-2 border-t">
-                <label className="block text-sm font-medium text-gray-700">
-                  Photos (optionnel)
-                </label>
-                
-                {/* Product Photo */}
-                <div>
-                  <p className="text-xs text-gray-600 mb-2">Photo du produit</p>
-                  {!manualEntry.productPhoto ? (
-                    <button
-                      type="button"
-                      onClick={() => handlePhotoCapture('product')}
-                      className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-500 transition-colors"
-                    >
-                      <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                      <p className="text-sm text-gray-600">Ajouter une photo du produit</p>
-                    </button>
-                  ) : (
-                    <div className="relative">
-                      <img 
-                        src={manualEntry.productPhoto} 
-                        alt="Produit" 
-                        className="w-full h-40 object-cover rounded-lg"
-                      />
-                      <button
-                        onClick={() => removePhoto('product')}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                  <input
-                    ref={productPhotoInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => handlePhotoChange(e, 'product')}
-                    className="hidden"
-                  />
-                </div>
-
-                {/* Price Tag Photo */}
-                <div>
-                  <p className="text-xs text-gray-600 mb-2">Photo de l'étiquette de prix</p>
-                  {!manualEntry.priceTagPhoto ? (
-                    <button
-                      type="button"
-                      onClick={() => handlePhotoCapture('priceTag')}
-                      className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-500 transition-colors"
-                    >
-                      <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                      <p className="text-sm text-gray-600">Ajouter une photo de l'étiquette</p>
-                    </button>
-                  ) : (
-                    <div className="relative">
-                      <img 
-                        src={manualEntry.priceTagPhoto} 
-                        alt="Étiquette de prix" 
-                        className="w-full h-40 object-cover rounded-lg"
-                      />
-                      <button
-                        onClick={() => removePhoto('priceTag')}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                  <input
-                    ref={priceTagPhotoInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => handlePhotoChange(e, 'priceTag')}
-                    className="hidden"
-                  />
-                </div>
               </div>
 
               <div>
@@ -761,52 +773,51 @@ const PriceScannerApp = () => {
             </div>
 
             <div className="space-y-3">
-          <h3 className="font-semibold text-gray-800">Produits les plus suivis</h3>
-          {Array.from(new Set(recentPrices.map(p => p.product)))
-            .slice(0, 5)
-            .map(productName => {
-              const stats = getProductStats(productName);
-              return (
-                <div key={productName} className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-gray-900">{productName}</h4>
-                    <span className="text-sm text-gray-500">{stats.count} prix</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <div className="text-gray-500 text-xs">Min</div>
-                      <div className="font-semibold text-green-600">{stats.min.toFixed(2)}€</div>
+              <h3 className="font-semibold text-gray-800">Produits les plus suivis</h3>
+              {Array.from(new Set(recentPrices.map(p => p.product)))
+                .slice(0, 5)
+                .map(productName => {
+                  const stats = getProductStats(productName);
+                  return (
+                    <div key={productName} className="bg-white border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium text-gray-900">{productName}</h4>
+                        <span className="text-sm text-gray-500">{stats.count} prix</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <div className="text-gray-500 text-xs">Min</div>
+                          <div className="font-semibold text-green-600">{stats.min.toFixed(2)}€</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-xs">Moyen</div>
+                          <div className="font-semibold">{stats.avg.toFixed(2)}€</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 text-xs">Max</div>
+                          <div className="font-semibold text-red-600">{stats.max.toFixed(2)}€</div>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-600">
+                        Écart: {((stats.max - stats.min) / stats.min * 100).toFixed(0)}% de différence
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-gray-500 text-xs">Moyen</div>
-                      <div className="font-semibold">{stats.avg.toFixed(2)}€</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500 text-xs">Max</div>
-                      <div className="font-semibold text-red-600">{stats.max.toFixed(2)}€</div>
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-600">
-                    Écart: {((stats.max - stats.min) / stats.min * 100).toFixed(0)}% de différence
-                  </div>
-                </div>
-              );
-            })}
-        </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
-    )}
-  </div>
 
-  {/* Footer */}
-  <div className="bg-gray-50 border-t p-4 text-center text-sm text-gray-600 mt-8">
-    <p className="mb-2">Ensemble, nous créons la transparence sur les prix 💪</p>
-    <p className="text-xs text-gray-500">
-      Données crowdsourcées • Gratuit et ouvert à tous
-    </p>
-  </div>
-</div>
-
-);
+      {/* Footer */}
+      <div className="bg-gray-50 border-t p-4 text-center text-sm text-gray-600 mt-8">
+        <p className="mb-2">Ensemble, nous créons la transparence sur les prix 💪</p>
+        <p className="text-xs text-gray-500">
+          Données crowdsourcées • Gratuit et ouvert à tous
+        </p>
+      </div>
+    </div>
+  );
 };
 
 export default PriceScannerApp;
