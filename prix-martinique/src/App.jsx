@@ -348,8 +348,8 @@ const PriceScannerApp = () => {
     <div className="max-w-2xl mx-auto bg-white min-h-screen">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 shadow-lg">
-        <h1 className="text-2xl font-bold mb-2">Prix Martinique</h1>
-        <p className="text-blue-100 text-sm">Ensemble contre la vie chère</p>
+        <h1 className="text-2xl font-bold mb-2">Vie chère en Martinique</h1>
+        <p className="text-blue-100 text-sm">Quid de votre pouvoir d'achat</p>
       </div>
 
       {/* Error Alert */}
