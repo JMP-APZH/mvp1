@@ -132,22 +132,6 @@ const PriceScannerApp = () => {
     }
   };
 
-  const startScanning = async () => {
-    setScanning(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch (err) {
-      alert('Accès caméra refusé. Veuillez utiliser la saisie manuelle.');
-      setScanning(false);
-    }
-  };
-
   const startQuaggaScan = () => {
     setScanMethod('quagga');
     setScanning(true);
@@ -319,8 +303,6 @@ const PriceScannerApp = () => {
     setScanMethod(null);
   };
 
-
-
   const submitPrice = async () => {
     if (!manualEntry.productName || !manualEntry.price || !manualEntry.storeId) {
       alert('Veuillez remplir tous les champs obligatoires (produit, prix, magasin)');
@@ -428,8 +410,8 @@ const PriceScannerApp = () => {
     <div className="max-w-2xl mx-auto bg-white min-h-screen">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 shadow-lg">
-        <h1 className="text-2xl font-bold mb-2">Prix Martinique</h1>
-        <p className="text-blue-100 text-sm">Ensemble contre la vie chère</p>
+        <h1 className="text-2xl font-bold mb-2">Vie chère en Martinique</h1>
+        <p className="text-blue-100 text-sm">Quid de votre pouvoir d'achat</p>
       </div>
 
       {/* Error Alert */}
