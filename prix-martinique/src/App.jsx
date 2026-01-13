@@ -103,6 +103,8 @@ const PriceScannerApp = () => {
           price,
           user_name,
           created_at,
+          product_photo_url,
+          price_tag_photo_url,
           products (name, barcode),
           stores (name, location)
         `)
@@ -120,7 +122,9 @@ const PriceScannerApp = () => {
         store: item.stores?.name || 'Magasin inconnu',
         location: item.stores?.location,
         userName: item.user_name || 'Anonyme',
-        date: new Date(item.created_at).toLocaleDateString('fr-FR')
+        date: new Date(item.created_at).toLocaleDateString('fr-FR'),
+        productPhotoUrl: item.product_photo_url,
+        priceTagPhotoUrl: item.price_tag_photo_url
       }));
 
       setRecentPrices(transformedPrices);
@@ -290,14 +294,70 @@ const PriceScannerApp = () => {
         productId = newProduct.id;
       }
 
-      // Step 2: Insert price
+      // Step 2: Upload photos if they exist
+      let productPhotoUrl = null;
+      let priceTagPhotoUrl = null;
+
+      if (manualEntry.productPhoto) {
+        const fileName = `${Date.now()}_${productId}_product.jpg`;
+        const base64Data = manualEntry.productPhoto.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('product-photos')
+          .upload(fileName, blob);
+
+        if (uploadError) {
+          console.error('Product photo upload error:', uploadError);
+        } else {
+          const { data: urlData } = supabase.storage
+            .from('product-photos')
+            .getPublicUrl(fileName);
+          productPhotoUrl = urlData.publicUrl;
+        }
+      }
+
+      if (manualEntry.priceTagPhoto) {
+        const fileName = `${Date.now()}_${productId}_pricetag.jpg`;
+        const base64Data = manualEntry.priceTagPhoto.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('price-tag-photos')
+          .upload(fileName, blob);
+
+        if (uploadError) {
+          console.error('Price tag photo upload error:', uploadError);
+        } else {
+          const { data: urlData } = supabase.storage
+            .from('price-tag-photos')
+            .getPublicUrl(fileName);
+          priceTagPhotoUrl = urlData.publicUrl;
+        }
+      }
+
+      // Step 3: Insert price with photo URLs
       const { error: priceError } = await supabase
         .from('prices')
         .insert([{
           product_id: productId,
           store_id: manualEntry.storeId,
           price: parseFloat(manualEntry.price),
-          user_name: manualEntry.userName || 'Anonyme'
+          user_name: manualEntry.userName || 'Anonyme',
+          product_photo_url: productPhotoUrl,
+          price_tag_photo_url: priceTagPhotoUrl
         }]);
 
       if (priceError) throw priceError;
@@ -348,8 +408,8 @@ const PriceScannerApp = () => {
     <div className="max-w-2xl mx-auto bg-white min-h-screen">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 shadow-lg">
-        <h1 className="text-2xl font-bold mb-2">Vie chère en Martinique</h1>
-        <p className="text-blue-100 text-sm">Quid de votre pouvoir d'achat</p>
+        <h1 className="text-2xl font-bold mb-2">Prix Martinique</h1>
+        <p className="text-blue-100 text-sm">Ensemble contre la vie chère</p>
       </div>
 
       {/* Error Alert */}
@@ -708,6 +768,27 @@ const PriceScannerApp = () => {
                             )}
                           </div>
                         </div>
+                        
+                        {/* Photos display */}
+                        {(price.productPhotoUrl || price.priceTagPhotoUrl) && (
+                          <div className="flex gap-2 mt-3 mb-2">
+                            {price.productPhotoUrl && (
+                              <img 
+                                src={price.productPhotoUrl} 
+                                alt="Produit" 
+                                className="w-20 h-20 object-cover rounded border border-gray-200"
+                              />
+                            )}
+                            {price.priceTagPhotoUrl && (
+                              <img 
+                                src={price.priceTagPhotoUrl} 
+                                alt="Étiquette" 
+                                className="w-20 h-20 object-cover rounded border border-gray-200"
+                              />
+                            )}
+                          </div>
+                        )}
+                        
                         <div className="flex justify-between text-xs text-gray-500 mt-2 pt-2 border-t">
                           <span>Par {price.userName}</span>
                           <span>{price.date}</span>
