@@ -567,7 +567,7 @@ const PriceScannerApp = () => {
           <div className="mt-3 flex items-center gap-2 text-sm">
             <div className="bg-white/20 rounded-full px-3 py-1 flex items-center gap-1">
               <Star className="w-4 h-4 text-yellow-300" />
-              <span>{userProfile.total_points || 0} points</span>
+              <span>{userProfile.points || 0} points</span>
             </div>
             <div className="bg-white/20 rounded-full px-3 py-1">
               Niveau {userProfile.level || 1}

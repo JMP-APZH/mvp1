@@ -18,8 +18,8 @@ const Leaderboard = () => {
     try {
       let query = supabase
         .from('user_profiles')
-        .select('id, display_name, total_points, level, prices_submitted')
-        .order('total_points', { ascending: false })
+        .select('id, display_name, points, level, total_contributions')
+        .order('points', { ascending: false })
         .limit(10);
 
       const { data, error } = await query;
@@ -144,7 +144,7 @@ const Leaderboard = () => {
               <p className="text-xs font-medium text-gray-700 truncate max-w-16">
                 {leaders[1]?.display_name?.split(' ')[0] || 'Anon'}
               </p>
-              <p className="text-xs text-gray-500">{leaders[1]?.total_points} pts</p>
+              <p className="text-xs text-gray-500">{leaders[1]?.points} pts</p>
             </div>
             <div className="w-16 h-16 bg-gradient-to-t from-gray-300 to-gray-200 rounded-t-lg mt-2 flex items-center justify-center">
               <span className="text-2xl font-bold text-gray-500">2</span>
@@ -161,7 +161,7 @@ const Leaderboard = () => {
               <p className="text-sm font-semibold text-gray-800 truncate max-w-20">
                 {leaders[0]?.display_name?.split(' ')[0] || 'Anon'}
               </p>
-              <p className="text-xs text-yellow-600 font-medium">{leaders[0]?.total_points} pts</p>
+              <p className="text-xs text-yellow-600 font-medium">{leaders[0]?.points} pts</p>
             </div>
             <div className="w-20 h-24 bg-gradient-to-t from-yellow-400 to-yellow-300 rounded-t-lg mt-2 flex items-center justify-center">
               <span className="text-3xl font-bold text-yellow-700">1</span>
@@ -177,7 +177,7 @@ const Leaderboard = () => {
               <p className="text-xs font-medium text-gray-700 truncate max-w-16">
                 {leaders[2]?.display_name?.split(' ')[0] || 'Anon'}
               </p>
-              <p className="text-xs text-gray-500">{leaders[2]?.total_points} pts</p>
+              <p className="text-xs text-gray-500">{leaders[2]?.points} pts</p>
             </div>
             <div className="w-16 h-12 bg-gradient-to-t from-orange-400 to-orange-300 rounded-t-lg mt-2 flex items-center justify-center">
               <span className="text-2xl font-bold text-orange-600">3</span>
@@ -216,7 +216,7 @@ const Leaderboard = () => {
                   <span className="bg-gray-100 px-1.5 py-0.5 rounded">
                     Niv.{leader.level || 1}
                   </span>
-                  <span>{leader.prices_submitted || 0} prix</span>
+                  <span>{leader.total_contributions || 0} prix</span>
                 </div>
               </div>
 
@@ -224,7 +224,7 @@ const Leaderboard = () => {
               <div className="text-right flex-shrink-0">
                 <div className="flex items-center gap-1 text-lg font-bold text-gray-900">
                   <Star className="w-4 h-4 text-yellow-500" />
-                  {leader.total_points || 0}
+                  {leader.points || 0}
                 </div>
                 <p className="text-xs text-gray-500">points</p>
               </div>

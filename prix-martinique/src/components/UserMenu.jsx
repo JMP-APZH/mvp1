@@ -30,7 +30,7 @@ const UserMenu = ({ onSignInClick }) => {
     const currentLevel = userProfile.level || 1;
     const pointsForCurrentLevel = (currentLevel - 1) * 100;
     const pointsForNextLevel = currentLevel * 100;
-    const progressPoints = userProfile.total_points - pointsForCurrentLevel;
+    const progressPoints = (userProfile.points || 0) - pointsForCurrentLevel;
     const pointsNeeded = pointsForNextLevel - pointsForCurrentLevel;
     return Math.min((progressPoints / pointsNeeded) * 100, 100);
   };
@@ -97,7 +97,7 @@ const UserMenu = ({ onSignInClick }) => {
           <span className="text-xs font-medium leading-tight">{displayName}</span>
           <span className="text-xs text-orange-100 leading-tight flex items-center gap-1">
             <Star className="w-3 h-3" />
-            {userProfile?.total_points || 0} pts
+            {userProfile?.points || 0} pts
           </span>
         </div>
 
@@ -141,13 +141,13 @@ const UserMenu = ({ onSignInClick }) => {
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
                 <div className="text-xl font-bold text-gray-900">
-                  {userProfile?.total_points || 0}
+                  {userProfile?.points || 0}
                 </div>
                 <div className="text-xs text-gray-500">Points</div>
               </div>
               <div>
                 <div className="text-xl font-bold text-gray-900">
-                  {userProfile?.prices_submitted || 0}
+                  {userProfile?.total_contributions || 0}
                 </div>
                 <div className="text-xs text-gray-500">Prix</div>
               </div>
