@@ -7,6 +7,9 @@ const UserMenu = ({ onSignInClick }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
 
+  // Debug logging
+  console.log('UserMenu render - user:', user?.id, 'userProfile:', userProfile, 'loading:', loading);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {

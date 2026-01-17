@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
   // Fetch user profile from user_profiles table
   const fetchUserProfile = async (userId) => {
     try {
+      console.log('Fetching profile for user:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -30,6 +31,7 @@ export const AuthProvider = ({ children }) => {
         console.error('Error fetching user profile:', error);
         return null;
       }
+      console.log('User profile fetched:', data);
       return data;
     } catch (err) {
       console.error('Error in fetchUserProfile:', err);
