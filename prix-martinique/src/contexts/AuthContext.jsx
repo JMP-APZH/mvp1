@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }) => {
   // Fetch user profile from user_profiles table
   const fetchUserProfile = async (userId) => {
     try {
-      console.log('Fetching profile for user:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -31,7 +30,6 @@ export const AuthProvider = ({ children }) => {
         console.error('Error fetching user profile:', error);
         return null;
       }
-      console.log('User profile fetched:', data);
       return data;
     } catch (err) {
       console.error('Error in fetchUserProfile:', err);
@@ -71,48 +69,54 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+    let isMounted = true;
 
-        if (session?.user) {
-          setUser(session.user);
-          const profile = await fetchUserProfile(session.user.id);
-          setUserProfile(profile);
-          const badges = await fetchUserBadges(session.user.id);
-          setUserBadges(badges);
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        setLoading(false);
-      }
+    // Helper to load user data
+    const loadUserData = async (userId) => {
+      const [profile, badges] = await Promise.all([
+        fetchUserProfile(userId),
+        fetchUserBadges(userId)
+      ]);
+      return { profile, badges };
     };
 
-    initAuth();
-
-    // Listen for auth changes
+    // Listen for auth changes - this is the primary source of truth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event);
 
+        if (!isMounted) return;
+
         if (session?.user) {
           setUser(session.user);
-          const profile = await fetchUserProfile(session.user.id);
-          setUserProfile(profile);
-          const badges = await fetchUserBadges(session.user.id);
-          setUserBadges(badges);
+
+          // Load profile and badges
+          const { profile, badges } = await loadUserData(session.user.id);
+
+          if (isMounted) {
+            setUserProfile(profile);
+            setUserBadges(badges);
+            setLoading(false);
+          }
         } else {
           setUser(null);
           setUserProfile(null);
           setUserBadges([]);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
+    // Get initial session - triggers onAuthStateChange with INITIAL_SESSION
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      // If no session, make sure loading is set to false
+      if (!session && isMounted) {
+        setLoading(false);
+      }
+    });
+
     return () => {
+      isMounted = false;
       subscription?.unsubscribe();
     };
   }, []);
