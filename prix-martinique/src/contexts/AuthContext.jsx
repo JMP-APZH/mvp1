@@ -105,8 +105,15 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        // Only handle SIGNED_IN if we're already initialized (actual sign in, not page load)
+        // Only handle SIGNED_IN if we're already initialized AND user is different (actual sign in, not page load)
         if (event === 'SIGNED_IN' && isInitialized && session?.user) {
+          // Check if this is a different user (actual new sign in vs duplicate event)
+          const currentUserId = user?.id;
+          if (currentUserId === session.user.id) {
+            console.log('SIGNED_IN for same user, skipping duplicate load');
+            return;
+          }
+
           console.log('User signed in (post-init), loading profile...');
           setUser(session.user);
           setLoading(true);
