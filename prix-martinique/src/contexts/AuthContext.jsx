@@ -83,22 +83,36 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes - this is the primary source of truth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event);
+        console.log('Auth state changed:', event, 'session:', !!session);
 
-        if (!isMounted) return;
+        if (!isMounted) {
+          console.log('Component unmounted, skipping');
+          return;
+        }
 
         if (session?.user) {
+          console.log('User found, setting user and loading profile...');
           setUser(session.user);
 
           // Load profile and badges
-          const { profile, badges } = await loadUserData(session.user.id);
+          try {
+            const { profile, badges } = await loadUserData(session.user.id);
+            console.log('Profile loaded:', !!profile, 'Badges:', badges?.length);
 
-          if (isMounted) {
-            setUserProfile(profile);
-            setUserBadges(badges);
-            setLoading(false);
+            if (isMounted) {
+              setUserProfile(profile);
+              setUserBadges(badges);
+              setLoading(false);
+              console.log('Auth loading complete');
+            }
+          } catch (err) {
+            console.error('Error loading user data:', err);
+            if (isMounted) {
+              setLoading(false);
+            }
           }
         } else {
+          console.log('No session, clearing user');
           setUser(null);
           setUserProfile(null);
           setUserBadges([]);
