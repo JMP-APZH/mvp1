@@ -75,6 +75,7 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth state
   useEffect(() => {
     let isMounted = true;
+    let isInitialized = false;
 
     // Helper to load user data
     const loadUserData = async (userId) => {
@@ -87,6 +88,46 @@ export const AuthProvider = ({ children }) => {
       return { profile, badges };
     };
 
+    // Set up auth state change listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, 'isInitialized:', isInitialized);
+
+        if (!isMounted) return;
+
+        // Handle sign out
+        if (event === 'SIGNED_OUT') {
+          console.log('User signed out, clearing state');
+          setUser(null);
+          setUserProfile(null);
+          setUserBadges([]);
+          setLoading(false);
+          return;
+        }
+
+        // Only handle SIGNED_IN if we're already initialized (actual sign in, not page load)
+        if (event === 'SIGNED_IN' && isInitialized && session?.user) {
+          console.log('User signed in (post-init), loading profile...');
+          setUser(session.user);
+          setLoading(true);
+
+          const { profile, badges } = await loadUserData(session.user.id);
+          if (isMounted) {
+            setUserProfile(profile);
+            setUserBadges(badges);
+            setLoading(false);
+            console.log('Sign in complete');
+          }
+        }
+
+        // Handle token refresh
+        if (event === 'TOKEN_REFRESHED' && session?.user) {
+          console.log('Token refreshed');
+          setUser(session.user);
+        }
+      }
+    );
+
     // Main initialization function
     const initializeAuth = async () => {
       try {
@@ -96,6 +137,7 @@ export const AuthProvider = ({ children }) => {
         if (error) {
           console.error('Error getting session:', error);
           if (isMounted) setLoading(false);
+          isInitialized = true;
           return;
         }
 
@@ -114,53 +156,18 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
           console.log('Auth initialization complete');
         }
+
+        // Mark as initialized so future SIGNED_IN events are handled
+        isInitialized = true;
       } catch (err) {
         console.error('Error initializing auth:', err);
         if (isMounted) setLoading(false);
+        isInitialized = true;
       }
     };
 
-    // Initialize auth state immediately
+    // Initialize auth state
     initializeAuth();
-
-    // Listen for auth changes (sign in, sign out, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event);
-
-        if (!isMounted) return;
-
-        // Handle sign out
-        if (event === 'SIGNED_OUT' || !session) {
-          console.log('User signed out, clearing state');
-          setUser(null);
-          setUserProfile(null);
-          setUserBadges([]);
-          setLoading(false);
-          return;
-        }
-
-        // Handle sign in (but not INITIAL_SESSION as we handle that in initializeAuth)
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('User signed in, loading profile...');
-          setUser(session.user);
-
-          const { profile, badges } = await loadUserData(session.user.id);
-          if (isMounted) {
-            setUserProfile(profile);
-            setUserBadges(badges);
-            setLoading(false);
-            console.log('Sign in complete');
-          }
-        }
-
-        // Handle token refresh
-        if (event === 'TOKEN_REFRESHED' && session?.user) {
-          console.log('Token refreshed');
-          setUser(session.user);
-        }
-      }
-    );
 
     return () => {
       isMounted = false;
