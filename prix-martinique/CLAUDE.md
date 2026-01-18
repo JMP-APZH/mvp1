@@ -44,12 +44,14 @@ The UI is entirely in French (Caribbean French). Maintain French for all user-fa
 - **Deployment:** Vercel (auto-deploy from GitHub)
 
 ### App Versions
-There are three App component variants in `src/`:
+There are multiple App component variants in `src/`:
 - `App.jsx` - Blue theme, original version
-- `App2.jsx` - Intermediate version (commented out)
-- `App3.jsx` - **Orange/red gradient theme, CURRENTLY ACTIVE** (imported in `main.jsx`)
+- `App2.jsx` - Intermediate version
+- `App3.jsx` - Orange/red gradient theme
+- `App4.jsx` - Added QuaggaJS for iOS barcode scanning
+- `App5.jsx` - **CURRENTLY ACTIVE** (imported in `main.jsx`) - Full authentication + gamification integration
 
-All three share the same structure and functionality, differing only in color scheme.
+All variants share similar structure but differ in features and color scheme.
 
 ### Data Flow
 1. **Supabase Client** (`src/supabaseClient.js`): Configured with env vars
@@ -73,18 +75,38 @@ Single-page app with three tabs (mobile-optimized):
 ### ✅ Core Functionality
 - **Price Entry**: Manual form with product name, barcode, price, store selection
 - **Photo Upload**: Product photo + price tag photo (stored in Supabase Storage)
-- **Barcode Scanning**: BarcodeDetector API (Android only - see iOS limitation below)
+- **Barcode Scanning**:
+  - BarcodeDetector API (Android/Chrome)
+  - QuaggaJS fallback (iOS Safari)
 - **Price Comparison**: Search, filter, min/max/avg stats, "best price" highlighting
 - **Real-time Sync**: New prices appear instantly across all devices
-- **PWA**: Installable on Android, custom install instructions for iOS
+- **PWA**:
+  - Installable on Android (beforeinstallprompt)
+  - Custom install instructions for iOS (Share → Add to Home Screen)
+  - Network-first service worker for cache management
+
+### ✅ Authentication System (NEW)
+- **Google OAuth**: Sign in with Google account
+- **Email/Password**: Traditional sign up/sign in
+- **AuthContext**: React context for auth state management (`src/contexts/AuthContext.jsx`)
+- **AuthModal**: Sign in/sign up modal component (`src/components/AuthModal.jsx`)
+- **UserMenu**: User dropdown with avatar, points, level display (`src/components/UserMenu.jsx`)
+- **Session Persistence**: Auth state persists across page refreshes
+- **Optional Auth**: Anonymous contributions still allowed
+
+### ✅ Gamification System (NEW)
+- **Points**: +10 points per price submission (for authenticated users)
+- **Levels**: Level up system based on points
+- **Leaderboard**: Top 10 contributors display (`src/components/Leaderboard.jsx`)
+- **User Profiles**: Display name, avatar (Google), points, level, total contributions
+- **Badges**: Database ready (user_badges table)
 
 ### 🚧 Database Ready (Not Yet Implemented)
-- User authentication (Email, Google, Phone)
-- Gamification system (points, levels, badges, leaderboards)
 - Shopping list optimizer
 - Category filtering (Bébé, Végétarien, Économique, etc.)
 - Meal plan recommendations
 - Enhanced store database (30+ locations)
+- Badge awarding logic
 
 ## Database Schema (Supabase)
 
@@ -137,15 +159,32 @@ price_tag_photo_url TEXT
 created_at TIMESTAMP
 ```
 
-### Gamification Tables (Ready, Not Active)
+### User & Gamification Tables (ACTIVE)
 
 **user_profiles** - Extends Supabase auth.users
+```sql
+id UUID PK (FK → auth.users)
+username TEXT
+display_name TEXT
+avatar_url TEXT           -- Google profile picture
+points INTEGER DEFAULT 0
+level INTEGER DEFAULT 1
+badges JSONB DEFAULT '[]'
+total_contributions INTEGER DEFAULT 0
+created_at, updated_at TIMESTAMP
+```
+
 **badges** - Achievement definitions
-**user_badges** - Earned achievements
+**user_badges** - Earned achievements (FK → user_profiles, badges)
 **user_activities** - Point tracking
+
+### Other Tables (Database Ready)
 **shopping_lists** + **shopping_list_items** - List feature
 **categories** + **tags** - Product categorization
 **meal_plans** + **meal_plan_ingredients** - Recipe system
+
+### Database Triggers
+- `handle_new_user`: Auto-creates user_profile on auth.users INSERT (extracts Google avatar, display name)
 
 See full schema details in project conversation history.
 
@@ -171,33 +210,35 @@ See full schema details in project conversation history.
 - Cards: `rounded-lg shadow-sm`
 - Navigation: Vertical icon + label layout on mobile
 
-## Critical iOS Limitations ⚠️
+## iOS Support ✅
 
 **Barcode Scanning:**
-- ❌ BarcodeDetector API does NOT work on iOS (any browser)
-- All iOS browsers use Safari's WebKit (Apple restriction)
-- Chrome/Edge on iOS = Safari with different UI
-- **Solution needed:** Re-implement QuaggaJS for iOS devices
-- Detection: `/iPad|iPhone|iPod/.test(navigator.userAgent)`
+- ✅ QuaggaJS implemented as fallback for iOS (App4.jsx, App5.jsx)
+- BarcodeDetector API used on Android/Chrome
+- Auto-detection: `/iPad|iPhone|iPod/.test(navigator.userAgent)`
 
 **PWA Install:**
-- ❌ `beforeinstallprompt` event doesn't exist on iOS
-- **Solution needed:** Show custom "Share → Add to Home Screen" instructions
+- ✅ Custom iOS install instructions shown (Share → Add to Home Screen)
+- `beforeinstallprompt` for Android, manual instructions for iOS
 - Check if installed: `window.matchMedia('(display-mode: standalone)').matches`
 
 ## Known Issues & Priority Todos
 
-### 🔴 Critical (Blocks ~40-50% of Users)
-- [ ] Re-implement QuaggaJS for iOS barcode scanning
-- [ ] Add iOS-specific PWA install instructions UI
-- [ ] Test on real iOS devices (Safari, Chrome, Firefox)
+### ✅ Recently Completed
+- [x] QuaggaJS for iOS barcode scanning
+- [x] iOS-specific PWA install instructions
+- [x] User authentication (Google OAuth + Email/Password)
+- [x] Gamification UI (points, levels, leaderboards)
+- [x] User profile with Google avatar
+- [x] Network-first service worker (fixes stale cache)
+- [x] PWA theme colors updated to orange
 
 ### 🟡 High Priority
-- [ ] Implement user authentication (Supabase Auth)
-- [ ] Build gamification UI (points, badges, leaderboards)
 - [ ] Create shopping list feature
 - [ ] Add category filters to search
 - [ ] Import complete Martinique store database (CSV)
+- [ ] Badge awarding automation
+- [ ] Test on real iOS devices
 
 ### 🟢 Medium Priority
 - [ ] Mainland France price comparison
@@ -205,6 +246,7 @@ See full schema details in project conversation history.
 - [ ] User dietary preferences
 - [ ] Store location map view
 - [ ] Price trend graphs
+- [ ] Remove debug console.log statements from AuthContext
 
 ## Important Development Notes
 
@@ -231,18 +273,23 @@ See full schema details in project conversation history.
 ## Testing Checklist
 
 **Android (Chrome/Edge):**
-- [x] Barcode scanning works
+- [x] Barcode scanning works (BarcodeDetector API)
 - [x] PWA install prompt appears
 - [x] Home screen installation works
 - [x] Photos upload successfully
 - [x] Real-time updates work
+- [x] Google sign-in works
+- [x] User avatar displays
+- [x] Points awarded on submission
 
 **iOS (Safari/Chrome/Firefox):**
-- [ ] Barcode scanning (needs QuaggaJS)
-- [ ] Install instructions shown
+- [x] Barcode scanning (QuaggaJS)
+- [x] Install instructions shown
 - [x] Manual entry works
 - [x] Photos upload successfully
 - [x] UI displays correctly
+- [ ] Google sign-in (needs testing)
+- [ ] PWA with auth (needs testing)
 
 ## Deployment
 
@@ -319,8 +366,32 @@ But MVP focus remains: **Make it dead simple to contribute and compare prices.**
 - Use React DevTools to inspect state
 - Check Network tab for failed API calls
 
+## Authentication Implementation Notes
+
+### Auth Flow
+1. `AuthProvider` wraps app in `main.jsx`
+2. `initializeAuth()` called on mount → `getSession()` restores session
+3. `onAuthStateChange` listener handles sign-in/sign-out events
+4. `isInitialized` and `currentLoadedUserId` flags prevent duplicate loads
+
+### Key Files
+- `src/contexts/AuthContext.jsx` - Auth state management
+- `src/components/AuthModal.jsx` - Sign in/up modal
+- `src/components/UserMenu.jsx` - User dropdown menu
+- `src/components/Leaderboard.jsx` - Top contributors
+
+### Supabase Auth Configuration
+- Google OAuth enabled
+- Redirect URLs configured for localhost:5173 and Vercel production
+- `handle_new_user` trigger creates profile on signup
+
+### Known Auth Quirks
+- Supabase fires multiple `SIGNED_IN` events (handled via deduplication)
+- Session stored in localStorage by Supabase client
+- `getSession()` is authoritative for page refresh
+
 ---
 
-**Last Updated:** 2026-01-17  
-**Current Version:** MVP v1 (Orange theme, photo uploads, Barcode API)  
-**Next Milestone:** iOS support via QuaggaJS
+**Last Updated:** 2026-01-18
+**Current Version:** MVP v1.1 (Auth + Gamification + iOS support)
+**Next Milestone:** Shopping lists + Badge automation
