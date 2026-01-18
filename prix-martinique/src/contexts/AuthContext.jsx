@@ -76,6 +76,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
     let isInitialized = false;
+    let currentLoadedUserId = null; // Track which user's data we've loaded
 
     // Helper to load user data
     const loadUserData = async (userId) => {
@@ -98,6 +99,7 @@ export const AuthProvider = ({ children }) => {
         // Handle sign out
         if (event === 'SIGNED_OUT') {
           console.log('User signed out, clearing state');
+          currentLoadedUserId = null;
           setUser(null);
           setUserProfile(null);
           setUserBadges([]);
@@ -105,11 +107,10 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        // Only handle SIGNED_IN if we're already initialized AND user is different (actual sign in, not page load)
+        // Only handle SIGNED_IN if we're already initialized AND user data not already loaded
         if (event === 'SIGNED_IN' && isInitialized && session?.user) {
-          // Check if this is a different user (actual new sign in vs duplicate event)
-          const currentUserId = user?.id;
-          if (currentUserId === session.user.id) {
+          // Check if we've already loaded this user's data
+          if (currentLoadedUserId === session.user.id) {
             console.log('SIGNED_IN for same user, skipping duplicate load');
             return;
           }
@@ -120,6 +121,7 @@ export const AuthProvider = ({ children }) => {
 
           const { profile, badges } = await loadUserData(session.user.id);
           if (isMounted) {
+            currentLoadedUserId = session.user.id;
             setUserProfile(profile);
             setUserBadges(badges);
             setLoading(false);
@@ -154,6 +156,7 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           const { profile, badges } = await loadUserData(session.user.id);
           if (isMounted) {
+            currentLoadedUserId = session.user.id;
             setUserProfile(profile);
             setUserBadges(badges);
           }
