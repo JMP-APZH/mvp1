@@ -65,10 +65,11 @@ All variants share similar structure but differ in features and color scheme.
 4. **Real-time**: Subscribed to `prices` table INSERT events for live updates
 
 ### UI Structure
-Single-page app with three tabs (mobile-optimized):
+Single-page app with four tabs (mobile-optimized):
 1. **Scanner** (`scan`): Barcode scanning + manual price entry form + photo uploads
 2. **Comparer** (`search`): Search and browse submitted prices with stats
 3. **Stats** (`stats`): Community statistics and most-tracked products
+4. **À Propos** (`about`): Community manifesto with RVN colors and activist vision
 
 ## Key Features Implemented
 
@@ -233,6 +234,7 @@ See full schema details in project conversation history.
 - [x] Network-first service worker (fixes stale cache)
 - [x] PWA theme colors updated to orange
 - [x] French accent corrections in App5.jsx (é, è, ê, à, etc.)
+- [x] À Propos page with community manifesto and RVN colors
 
 ### 🟡 High Priority
 - [ ] Create shopping list feature
@@ -379,6 +381,7 @@ But MVP focus remains: **Make it dead simple to contribute and compare prices.**
 - `src/components/AuthModal.jsx` - Sign in/up modal
 - `src/components/UserMenu.jsx` - User dropdown menu
 - `src/components/Leaderboard.jsx` - Top contributors
+- `src/components/AboutPage.jsx` - Community manifesto page
 
 ### Supabase Auth Configuration
 - Google OAuth enabled
