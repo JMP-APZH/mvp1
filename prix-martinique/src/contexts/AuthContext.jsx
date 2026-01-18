@@ -20,6 +20,7 @@ export const AuthProvider = ({ children }) => {
   // Fetch user profile from user_profiles table
   const fetchUserProfile = async (userId) => {
     try {
+      console.log('Fetching profile for user:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -30,6 +31,7 @@ export const AuthProvider = ({ children }) => {
         console.error('Error fetching user profile:', error);
         return null;
       }
+      console.log('Profile fetched successfully');
       return data;
     } catch (err) {
       console.error('Error in fetchUserProfile:', err);
@@ -40,6 +42,7 @@ export const AuthProvider = ({ children }) => {
   // Fetch user badges
   const fetchUserBadges = async (userId) => {
     try {
+      console.log('Fetching badges for user:', userId);
       const { data, error } = await supabase
         .from('user_badges')
         .select(`
@@ -57,12 +60,14 @@ export const AuthProvider = ({ children }) => {
         .order('earned_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching user badges:', error);
+        // Table might not exist yet - this is not critical
+        console.warn('Error fetching user badges (non-critical):', error.message);
         return [];
       }
+      console.log('Badges fetched:', data?.length || 0);
       return data || [];
     } catch (err) {
-      console.error('Error in fetchUserBadges:', err);
+      console.warn('Error in fetchUserBadges (non-critical):', err);
       return [];
     }
   };
