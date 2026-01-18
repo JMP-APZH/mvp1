@@ -75,14 +75,15 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth state
   useEffect(() => {
     let isMounted = true;
+    let currentFetchId = 0; // Track which fetch is current to handle race conditions
 
     // Helper to load user data
-    const loadUserData = async (userId) => {
+    const loadUserData = async (userId, fetchId) => {
       const [profile, badges] = await Promise.all([
         fetchUserProfile(userId),
         fetchUserBadges(userId)
       ]);
-      return { profile, badges };
+      return { profile, badges, fetchId };
     };
 
     // Listen for auth changes - this is the primary source of truth
@@ -96,23 +97,30 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (session?.user) {
-          console.log('User found, setting user and loading profile...');
+          // Increment fetch ID to invalidate any pending fetches
+          currentFetchId++;
+          const thisFetchId = currentFetchId;
+
+          console.log('User found, setting user and loading profile... (fetch #' + thisFetchId + ')');
           setUser(session.user);
 
           // Load profile and badges
           try {
-            const { profile, badges } = await loadUserData(session.user.id);
-            console.log('Profile loaded:', !!profile, 'Badges:', badges?.length);
+            const { profile, badges, fetchId } = await loadUserData(session.user.id, thisFetchId);
 
-            if (isMounted) {
+            // Only update state if this is still the current fetch and component is mounted
+            if (isMounted && thisFetchId === currentFetchId) {
+              console.log('Profile loaded:', !!profile, 'Badges:', badges?.length, '(fetch #' + fetchId + ')');
               setUserProfile(profile);
               setUserBadges(badges);
               setLoading(false);
               console.log('Auth loading complete');
+            } else {
+              console.log('Skipping stale fetch result (fetch #' + thisFetchId + ', current is #' + currentFetchId + ')');
             }
           } catch (err) {
             console.error('Error loading user data:', err);
-            if (isMounted) {
+            if (isMounted && thisFetchId === currentFetchId) {
               setLoading(false);
             }
           }
