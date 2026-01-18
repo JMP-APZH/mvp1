@@ -232,6 +232,7 @@ See full schema details in project conversation history.
 - [x] User profile with Google avatar
 - [x] Network-first service worker (fixes stale cache)
 - [x] PWA theme colors updated to orange
+- [x] French accent corrections in App5.jsx (é, è, ê, à, etc.)
 
 ### 🟡 High Priority
 - [ ] Create shopping list feature

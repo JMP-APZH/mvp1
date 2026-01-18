@@ -186,7 +186,7 @@ const PriceScannerApp = () => {
 
     setManualEntry(prev => ({ ...prev, barcode: code }));
     stopScanning();
-    alert(`Code-barres detecte:\nCode: ${code}\nFormat: ${format}\n\nVeuillez saisir le nom du produit, le prix et selectionner le magasin.`);
+    alert(`Code-barres détecté:\nCode: ${code}\nFormat: ${format}\n\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
   };
 
   // QuaggaJS Scanner for iOS
@@ -232,7 +232,7 @@ const PriceScannerApp = () => {
     }, (err) => {
       if (err) {
         console.error('QuaggaJS init error:', err);
-        alert('Erreur lors de l\'initialisation du scanner. Verifiez les permissions camera.');
+        alert('Erreur lors de l\'initialisation du scanner. Vérifiez les permissions caméra.');
         setScanning(false);
         return;
       }
@@ -302,7 +302,7 @@ const PriceScannerApp = () => {
       }
     } catch (err) {
       console.error('Camera error:', err);
-      alert('Acces camera refuse. Veuillez utiliser la saisie manuelle.');
+      alert('Accès caméra refusé. Veuillez utiliser la saisie manuelle.');
       setScanning(false);
     }
   };
@@ -509,8 +509,8 @@ const PriceScannerApp = () => {
 
       // Success message
       const successMessage = user
-        ? `Prix enregistre avec succes! +${pointsAwarded} points`
-        : 'Prix enregistre avec succes! Merci pour votre contribution.';
+        ? `Prix enregistré avec succès! +${pointsAwarded} points`
+        : 'Prix enregistré avec succès! Merci pour votre contribution.';
       alert(successMessage);
 
       // Reset form
@@ -530,7 +530,7 @@ const PriceScannerApp = () => {
 
     } catch (err) {
       console.error('Error submitting price:', err);
-      setError('Erreur lors de l\'enregistrement du prix. Veuillez reessayer.');
+      setError('Erreur lors de l\'enregistrement du prix. Veuillez réessayer.');
       setLoading(false);
     }
   };
@@ -557,7 +557,7 @@ const PriceScannerApp = () => {
       {/* Header with UserMenu */}
       <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white p-4 shadow-lg">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-xl font-bold">Vie chere en Martinique</h1>
+          <h1 className="text-xl font-bold">Vie chère en Martinique</h1>
           <UserMenu onSignInClick={() => setShowAuthModal(true)} />
         </div>
         <p className="text-orange-100 text-sm">Quid de votre pouvoir d'achat</p>
@@ -614,7 +614,7 @@ const PriceScannerApp = () => {
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="bg-amber-200 rounded px-1">2</span>
-                  Faites defiler et selectionnez "Sur l'ecran d'accueil"
+                  Faites défiler et sélectionnez "Sur l'écran d'accueil"
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="bg-amber-200 rounded px-1">3</span>
@@ -635,7 +635,7 @@ const PriceScannerApp = () => {
                 Installer l'application
               </p>
               <p className="text-xs text-amber-700 mb-3">
-                Ajoutez Vie chere en Martinique a votre ecran d'accueil pour un acces rapide !
+                Ajoutez Vie chère en Martinique à votre écran d'accueil pour un accès rapide !
               </p>
               <div className="flex gap-2">
                 <button
@@ -707,7 +707,7 @@ const PriceScannerApp = () => {
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-sm text-amber-800">
                 <Users className="inline w-4 h-4 mr-1" />
-                <strong>{recentPrices.length}</strong> prix partages par la communaute
+                <strong>{recentPrices.length}</strong> prix partagés par la communauté
               </p>
             </div>
 
@@ -849,7 +849,7 @@ const PriceScannerApp = () => {
 
                 {/* Price Tag Photo */}
                 <div>
-                  <p className="text-xs text-gray-600 mb-2">Photo de l'etiquette de prix</p>
+                  <p className="text-xs text-gray-600 mb-2">Photo de l'étiquette de prix</p>
                   {!manualEntry.priceTagPhoto ? (
                     <button
                       type="button"
@@ -857,7 +857,7 @@ const PriceScannerApp = () => {
                       className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
                     >
                       <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                      <p className="text-sm text-orange-600">Ajouter une photo de l'etiquette</p>
+                      <p className="text-sm text-orange-600">Ajouter une photo de l'étiquette</p>
                     </button>
                   ) : (
                     <div className="relative">
@@ -908,7 +908,7 @@ const PriceScannerApp = () => {
                   onChange={(e) => setManualEntry({ ...manualEntry, storeId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 >
-                  <option value="">Selectionner un magasin</option>
+                  <option value="">Sélectionner un magasin</option>
                   {stores.map(store => (
                     <option key={store.id} value={store.id}>
                       {store.name} - {store.location}
@@ -931,7 +931,7 @@ const PriceScannerApp = () => {
                 />
                 {user && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Connecte en tant que {userProfile?.display_name || user.email}
+                    Connecté en tant que {userProfile?.display_name || user.email}
                   </p>
                 )}
               </div>
@@ -975,7 +975,7 @@ const PriceScannerApp = () => {
                 {filteredPrices.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Aucun prix trouve</p>
+                    <p>Aucun prix trouvé</p>
                   </div>
                 ) : (
                   filteredPrices.map(price => {
@@ -1033,7 +1033,7 @@ const PriceScannerApp = () => {
                           <div className="mt-2 pt-2 border-t text-xs text-gray-600">
                             <span>Prix moyen: {stats.avg.toFixed(2)}EUR</span>
                             <span className="mx-2">-</span>
-                            <span>De {stats.min.toFixed(2)}EUR a {stats.max.toFixed(2)}EUR</span>
+                            <span>De {stats.min.toFixed(2)}€ à {stats.max.toFixed(2)}€</span>
                             <span className="mx-2">-</span>
                             <span>{stats.count} magasins</span>
                           </div>
@@ -1055,7 +1055,7 @@ const PriceScannerApp = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-3xl font-bold">{recentPrices.length}</div>
-                  <div className="text-orange-100 text-sm">Prix partages</div>
+                  <div className="text-orange-100 text-sm">Prix partagés</div>
                 </div>
                 <div>
                   <div className="text-3xl font-bold">
@@ -1072,11 +1072,11 @@ const PriceScannerApp = () => {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <h3 className="font-semibold text-yellow-900 mb-2">Prochainement</h3>
               <ul className="text-sm text-yellow-800 space-y-1">
-                <li>- Graphiques d'evolution des prix</li>
-                <li>- Comparaison Martinique vs France metropolitaine</li>
+                <li>- Graphiques d'évolution des prix</li>
+                <li>- Comparaison Martinique vs France métropolitaine</li>
                 <li>- Alertes sur vos produits favoris</li>
                 <li>- Classement des magasins les moins chers</li>
-                <li>- Actions collectives et petitions</li>
+                <li>- Actions collectives et pétitions</li>
               </ul>
             </div>
 
@@ -1107,7 +1107,7 @@ const PriceScannerApp = () => {
                         </div>
                       </div>
                       <div className="mt-2 text-xs text-gray-600">
-                        Ecart: {((stats.max - stats.min) / stats.min * 100).toFixed(0)}% de difference
+                        Écart: {((stats.max - stats.min) / stats.min * 100).toFixed(0)}% de différence
                       </div>
                     </div>
                   );
@@ -1119,9 +1119,9 @@ const PriceScannerApp = () => {
 
       {/* Footer */}
       <div className="bg-gray-50 border-t p-4 text-center text-sm text-gray-600 mt-8">
-        <p className="mb-2">Ensemble, nous creons la transparence sur les prix</p>
+        <p className="mb-2">Ensemble, nous créons la transparence sur les prix</p>
         <p className="text-xs text-gray-500">
-          Donnees crowdsourcees - Gratuit et ouvert a tous
+          Données crowdsourcées - Gratuit et ouvert à tous
         </p>
       </div>
     </div>
