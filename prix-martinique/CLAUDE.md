@@ -246,7 +246,6 @@ See full schema details in project conversation history.
 - [ ] User dietary preferences
 - [ ] Store location map view
 - [ ] Price trend graphs
-- [ ] Remove debug console.log statements from AuthContext
 
 ## Important Development Notes
 

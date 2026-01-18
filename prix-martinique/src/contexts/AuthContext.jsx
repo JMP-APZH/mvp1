@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext({});
@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }) => {
   // Fetch user profile from user_profiles table
   const fetchUserProfile = async (userId) => {
     try {
-      console.log('Fetching profile for user:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -28,13 +27,10 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
         return null;
       }
-      console.log('Profile fetched successfully');
       return data;
     } catch (err) {
-      console.error('Error in fetchUserProfile:', err);
       return null;
     }
   };
@@ -42,7 +38,6 @@ export const AuthProvider = ({ children }) => {
   // Fetch user badges
   const fetchUserBadges = async (userId) => {
     try {
-      console.log('Fetching badges for user:', userId);
       const { data, error } = await supabase
         .from('user_badges')
         .select(`
@@ -61,13 +56,10 @@ export const AuthProvider = ({ children }) => {
 
       if (error) {
         // Table might not exist yet - this is not critical
-        console.warn('Error fetching user badges (non-critical):', error.message);
         return [];
       }
-      console.log('Badges fetched:', data?.length || 0);
       return data || [];
     } catch (err) {
-      console.warn('Error in fetchUserBadges (non-critical):', err);
       return [];
     }
   };
@@ -80,25 +72,20 @@ export const AuthProvider = ({ children }) => {
 
     // Helper to load user data
     const loadUserData = async (userId) => {
-      console.log('Loading user data for:', userId);
       const [profile, badges] = await Promise.all([
         fetchUserProfile(userId),
         fetchUserBadges(userId)
       ]);
-      console.log('User data loaded - profile:', !!profile, 'badges:', badges?.length);
       return { profile, badges };
     };
 
     // Set up auth state change listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, 'isInitialized:', isInitialized);
-
         if (!isMounted) return;
 
         // Handle sign out
         if (event === 'SIGNED_OUT') {
-          console.log('User signed out, clearing state');
           currentLoadedUserId = null;
           setUser(null);
           setUserProfile(null);
@@ -111,11 +98,9 @@ export const AuthProvider = ({ children }) => {
         if (event === 'SIGNED_IN' && isInitialized && session?.user) {
           // Check if we've already loaded this user's data
           if (currentLoadedUserId === session.user.id) {
-            console.log('SIGNED_IN for same user, skipping duplicate load');
             return;
           }
 
-          console.log('User signed in (post-init), loading profile...');
           setUser(session.user);
           setLoading(true);
 
@@ -125,13 +110,11 @@ export const AuthProvider = ({ children }) => {
             setUserProfile(profile);
             setUserBadges(badges);
             setLoading(false);
-            console.log('Sign in complete');
           }
         }
 
         // Handle token refresh
         if (event === 'TOKEN_REFRESHED' && session?.user) {
-          console.log('Token refreshed');
           setUser(session.user);
         }
       }
@@ -144,13 +127,10 @@ export const AuthProvider = ({ children }) => {
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
-          console.error('Error getting session:', error);
           if (isMounted) setLoading(false);
           isInitialized = true;
           return;
         }
-
-        console.log('Initial session:', !!session);
 
         if (session?.user && isMounted) {
           setUser(session.user);
@@ -164,13 +144,11 @@ export const AuthProvider = ({ children }) => {
 
         if (isMounted) {
           setLoading(false);
-          console.log('Auth initialization complete');
         }
 
         // Mark as initialized so future SIGNED_IN events are handled
         isInitialized = true;
       } catch (err) {
-        console.error('Error initializing auth:', err);
         if (isMounted) setLoading(false);
         isInitialized = true;
       }
@@ -227,7 +205,6 @@ export const AuthProvider = ({ children }) => {
     try {
       // Use current origin for redirect (works for both localhost and production)
       const redirectUrl = window.location.origin;
-      console.log('Google OAuth redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
