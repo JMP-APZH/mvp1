@@ -75,72 +75,92 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth state
   useEffect(() => {
     let isMounted = true;
-    let currentFetchId = 0; // Track which fetch is current to handle race conditions
 
     // Helper to load user data
-    const loadUserData = async (userId, fetchId) => {
+    const loadUserData = async (userId) => {
+      console.log('Loading user data for:', userId);
       const [profile, badges] = await Promise.all([
         fetchUserProfile(userId),
         fetchUserBadges(userId)
       ]);
-      return { profile, badges, fetchId };
+      console.log('User data loaded - profile:', !!profile, 'badges:', badges?.length);
+      return { profile, badges };
     };
 
-    // Listen for auth changes - this is the primary source of truth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, 'session:', !!session);
+    // Main initialization function
+    const initializeAuth = async () => {
+      try {
+        // Get current session
+        const { data: { session }, error } = await supabase.auth.getSession();
 
-        if (!isMounted) {
-          console.log('Component unmounted, skipping');
+        if (error) {
+          console.error('Error getting session:', error);
+          if (isMounted) setLoading(false);
           return;
         }
 
-        if (session?.user) {
-          // Increment fetch ID to invalidate any pending fetches
-          currentFetchId++;
-          const thisFetchId = currentFetchId;
+        console.log('Initial session:', !!session);
 
-          console.log('User found, setting user and loading profile... (fetch #' + thisFetchId + ')');
+        if (session?.user && isMounted) {
           setUser(session.user);
-
-          // Load profile and badges
-          try {
-            const { profile, badges, fetchId } = await loadUserData(session.user.id, thisFetchId);
-
-            // Only update state if this is still the current fetch and component is mounted
-            if (isMounted && thisFetchId === currentFetchId) {
-              console.log('Profile loaded:', !!profile, 'Badges:', badges?.length, '(fetch #' + fetchId + ')');
-              setUserProfile(profile);
-              setUserBadges(badges);
-              setLoading(false);
-              console.log('Auth loading complete');
-            } else {
-              console.log('Skipping stale fetch result (fetch #' + thisFetchId + ', current is #' + currentFetchId + ')');
-            }
-          } catch (err) {
-            console.error('Error loading user data:', err);
-            if (isMounted && thisFetchId === currentFetchId) {
-              setLoading(false);
-            }
+          const { profile, badges } = await loadUserData(session.user.id);
+          if (isMounted) {
+            setUserProfile(profile);
+            setUserBadges(badges);
           }
-        } else {
-          console.log('No session, clearing user');
+        }
+
+        if (isMounted) {
+          setLoading(false);
+          console.log('Auth initialization complete');
+        }
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    // Initialize auth state immediately
+    initializeAuth();
+
+    // Listen for auth changes (sign in, sign out, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event);
+
+        if (!isMounted) return;
+
+        // Handle sign out
+        if (event === 'SIGNED_OUT' || !session) {
+          console.log('User signed out, clearing state');
           setUser(null);
           setUserProfile(null);
           setUserBadges([]);
           setLoading(false);
+          return;
+        }
+
+        // Handle sign in (but not INITIAL_SESSION as we handle that in initializeAuth)
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('User signed in, loading profile...');
+          setUser(session.user);
+
+          const { profile, badges } = await loadUserData(session.user.id);
+          if (isMounted) {
+            setUserProfile(profile);
+            setUserBadges(badges);
+            setLoading(false);
+            console.log('Sign in complete');
+          }
+        }
+
+        // Handle token refresh
+        if (event === 'TOKEN_REFRESHED' && session?.user) {
+          console.log('Token refreshed');
+          setUser(session.user);
         }
       }
     );
-
-    // Get initial session - triggers onAuthStateChange with INITIAL_SESSION
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      // If no session, make sure loading is set to false
-      if (!session && isMounted) {
-        setLoading(false);
-      }
-    });
 
     return () => {
       isMounted = false;
