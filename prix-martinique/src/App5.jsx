@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star } from 'lucide-react';
+import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import Quagga from 'quagga';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
 import UserMenu from './components/UserMenu';
 import Leaderboard from './components/Leaderboard';
+import AboutPage from './components/AboutPage';
 
 const PriceScannerApp = () => {
   const [activeTab, setActiveTab] = useState('scan');
@@ -697,6 +698,19 @@ const PriceScannerApp = () => {
             <span className="text-xs">Stats</span>
           </div>
         </button>
+        <button
+          onClick={() => setActiveTab('about')}
+          className={`flex-1 py-3 px-2 font-medium transition-colors ${
+            activeTab === 'about'
+              ? 'border-b-2 border-orange-500 text-orange-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <div className="flex flex-col items-center gap-1">
+            <Info className="w-5 h-5" />
+            <span className="text-xs">À Propos</span>
+          </div>
+        </button>
       </div>
 
       {/* Content */}
@@ -1115,6 +1129,9 @@ const PriceScannerApp = () => {
             </div>
           </div>
         )}
+
+        {/* À Propos Tab */}
+        {activeTab === 'about' && <AboutPage />}
       </div>
 
       {/* Footer */}
