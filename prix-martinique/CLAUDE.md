@@ -49,7 +49,11 @@ There are multiple App component variants in `src/`:
 - `App2.jsx` - Intermediate version
 - `App3.jsx` - Orange/red gradient theme
 - `App4.jsx` - Added QuaggaJS for iOS barcode scanning
-- `App5.jsx` - **CURRENTLY ACTIVE** (imported in `main.jsx`) - Full authentication + gamification integration
+- `App5.jsx` - Full authentication + gamification integration
+- `App6.jsx` - **CURRENTLY ACTIVE** (imported in `main.jsx`) - Added HybridBarcodeScanner for iOS compatibility
+  - Solves iOS Safari black screen issue
+  - Hybrid scanning: auto + native + manual
+  - Production-ready for iOS testing
 
 All variants share similar structure but differ in features and color scheme.
 
@@ -85,6 +89,16 @@ Single-page app with four tabs (mobile-optimized):
   - Installable on Android (beforeinstallprompt)
   - Custom install instructions for iOS (Share → Add to Home Screen)
   - Network-first service worker for cache management
+
+### ✅ iOS-Compatible Barcode Scanner (NEW in App6.jsx)
+- **Hybrid approach**: QuaggaJS with native fallback
+- **Auto-detects** iOS devices
+- **3-second timeout** to fallback if QuaggaJS fails
+- **Native camera input** for iOS Safari
+- **Photo capture** + manual entry option
+- **Always provides** manual barcode entry
+- **No user stuck** on black screen
+- **Graceful degradation** strategy
 
 ### ✅ Authentication System (NEW)
 - **Google OAuth**: Sign in with Google account
@@ -211,17 +225,26 @@ See full schema details in project conversation history.
 - Cards: `rounded-lg shadow-sm`
 - Navigation: Vertical icon + label layout on mobile
 
-## iOS Support ✅
+## iOS Support ✅ (Enhanced in App6.jsx)
 
 **Barcode Scanning:**
-- ✅ QuaggaJS implemented as fallback for iOS (App4.jsx, App5.jsx)
-- BarcodeDetector API used on Android/Chrome
-- Auto-detection: `/iPad|iPhone|iPod/.test(navigator.userAgent)`
+- ✅ HybridBarcodeScanner implemented (`src/components/HybridBarcodeScanner.jsx`)
+- ✅ QuaggaJS attempts first (3-second timeout)
+- ✅ Native HTML5 camera fallback for iOS
+- ✅ Photo capture with manual entry
+- ✅ Always provides manual input option
+- ✅ Auto-detection: iOS → Optimized behavior
+- ✅ No black screen failure mode
 
 **PWA Install:**
 - ✅ Custom iOS install instructions shown (Share → Add to Home Screen)
 - `beforeinstallprompt` for Android, manual instructions for iOS
 - Check if installed: `window.matchMedia('(display-mode: standalone)').matches`
+
+**Testing Status:**
+- ✅ Desktop Chrome: Working
+- 🧪 iOS Safari: Needs real device testing
+- 🧪 iOS PWA mode: Needs testing
 
 ## Known Issues & Priority Todos
 
@@ -235,6 +258,7 @@ See full schema details in project conversation history.
 - [x] PWA theme colors updated to orange
 - [x] French accent corrections in App5.jsx (é, è, ê, à, etc.)
 - [x] À Propos page with community manifesto and RVN colors
+- [x] HybridBarcodeScanner for iOS compatibility (App6.jsx)
 
 ### 🟡 High Priority
 - [ ] Create shopping list feature
@@ -292,6 +316,17 @@ See full schema details in project conversation history.
 - [x] UI displays correctly
 - [ ] Google sign-in (needs testing)
 - [ ] PWA with auth (needs testing)
+
+**App6.jsx - iOS Hybrid Scanner:**
+- [ ] Scanner opens on iOS Safari
+- [ ] QuaggaJS initialization attempted
+- [ ] Auto-fallback to native after 3s if needed
+- [ ] Native camera opens correctly
+- [ ] Photo capture works
+- [ ] Manual entry accepts valid barcodes (8-13 digits)
+- [ ] Barcode fills into price form
+- [ ] No console errors
+- [ ] PWA mode compatible
 
 ## Deployment
 
@@ -382,6 +417,7 @@ But MVP focus remains: **Make it dead simple to contribute and compare prices.**
 - `src/components/UserMenu.jsx` - User dropdown menu
 - `src/components/Leaderboard.jsx` - Top contributors
 - `src/components/AboutPage.jsx` - Community manifesto page
+- `src/components/HybridBarcodeScanner.jsx` - iOS-compatible barcode scanner with native fallback
 
 ### Supabase Auth Configuration
 - Google OAuth enabled
