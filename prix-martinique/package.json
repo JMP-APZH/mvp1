@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",
+    "@undecaf/barcode-detector-polyfill": "^0.9.23",
     "lucide-react": "^0.562.0",
     "quagga": "^0.12.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "zxing-wasm": "^2.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
