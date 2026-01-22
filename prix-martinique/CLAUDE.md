@@ -246,6 +246,23 @@ See full schema details in project conversation history.
 - 🧪 iOS Safari: Needs real device testing
 - 🧪 iOS PWA mode: Needs testing
 
+## App6.jsx Scanner Issues (FIXED)
+
+**Issue 1: Android Performance Regression**
+- Original: Only QuaggaJS (slow on Android)
+- Fixed: Platform detection → BarcodeDetector for Android
+- Status: ✅ Resolved
+
+**Issue 2: Black Screen on Manual Entry**
+- Original: Missing background color in native UI
+- Fixed: Added `bg-gray-900` to flex container
+- Status: ✅ Resolved
+
+**Platform Detection Logic**:
+- Android + BarcodeDetector available → Native API (fast)
+- iOS or no BarcodeDetector → QuaggaJS
+- Fallback → Native camera + manual entry
+
 ## Known Issues & Priority Todos
 
 ### ✅ Recently Completed
@@ -259,6 +276,8 @@ See full schema details in project conversation history.
 - [x] French accent corrections in App5.jsx (é, è, ê, à, etc.)
 - [x] À Propos page with community manifesto and RVN colors
 - [x] HybridBarcodeScanner for iOS compatibility (App6.jsx)
+- [x] Enhanced HybridBarcodeScanner with platform detection (BarcodeDetector for Android, QuaggaJS for iOS)
+- [x] Fixed black screen on manual entry
 
 ### 🟡 High Priority
 - [ ] Create shopping list feature
