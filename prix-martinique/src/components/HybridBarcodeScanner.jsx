@@ -31,6 +31,7 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
   useEffect(() => {
     let mounted = true;
     let animationFrameId;
+    let initTimeoutId;
 
     const detectPlatformAndInit = async () => {
       console.log('🔍 Platform detection:', { isAndroid, isIOS, hasBarcodeDetector });
@@ -39,18 +40,20 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
       if (isAndroid && hasBarcodeDetector) {
         console.log('✅ Using BarcodeDetector API (Android)');
         setScanMethod('barcode-api');
-        await initBarcodeDetector();
+        // Don't call initBarcodeDetector here - wait for the video element to be rendered
       }
       // iOS or Android without BarcodeDetector → QuaggaJS
       else {
         console.log('✅ Using QuaggaJS (iOS or fallback)');
         setScanMethod('quagga');
-        await initQuaggaJS();
+        // Don't call initQuaggaJS here - wait for the scanner element to be rendered
       }
     };
 
     const initBarcodeDetector = async () => {
       try {
+        console.log('📷 Requesting camera access...');
+
         // Request camera access
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' }
@@ -61,12 +64,56 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
           return;
         }
 
+        console.log('📷 Camera access granted');
         streamRef.current = stream;
 
-        // Set up video element
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+        // Wait for video element to be available
+        const waitForVideo = () => {
+          return new Promise((resolve, reject) => {
+            let attempts = 0;
+            const checkVideo = () => {
+              if (videoRef.current) {
+                resolve(videoRef.current);
+              } else if (attempts < 50) {
+                attempts++;
+                setTimeout(checkVideo, 100);
+              } else {
+                reject(new Error('Video element not found'));
+              }
+            };
+            checkVideo();
+          });
+        };
+
+        const video = await waitForVideo();
+
+        if (!mounted) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        // Set up video element and wait for it to be ready
+        video.srcObject = stream;
+
+        await new Promise((resolve, reject) => {
+          video.onloadedmetadata = () => {
+            console.log('📷 Video metadata loaded');
+            resolve();
+          };
+          video.onerror = (e) => {
+            console.error('📷 Video error:', e);
+            reject(e);
+          };
+          // Timeout after 5 seconds
+          setTimeout(() => reject(new Error('Video load timeout')), 5000);
+        });
+
+        await video.play();
+        console.log('📷 Video playing');
+
+        if (!mounted) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
         }
 
         // Create BarcodeDetector
@@ -78,11 +125,12 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
           ]
         });
 
+        console.log('✅ BarcodeDetector initialized');
         setIsInitializing(false);
 
         // Start continuous detection
         const detectBarcodes = async () => {
-          if (!mounted || !videoRef.current) return;
+          if (!mounted || !videoRef.current || !barcodeDetectorRef.current) return;
 
           try {
             const barcodes = await barcodeDetectorRef.current.detect(videoRef.current);
@@ -112,7 +160,7 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
 
       } catch (err) {
         console.error('BarcodeDetector init error:', err);
-        setError('Erreur caméra');
+        setError('Erreur caméra: ' + err.message);
         if (mounted) {
           // Fallback to native
           setScanMethod('native');
@@ -206,10 +254,25 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
 
     if (scanMethod === 'detecting') {
       detectPlatformAndInit();
+    } else if (scanMethod === 'barcode-api' && isInitializing) {
+      // Initialize BarcodeDetector after the video element is rendered
+      initTimeoutId = setTimeout(() => {
+        initBarcodeDetector();
+      }, 100);
+    } else if (scanMethod === 'quagga' && isInitializing) {
+      // Initialize QuaggaJS after the scanner element is rendered
+      initTimeoutId = setTimeout(() => {
+        initQuaggaJS();
+      }, 100);
     }
 
     return () => {
       mounted = false;
+
+      // Clear any pending init timeout
+      if (initTimeoutId) {
+        clearTimeout(initTimeoutId);
+      }
 
       // Cleanup BarcodeDetector
       if (animationFrameId) {
