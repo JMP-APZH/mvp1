@@ -54,9 +54,14 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
       try {
         console.log('📷 Requesting camera access...');
 
-        // Request camera access
+        // Request camera access with better constraints for mobile
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
         });
 
         if (!mounted) {
@@ -449,8 +454,11 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
+          autoPlay
           playsInline
           muted
+          webkit-playsinline="true"
+          style={{ transform: 'scaleX(1)' }}
         />
 
         {/* Overlay */}
