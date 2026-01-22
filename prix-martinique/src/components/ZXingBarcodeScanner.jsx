@@ -28,6 +28,7 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
   const [error, setError] = useState('');
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualCode, setManualCode] = useState('');
+  const [capturedImage, setCapturedImage] = useState(null);
 
   // Refs
   const videoRef = useRef(null);
@@ -36,6 +37,7 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
   const animationFrameRef = useRef(null);
   const offscreenCanvasRef = useRef(null);
   const scanRegionRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   // Initialize barcode detector on mount
   useEffect(() => {
@@ -226,6 +228,18 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
     }
   };
 
+  // Handle camera capture for barcode photo
+  const handleCameraCapture = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCapturedImage(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Handle close
   const handleClose = () => {
     stopScanning();
@@ -251,42 +265,105 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 bg-gray-900">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full text-center space-y-4">
-            <div className="text-4xl mb-2">⌨️</div>
-            <h4 className="font-medium text-lg text-gray-900">Entrez le code-barres</h4>
-            <p className="text-gray-600 text-sm">
-              Saisissez les chiffres sous le code-barres
-            </p>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto bg-gray-900">
+          {!capturedImage ? (
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full text-center space-y-4">
+              <div className="text-4xl mb-2">📷</div>
+              <h4 className="font-medium text-lg text-gray-900">Prendre une photo du code-barres</h4>
+              <p className="text-gray-600 text-sm">
+                Prenez une photo claire du code-barres, puis saisissez les chiffres manuellement
+              </p>
 
-            <input
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Code-barres (8-13 chiffres)"
-              value={manualCode}
-              onChange={(e) => setManualCode(e.target.value.replace(/\D/g, ''))}
-              className="w-full border-2 border-orange-300 rounded-lg px-4 py-3 text-center text-xl font-mono focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              maxLength="13"
-              autoFocus
-            />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleCameraCapture}
+                className="hidden"
+              />
 
-            <div className="flex gap-2">
+              <button
+                onClick={() => cameraInputRef.current?.click()}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-lg font-medium hover:opacity-90"
+              >
+                Ouvrir la caméra
+              </button>
+
+              {/* Manual entry option without photo */}
+              <div className="pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-600 mb-2">Ou saisissez directement :</p>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Code-barres (8-13 chiffres)"
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-center text-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  maxLength="13"
+                />
+                <button
+                  onClick={handleManualSubmit}
+                  disabled={manualCode.length < 8}
+                  className="w-full mt-2 bg-gray-200 text-gray-700 py-2 rounded-lg font-medium disabled:opacity-50 hover:bg-gray-300 disabled:hover:bg-gray-200"
+                >
+                  Valider
+                </button>
+              </div>
+
+              {/* Back to scanner button */}
               <button
                 onClick={() => setShowManualEntry(false)}
-                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-300"
+                className="w-full text-gray-500 py-2 text-sm hover:text-gray-700"
               >
-                Retour
-              </button>
-              <button
-                onClick={handleManualSubmit}
-                disabled={manualCode.length < 8}
-                className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 rounded-lg font-medium disabled:opacity-50 hover:opacity-90"
-              >
-                Valider
+                ← Retour au scanner
               </button>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full space-y-4">
+              <img
+                src={capturedImage}
+                alt="Code-barres capturé"
+                className="w-full rounded-lg border border-gray-200"
+              />
+
+              <p className="text-sm text-gray-600 text-center">
+                Saisissez les chiffres du code-barres :
+              </p>
+
+              <input
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Code-barres (8-13 chiffres)"
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value.replace(/\D/g, ''))}
+                className="w-full border-2 border-orange-300 rounded-lg px-4 py-3 text-center text-xl font-mono focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                maxLength="13"
+                autoFocus
+              />
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setCapturedImage(null);
+                    setManualCode('');
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-300"
+                >
+                  Reprendre
+                </button>
+                <button
+                  onClick={handleManualSubmit}
+                  disabled={manualCode.length < 8}
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 rounded-lg font-medium disabled:opacity-50 hover:opacity-90"
+                >
+                  Valider
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
