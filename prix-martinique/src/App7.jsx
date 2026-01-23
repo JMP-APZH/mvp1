@@ -116,8 +116,8 @@ const PriceScannerApp = () => {
     try {
       const { data, error } = await supabase
         .from('stores')
-        .select('*')
-        .order('name');
+        .select('id, name')
+        .order('name', { ascending: true });
 
       if (error) throw error;
       setStores(data || []);
@@ -749,7 +749,7 @@ const PriceScannerApp = () => {
                   <option value="">Sélectionner un magasin</option>
                   {stores.map(store => (
                     <option key={store.id} value={store.id}>
-                      {store.name} - {store.location}
+                      {store.name}
                     </option>
                   ))}
                 </select>
