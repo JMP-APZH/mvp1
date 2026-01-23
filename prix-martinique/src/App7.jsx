@@ -143,7 +143,7 @@ const PriceScannerApp = () => {
           product_photo_url,
           price_tag_photo_url,
           products (name, barcode),
-          stores (name, location)
+          stores (name, full_address)
         `)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -157,7 +157,7 @@ const PriceScannerApp = () => {
         barcode: item.products?.barcode,
         price: item.price,
         store: item.stores?.name || 'Magasin inconnu',
-        location: item.stores?.location,
+        location: item.stores?.full_address,
         userName: item.user_name || 'Anonyme',
         userId: item.user_id,
         date: new Date(item.created_at).toLocaleDateString('fr-FR'),
