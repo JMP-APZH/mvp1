@@ -255,7 +255,7 @@ const App9 = () => {
                 .insert([{
                     product_id: scannedProduct.id,
                     bqp_category_id: category.id,
-                    is_user_verified: true
+                    is_verified: true // User initiated link
                 }]);
 
             if (error) throw error;
