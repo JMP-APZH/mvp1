@@ -18,6 +18,9 @@ const App9 = () => {
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [bqpCheckResult, setBqpCheckResult] = useState(null); // { status: 'loading' | 'found' | 'not_found', product: ..., category: ... }
+    const [showBqpSelector, setShowBqpSelector] = useState(false);
+    const [scannedProduct, setScannedProduct] = useState(null);
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
@@ -177,17 +180,93 @@ const App9 = () => {
     };
 
     // Handle barcode detection from ZXingBarcodeScanner
-    const handleBarcodeDetected = (code) => {
+    // Handle barcode detection from ZXingBarcodeScanner
+    const handleBarcodeDetected = async (code) => {
         console.log('Barcode detected:', code);
+        setShowScanner(false);
 
-        // Vibrate if supported (backup, scanner also vibrates)
+        // Vibrate if supported
         if (navigator.vibrate) {
             navigator.vibrate(200);
         }
 
         setManualEntry(prev => ({ ...prev, barcode: code }));
-        setShowScanner(false);
-        alert(`Code-barres détecté: ${code}\n\nVeuillez saisir le nom du produit, le prix et sélectionner le magasin.`);
+
+        // Start BQP Check
+        setBqpCheckResult({ status: 'loading' });
+
+        try {
+            // 1. Check if product exists
+            const { data: product, error: prodError } = await supabase
+                .from('products')
+                .select('id, name, barcode')
+                .eq('barcode', code)
+                .single();
+
+            if (prodError && prodError.code !== 'PGRST116') throw prodError;
+
+            if (product) {
+                setScannedProduct(product);
+                // 2. Check for BQP association
+                const { data: association, error: assocError } = await supabase
+                    .from('product_bqp_associations')
+                    .select('*, bqp_categories(*)')
+                    .eq('product_id', product.id)
+                    .single();
+
+                if (assocError && assocError.code !== 'PGRST116') throw assocError;
+
+                if (association) {
+                    setBqpCheckResult({
+                        status: 'found',
+                        category: association.bqp_categories,
+                        product: product
+                    });
+                    setActiveTab('scan'); // stay on scan
+                } else {
+                    setBqpCheckResult({ status: 'not_found', product: product });
+                }
+            } else {
+                // New product
+                setBqpCheckResult({ status: 'new_product', barcode: code });
+            }
+
+        } catch (err) {
+            console.error('Error checking BQP status:', err);
+            // Fallback to manual entry
+            alert(`Code-barres détecté: ${code}`);
+        }
+    };
+
+    const handleBqpSelect = async (category) => {
+        if (!scannedProduct) return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('product_bqp_associations')
+                .insert([{
+                    product_id: scannedProduct.id,
+                    bqp_category_id: category.id,
+                    is_user_verified: true
+                }]);
+
+            if (error) throw error;
+
+            alert(`Produit associé à la catégorie BQP: ${category.code}`);
+            setShowBqpSelector(false);
+            setBqpCheckResult({
+                status: 'found',
+                category: category,
+                product: scannedProduct
+            });
+
+        } catch (err) {
+            console.error('Error linking BQP:', err);
+            alert('Erreur lors de l\'association BQP');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handlePhotoCapture = (photoType) => {
@@ -612,6 +691,36 @@ const App9 = () => {
 
                         {/* Scanner Button */}
                         <div>
+                            {bqpCheckResult && bqpCheckResult.status === 'found' && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 flex items-center gap-3">
+                                    <ShieldCheck className="w-8 h-8 text-green-600" />
+                                    <div>
+                                        <h3 className="font-bold text-green-800">Produit BQP Vérifié !</h3>
+                                        <p className="text-sm text-green-700">
+                                            {bqpCheckResult.category.code} - {bqpCheckResult.category.label}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {bqpCheckResult && bqpCheckResult.status === 'not_found' && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Info className="w-5 h-5 text-blue-600" />
+                                        <h3 className="font-bold text-blue-800">Produit non classé</h3>
+                                    </div>
+                                    <p className="text-sm text-blue-700 mb-3">
+                                        Est-ce un produit du Bouclier Qualité Prix ?
+                                    </p>
+                                    <button
+                                        onClick={() => setShowBqpSelector(true)}
+                                        className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
+                                    >
+                                        Oui, lier à une catégorie BQP
+                                    </button>
+                                </div>
+                            )}
+
                             <button
                                 onClick={() => setShowScanner(true)}
                                 className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 rounded-lg font-medium hover:from-orange-600 hover:to-red-600 transition-colors shadow-md mb-4"
@@ -621,6 +730,23 @@ const App9 = () => {
                             </button>
                             <p className="text-center text-gray-500 text-sm mb-4">ou</p>
                         </div>
+
+                        {/* BQP Selector Modal */}
+                        {showBqpSelector && (
+                            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                                <div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+                                    <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                                        <h3 className="font-bold text-lg">Sélectionner la catégorie BQP</h3>
+                                        <button onClick={() => setShowBqpSelector(false)} className="p-1 hover:bg-gray-200 rounded">
+                                            <X className="w-6 h-6" />
+                                        </button>
+                                    </div>
+                                    <div className="overflow-y-auto p-4">
+                                        <BQPVerifier onSelect={handleBqpSelect} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Manual Entry Form */}
                         <div className="bg-gray-50 rounded-lg p-4 space-y-3">

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ShieldCheck, ShoppingBag, Info, AlertTriangle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
-export default function BQPVerifier({ initialSearchTerm = '' }) {
+export default function BQPVerifier({ initialSearchTerm = '', onSelect = null }) {
     const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
     const [selectedList, setSelectedList] = useState('all');
     const [categories, setCategories] = useState([]);
@@ -130,7 +130,14 @@ export default function BQPVerifier({ initialSearchTerm = '' }) {
                         </div>
                     ) : (
                         filteredItems.map((item) => (
-                            <div key={item.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                            <div
+                                key={item.id}
+                                onClick={() => onSelect && onSelect(item)}
+                                className={`border rounded-lg p-3 transition-colors ${onSelect
+                                        ? 'cursor-pointer hover:bg-blue-50 border-blue-200 hover:border-blue-400'
+                                        : 'hover:bg-gray-50'
+                                    }`}
+                            >
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
@@ -161,6 +168,14 @@ export default function BQPVerifier({ initialSearchTerm = '' }) {
                                         {item.list_type}
                                     </span>
                                 </div>
+
+                                {onSelect && (
+                                    <div className="mt-2 text-center">
+                                        <span className="text-blue-600 text-xs font-semibold uppercase tracking-wider">
+                                            Sélectionner
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         ))
                     )}
