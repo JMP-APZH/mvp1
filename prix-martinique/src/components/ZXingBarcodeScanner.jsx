@@ -403,17 +403,16 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
       </div>
 
       {/* Header text */}
-      <div className="absolute top-8 left-0 right-0 text-center px-4 pointer-events-none">
+      <div className="absolute top-24 left-0 right-0 text-center px-4 pointer-events-none">
         <p className="text-white text-lg font-medium drop-shadow-lg">
           {!isInitialized ? 'Initialisation...' : 'Alignez le code-barres dans le cadre'}
         </p>
         {/* Scanner type badge */}
         {isInitialized && (
-          <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold ${
-            scannerType === 'native'
+          <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold ${scannerType === 'native'
               ? 'bg-green-500 bg-opacity-80 text-white'
               : 'bg-blue-500 bg-opacity-80 text-white'
-          }`}>
+            }`}>
             {scannerType === 'native' ? '🤖 API Native' : '🍎 ZXing WASM'}
           </span>
         )}
@@ -421,7 +420,7 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
 
       {/* Error message */}
       {error && (
-        <div className="absolute top-24 left-4 right-4 bg-red-500 text-white p-3 rounded-lg text-center text-sm">
+        <div className="absolute top-40 left-4 right-4 bg-red-500 text-white p-3 rounded-lg text-center text-sm">
           {error}
         </div>
       )}
@@ -429,7 +428,7 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
       {/* Close button */}
       <button
         onClick={handleClose}
-        className="absolute top-4 right-4 bg-white bg-opacity-20 backdrop-blur-sm text-white p-3 rounded-full pointer-events-auto z-10"
+        className="absolute top-6 right-6 bg-white bg-opacity-20 backdrop-blur-sm text-white p-3 rounded-full pointer-events-auto z-10 hover:bg-opacity-30 transition-all"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
