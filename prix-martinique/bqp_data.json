@@ -1,0 +1,44 @@
+{
+  "project": "Martinique Cost of Living Impact App",
+  "source": "Prefecture of Martinique - BQP 2024",
+  "data_version": "1.0",
+  "last_updated": "2026-02-01",
+  "metadata_logic": {
+    "local_production_flag": "Identifies items explicitly marked as PRODUCTION LOCALE in source ",
+    "size_tolerance": "Required for ranges like 230g/250g [cite: 40, 41]",
+    "selection_logic": "Used for 'Choice' items in Fruits & Vegetables [cite: 206]"
+  },
+  "lists": {
+    "hypermarket_134": {
+      "count": 134,
+      "categories": [
+        { "id": "H-01", "section": "FRAIS", "label": "Lait écrémé/demi-écrémé UHT", "unit": "1L", "local": true },
+        { "id": "H-02", "section": "FRAIS", "label": "Lait en poudre", "unit": "400g", "local": true },
+        { "id": "H-03", "section": "FRAIS", "label": "Beurre doux", "unit": "125g/250g", "local": true },
+        { "id": "H-04", "section": "SURGELÉS", "label": "Haut de cuisses/Pilons de poulet", "unit": "1kg/2.5kg", "local": true },
+        { "id": "H-05", "section": "EPICERIE", "label": "Sucre blanc/roux", "unit": "1kg", "local": true },
+        { "id": "H-06", "section": "HYGIÈNE", "label": "Gel douche", "unit": "250ml", "local": true }
+      ]
+    },
+    "supermarket_72": {
+      "count": 72,
+      "categories": [
+        { "id": "M-01", "section": "BOULANGERIE", "label": "Farine de blé", "unit": "1kg", "local": true },
+        { "id": "M-02", "section": "FRAIS", "label": "Lait écrémé/demi-écrémé UHT", "unit": "1L", "local": true },
+        { "id": "M-03", "section": "SURGELÉS", "label": "Steaks hachés 100% pur bœuf", "unit": "10x100g", "local": true },
+        { "id": "M-04", "section": "EPICERIE SÈCHE", "label": "Riz (Basmati/Standard)", "unit": "1kg", "local": true },
+        { "id": "M-05", "section": "ENTRETIEN", "label": "Eau de javel", "unit": "1L", "local": true }
+      ]
+    },
+    "superette_35": {
+      "count": 35,
+      "categories": [
+        { "id": "S-01", "section": "BOULANGERIE", "label": "Pain", "unit": "400g", "local": true },
+        { "id": "S-02", "section": "EPICERIE", "label": "Huile de cuisson", "unit": "1L", "local": true },
+        { "id": "S-03", "section": "EPICERIE SÈCHE", "label": "Lentilles blondes", "unit": "500g", "local": true },
+        { "id": "S-04", "section": "INFANTILES", "label": "Couches", "unit": "x30/x40", "local": true },
+        { "id": "S-05", "section": "CONSERVERIE", "label": "Thon naturel", "unit": "130g", "local": true }
+      ]
+    }
+  }
+}

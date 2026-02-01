@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import BQPSearchPrototype from './components/BQPSearchPrototype';
+import BQPVerifier from './components/BQPVerifier';
 import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
@@ -10,7 +10,7 @@ import AboutPage from './components/AboutPage';
 import ZXingBarcodeScanner from './components/ZXingBarcodeScanner';
 import StoreSelectionWizard from './components/StoreSelectionWizard';
 
-const PriceScannerApp = () => {
+const App9 = () => {
     const [activeTab, setActiveTab] = useState('scan');
     const [showScanner, setShowScanner] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -957,10 +957,10 @@ const PriceScannerApp = () => {
                     </div>
                 )}
 
-                {/* BQP Tab (Prototype) */}
+                {/* BQP Tab (Live) */}
                 {activeTab === 'bqp' && (
                     <div className="space-y-4">
-                        <BQPSearchPrototype />
+                        <BQPVerifier />
                     </div>
                 )}
 
@@ -979,4 +979,4 @@ const PriceScannerApp = () => {
     );
 };
 
-export default PriceScannerApp;
+export default App9;
