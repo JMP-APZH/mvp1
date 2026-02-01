@@ -216,42 +216,42 @@ export default function StoreSelectionWizard({
     return (
         <div className={className}>
             {/* Progress Indicator */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 1 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2 sm:gap-0">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 1 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
                         }`}>
                         {step > 1 ? '✓' : '1'}
                     </div>
-                    <div className="text-xs text-gray-600">Ville</div>
+                    <div className="text-xs text-gray-600 hidden xs:block">Ville</div>
 
-                    <div className="w-8 h-0.5 bg-gray-300"></div>
+                    <div className="w-4 sm:w-8 h-0.5 bg-gray-300"></div>
 
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 2 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 2 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
                         }`}>
                         {step > 2 ? '✓' : '2'}
                     </div>
-                    <div className="text-xs text-gray-600">Enseigne</div>
+                    <div className="text-xs text-gray-600 hidden xs:block">Enseigne</div>
 
-                    <div className="w-8 h-0.5 bg-gray-300"></div>
+                    <div className="w-4 sm:w-8 h-0.5 bg-gray-300"></div>
 
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 3 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 3 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
                         }`}>
                         3
                     </div>
-                    <div className="text-xs text-gray-600">Magasin</div>
+                    <div className="text-xs text-gray-600 hidden xs:block">Magasin</div>
                 </div>
 
                 {step > 1 && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 justify-end">
                         <button
                             onClick={handleBack}
-                            className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                            className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 bg-gray-100 px-2 py-1.5 rounded-lg"
                         >
                             ← Retour
                         </button>
                         <button
                             onClick={handleReset}
-                            className="text-sm text-red-600 hover:text-red-800"
+                            className="text-sm text-red-600 hover:text-red-800 bg-red-50 px-2 py-1.5 rounded-lg"
                         >
                             Recommencer
                         </button>
@@ -406,8 +406,8 @@ export default function StoreSelectionWizard({
                                             key={store.id}
                                             onClick={() => handleStoreSelect(store)}
                                             className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${isSelected
-                                                    ? 'bg-green-50 border-green-500'
-                                                    : 'bg-white border-transparent hover:bg-orange-50 hover:border-orange-300'
+                                                ? 'bg-green-50 border-green-500'
+                                                : 'bg-white border-transparent hover:bg-orange-50 hover:border-orange-300'
                                                 }`}
                                         >
                                             <div className="flex items-start justify-between mb-1">
