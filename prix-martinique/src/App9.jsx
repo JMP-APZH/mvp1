@@ -534,12 +534,39 @@ const App9 = () => {
             }
 
             // Success message
+            // Success message
             const successMessage = user
                 ? `Prix enregistré avec succès! +${pointsAwarded} points`
                 : 'Prix enregistré avec succès! Merci pour votre contribution.';
+
+            // Check BQP status before alerting/resetting to decide flow
+            let showBqpPrompt = false;
+            let productForBqp = null;
+
+            // Check if product is already BQP linked
+            const { data: existingAssoc } = await supabase
+                .from('product_bqp_associations')
+                .select('id')
+                .eq('product_id', productId)
+                .single();
+
+            if (!existingAssoc) {
+                // Not linked? We should prompt!
+                showBqpPrompt = true;
+                // Fetch full product for the prompt state if needed
+                if (manualEntry.barcode) {
+                    const { data: p } = await supabase.from('products').select('*').eq('id', productId).single();
+                    productForBqp = p;
+                } else {
+                    // If created by name, we might not have a barcode, but we have the ID and Name
+                    const { data: p } = await supabase.from('products').select('*').eq('id', productId).single();
+                    productForBqp = p;
+                }
+            }
+
             alert(successMessage);
 
-            // Reset form
+            // Reset form but conditionally set BQP prompt
             setManualEntry({
                 productName: '',
                 barcode: '',
@@ -549,6 +576,16 @@ const App9 = () => {
                 productPhoto: null,
                 priceTagPhoto: null
             });
+
+            if (showBqpPrompt && productForBqp) {
+                setBqpCheckResult({
+                    status: 'new_product', // Use 'new_product' to trigger the specific prompt text
+                    product: productForBqp
+                });
+                setScannedProduct(productForBqp); // Important for the selector to work
+            } else {
+                setBqpCheckResult(null);
+            }
 
             // Reload prices
             loadRecentPrices();
@@ -812,14 +849,19 @@ const App9 = () => {
                                 </div>
                             )}
 
-                            {bqpCheckResult && bqpCheckResult.status === 'not_found' && (
+                            {(bqpCheckResult && (bqpCheckResult.status === 'not_found' || bqpCheckResult.status === 'new_product')) && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Info className="w-5 h-5 text-blue-600" />
-                                        <h3 className="font-bold text-blue-800">Produit non classé</h3>
+                                        <h3 className="font-bold text-blue-800">
+                                            {bqpCheckResult.status === 'new_product' ? 'Nouveau produit' : 'Produit non classé'}
+                                        </h3>
                                     </div>
                                     <p className="text-sm text-blue-700 mb-3">
-                                        Est-ce un produit du Bouclier Qualité Prix ?
+                                        {bqpCheckResult.status === 'new_product'
+                                            ? "Ce produit n'est pas encore dans notre base. Est-il BQP ?"
+                                            : "Est-ce un produit du Bouclier Qualité Prix ?"
+                                        }
                                     </p>
                                     <button
                                         onClick={() => setShowBqpSelector(true)}
