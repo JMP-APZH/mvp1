@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BQPVerifier from './components/BQPVerifier';
-import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck } from 'lucide-react';
+
+import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
@@ -19,6 +20,7 @@ const App9 = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [bqpCheckResult, setBqpCheckResult] = useState(null); // { status: 'loading' | 'found' | 'not_found', product: ..., category: ... }
+    const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
     const [showBqpSelector, setShowBqpSelector] = useState(false);
     const [scannedProduct, setScannedProduct] = useState(null);
     const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -220,9 +222,14 @@ const App9 = () => {
                     setBqpCheckResult({
                         status: 'found',
                         category: association.bqp_categories,
-                        product: product
+                        product: product,
+                        associationId: association.id // Store association ID for voting
                     });
                     setActiveTab('scan'); // stay on scan
+
+                    // Fetch existing votes
+                    fetchBqpVotes(association.id);
+
                 } else {
                     setBqpCheckResult({ status: 'not_found', product: product });
                 }
@@ -266,6 +273,92 @@ const App9 = () => {
             alert('Erreur lors de l\'association BQP');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchBqpVotes = async (associationId) => {
+        try {
+            // Get vote counts
+            const { count: upvotes } = await supabase
+                .from('bqp_votes')
+                .select('*', { count: 'exact', head: true })
+                .eq('association_id', associationId)
+                .eq('vote_type', 1);
+
+            const { count: downvotes } = await supabase
+                .from('bqp_votes')
+                .select('*', { count: 'exact', head: true })
+                .eq('association_id', associationId)
+                .eq('vote_type', -1);
+
+            // Get user's vote if logged in
+            let userVote = 0;
+            if (user) {
+                const { data } = await supabase
+                    .from('bqp_votes')
+                    .select('vote_type')
+                    .eq('association_id', associationId)
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (data) userVote = data.vote_type;
+            }
+
+            setBqpVoteStats({ upvotes: upvotes || 0, downvotes: downvotes || 0, userVote });
+        } catch (err) {
+            console.error('Error fetching votes:', err);
+        }
+    };
+
+    const handleVote = async (voteType) => {
+        if (!user) {
+            alert("Vous devez être connecté pour voter !");
+            setShowAuthModal(true);
+            return;
+        }
+
+        if (!bqpCheckResult?.associationId) return;
+
+        try {
+            // Optimistic update
+            setBqpVoteStats(prev => {
+                // Remove old vote
+                let newUp = prev.upvotes - (prev.userVote === 1 ? 1 : 0);
+                let newDown = prev.downvotes - (prev.userVote === -1 ? 1 : 0);
+
+                // Add new vote (toggle off if clicking same)
+                const newVote = prev.userVote === voteType ? 0 : voteType;
+
+                if (newVote === 1) newUp++;
+                if (newVote === -1) newDown++;
+
+                return { upvotes: newUp, downvotes: newDown, userVote: newVote };
+            });
+
+            const associationId = bqpCheckResult.associationId;
+
+            // If toggling off
+            if (bqpVoteStats.userVote === voteType) {
+                await supabase
+                    .from('bqp_votes')
+                    .delete()
+                    .eq('association_id', associationId)
+                    .eq('user_id', user.id);
+            } else {
+                // Upsert new vote
+                await supabase
+                    .from('bqp_votes')
+                    .upsert({
+                        association_id: associationId,
+                        user_id: user.id,
+                        vote_type: voteType
+                    }, { onConflict: 'association_id, user_id' });
+            }
+
+        } catch (err) {
+            console.error('Error voting:', err);
+            alert('Erreur lors du vote');
+            // Revert state (could implement proper rollback here)
         }
     };
 
@@ -699,6 +792,22 @@ const App9 = () => {
                                         <p className="text-sm text-green-700">
                                             {bqpCheckResult.category.code} - {bqpCheckResult.category.label}
                                         </p>
+                                    </div>
+                                    <div className="ml-auto flex gap-2">
+                                        <button
+                                            onClick={() => handleVote(1)}
+                                            className={`p-2 rounded-full border ${bqpVoteStats.userVote === 1 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-white border-gray-200 text-gray-400'}`}
+                                        >
+                                            <ThumbsUp className="w-5 h-5" />
+                                            <span className="text-xs font-bold block text-center">{bqpVoteStats.upvotes}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleVote(-1)}
+                                            className={`p-2 rounded-full border ${bqpVoteStats.userVote === -1 ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-200 text-gray-400'}`}
+                                        >
+                                            <ThumbsDown className="w-5 h-5" />
+                                            <span className="text-xs font-bold block text-center">{bqpVoteStats.downvotes}</span>
+                                        </button>
                                     </div>
                                 </div>
                             )}
