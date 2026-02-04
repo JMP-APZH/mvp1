@@ -38,6 +38,8 @@ const App9 = () => {
         categoryId: null
     });
     const [categories, setCategories] = useState([]);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [categoryFilter, setCategoryFilter] = useState(null);
     const productPhotoInputRef = useRef(null);
     const priceTagPhotoInputRef = useRef(null);
 
@@ -659,10 +661,12 @@ const App9 = () => {
         }
     };
 
-    const filteredPrices = recentPrices.filter(p =>
-        p.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.store.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredPrices = recentPrices.filter(p => {
+        const matchesQuery = p.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.store.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = categoryFilter ? p.categoryId === categoryFilter : true;
+        return matchesQuery && matchesCategory;
+    });
 
     const getProductStats = (productName) => {
         const productPrices = recentPrices.filter(p => p.product === productName);
@@ -1177,6 +1181,24 @@ const App9 = () => {
                             />
                         </div>
 
+                        {categoryFilter && (
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xl">{categories.find(c => c.id === categoryFilter)?.icon}</span>
+                                    <span className="text-sm font-medium text-orange-800">
+                                        Filtré par: <span className="font-bold">{categories.find(c => c.id === categoryFilter)?.name}</span>
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setCategoryFilter(null)}
+                                    className="p-1 hover:bg-orange-100 rounded-full text-orange-600 transition-colors"
+                                    title="Réinitialiser le filtre"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
+
                         {loading ? (
                             <div className="text-center py-8 text-gray-500">
                                 <div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-2"></div>
@@ -1227,20 +1249,36 @@ const App9 = () => {
 
                                                 {/* Photos display */}
                                                 {(price.productPhotoUrl || price.priceTagPhotoUrl) && (
-                                                    <div className="flex gap-2 mt-3 mb-2">
+                                                    <div className="flex gap-2 mt-3 mb-2 overflow-x-auto pb-1 no-scrollbar">
                                                         {price.productPhotoUrl && (
-                                                            <img
-                                                                src={price.productPhotoUrl}
-                                                                alt="Produit"
-                                                                className="w-20 h-20 object-cover rounded border border-gray-200"
-                                                            />
+                                                            <div
+                                                                onClick={() => setSelectedImage(price.productPhotoUrl)}
+                                                                className="relative flex-shrink-0 cursor-zoom-in group"
+                                                            >
+                                                                <img
+                                                                    src={price.productPhotoUrl}
+                                                                    alt="Produit"
+                                                                    className="w-20 h-20 object-cover rounded border border-gray-200 group-hover:opacity-90 transition-opacity"
+                                                                />
+                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded">
+                                                                    <Search className="w-5 h-5 text-white" />
+                                                                </div>
+                                                            </div>
                                                         )}
                                                         {price.priceTagPhotoUrl && (
-                                                            <img
-                                                                src={price.priceTagPhotoUrl}
-                                                                alt="Etiquette"
-                                                                className="w-20 h-20 object-cover rounded border border-gray-200"
-                                                            />
+                                                            <div
+                                                                onClick={() => setSelectedImage(price.priceTagPhotoUrl)}
+                                                                className="relative flex-shrink-0 cursor-zoom-in group"
+                                                            >
+                                                                <img
+                                                                    src={price.priceTagPhotoUrl}
+                                                                    alt="Etiquette"
+                                                                    className="w-20 h-20 object-cover rounded border border-gray-200 group-hover:opacity-90 transition-opacity"
+                                                                />
+                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded">
+                                                                    <Search className="w-5 h-5 text-white" />
+                                                                </div>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 )}
@@ -1304,15 +1342,25 @@ const App9 = () => {
                                     .filter(Boolean)
                                     .sort((a, b) => b.count - a.count)
                                     .map((cat) => (
-                                        <div key={cat.id} className="flex items-center justify-between">
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => {
+                                                setCategoryFilter(cat.id);
+                                                setActiveTab('search');
+                                            }}
+                                            className="w-full flex items-center justify-between hover:bg-gray-50 p-1 rounded-lg transition-colors group"
+                                        >
                                             <div className="flex items-center gap-3">
                                                 <span className="text-2xl">{cat.icon}</span>
-                                                <span className="font-medium text-gray-700">{cat.name}</span>
+                                                <span className="font-medium text-gray-700 group-hover:text-orange-600 transition-colors">{cat.name}</span>
                                             </div>
-                                            <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">
-                                                {cat.count} scans
-                                            </span>
-                                        </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold group-hover:bg-orange-100 group-hover:text-orange-600 transition-colors">
+                                                    {cat.count} scans
+                                                </span>
+                                                <Search className="w-4 h-4 text-gray-300 group-hover:text-orange-400" />
+                                            </div>
+                                        </button>
                                     ))}
                                 {recentPrices.filter(p => !p.categoryId).length > 0 && (
                                     <div className="flex items-center justify-between border-t border-gray-100 pt-2 mt-2">
@@ -1393,6 +1441,30 @@ const App9 = () => {
                     </p>
                 </div>
             </div>
+
+            {/* Image Zoom Modal */}
+            {selectedImage && (
+                <div
+                    className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <button
+                        className="absolute top-4 right-4 text-white p-2 hover:bg-white/10 rounded-full transition-colors"
+                        onClick={() => setSelectedImage(null)}
+                    >
+                        <X className="w-8 h-8" />
+                    </button>
+
+                    <div className="relative w-full h-full flex items-center justify-center p-4">
+                        <img
+                            src={selectedImage}
+                            alt="Zoom"
+                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
