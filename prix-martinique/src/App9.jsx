@@ -160,7 +160,8 @@ const App9 = () => {
           created_at,
           product_photo_url,
           price_tag_photo_url,
-          products (id, name, barcode),
+          price_tag_photo_url,
+          products (id, name, barcode, category_id),
           stores (name, full_address)
         `)
                 .order('created_at', { ascending: false })
@@ -172,6 +173,7 @@ const App9 = () => {
             const transformedPrices = data.map(item => ({
                 id: item.id,
                 productId: item.products?.id,
+                categoryId: item.products?.category_id,
                 product: item.products?.name || 'Produit inconnu',
                 barcode: item.products?.barcode,
                 price: item.price,
@@ -852,6 +854,7 @@ const App9 = () => {
 
             {/* Content */}
             <div className="p-4">
+                {/* Tabs Placeholders */}
                 {/* Scan Tab */}
                 {activeTab === 'scan' && (
                     <div className="space-y-4">
@@ -1082,8 +1085,8 @@ const App9 = () => {
                                             key={cat.id}
                                             onClick={() => setManualEntry({ ...manualEntry, categoryId: cat.id })}
                                             className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors border min-h-[80px] ${manualEntry.categoryId === cat.id
-                                                    ? 'bg-orange-100 border-orange-500 ring-2 ring-orange-200'
-                                                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                                                ? 'bg-orange-100 border-orange-500 ring-2 ring-orange-200'
+                                                : 'bg-white border-gray-200 hover:bg-gray-50'
                                                 }`}
                                         >
                                             <span className="text-2xl" role="img" aria-label={cat.name}>{cat.icon}</span>
@@ -1121,20 +1124,7 @@ const App9 = () => {
                                 />
                             </div>
 
-                            {/* BQP Checkbox */}
-                            <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                                <input
-                                    type="checkbox"
-                                    id="isDeclaredBqp"
-                                    checked={manualEntry.isDeclaredBqp || false}
-                                    onChange={(e) => setManualEntry({ ...manualEntry, isDeclaredBqp: e.target.checked })}
-                                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                />
-                                <label htmlFor="isDeclaredBqp" className="text-sm text-blue-800">
-                                    <span className="font-semibold block">Ce produit est-il affiché "BQP" en rayon ?</span>
-                                    <span className="text-xs text-blue-600 block mt-0.5">Cochez cette case si vous voyez l'étiquette rouge BQP en magasin, même si l'application ne le reconnait pas encore.</span>
-                                </label>
-                            </div>
+
 
 
 
@@ -1173,7 +1163,6 @@ const App9 = () => {
                         </div>
                     </div>
                 )}
-
                 {/* Search/Compare Tab */}
                 {activeTab === 'search' && (
                     <div className="space-y-4">
@@ -1280,7 +1269,6 @@ const App9 = () => {
                         )}
                     </div>
                 )}
-
                 {/* Stats Tab */}
                 {activeTab === 'stats' && (
                     <div className="space-y-4">
@@ -1300,8 +1288,46 @@ const App9 = () => {
                             </div>
                         </div>
 
-                        {/* Leaderboard */}
-                        <Leaderboard />
+                        {/* Top Categories */}
+                        <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+                            <h3 className="font-bold text-gray-800 mb-4 flex items-center">
+                                <span className="bg-orange-100 p-2 rounded-lg mr-2">📊</span>
+                                Top Catégories
+                            </h3>
+                            <div className="space-y-3">
+                                {categories.map(cat => {
+                                    // Count scans for this category using the joined data
+                                    const count = recentPrices.filter(p => p.categoryId === cat.id).length;
+                                    if (count === 0) return null;
+                                    return { ...cat, count };
+                                })
+                                    .filter(Boolean)
+                                    .sort((a, b) => b.count - a.count)
+                                    .map((cat) => (
+                                        <div key={cat.id} className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-2xl">{cat.icon}</span>
+                                                <span className="font-medium text-gray-700">{cat.name}</span>
+                                            </div>
+                                            <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-bold">
+                                                {cat.count} scans
+                                            </span>
+                                        </div>
+                                    ))}
+                                {recentPrices.filter(p => !p.categoryId).length > 0 && (
+                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2 mt-2">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">❓</span>
+                                            <span className="font-medium text-gray-500">Non classé</span>
+                                        </div>
+                                        <span className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-bold">
+                                            {recentPrices.filter(p => !p.categoryId).length} scans
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
 
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                             <h3 className="font-semibold text-yellow-900 mb-2">Prochainement</h3>
@@ -1349,8 +1375,7 @@ const App9 = () => {
                         </div>
                     </div>
                 )}
-
-                {/* BQP Tab (Live) */}
+                {/* BQP Tab */}
                 {activeTab === 'bqp' && (
                     <div className="space-y-4">
                         <BQPVerifier />
@@ -1359,16 +1384,16 @@ const App9 = () => {
 
                 {/* À Propos Tab */}
                 {activeTab === 'about' && <AboutPage />}
-            </div>
 
-            {/* Footer */}
-            <div className="bg-gray-50 border-t p-4 text-center text-sm text-gray-600 mt-8">
-                <p className="mb-2">Ensemble, nous créons la transparence sur les prix</p>
-                <p className="text-xs text-gray-500">
-                    Données crowdsourcées - Gratuit et ouvert à tous
-                </p>
+                {/* Footer */}
+                <div className="bg-gray-50 border-t p-4 text-center text-sm text-gray-600 mt-8">
+                    <p className="mb-2">Ensemble, nous créons la transparence sur les prix</p>
+                    <p className="text-xs text-gray-500">
+                        Données crowdsourcées - Gratuit et ouvert à tous
+                    </p>
+                </div>
             </div>
-        </div >
+        </div>
     );
 };
 
