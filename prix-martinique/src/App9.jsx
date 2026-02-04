@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import BQPVerifier from './components/BQPVerifier';
 
-import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
@@ -33,13 +33,16 @@ const App9 = () => {
         storeId: '',
         userName: '',
         productPhoto: null,
-        priceTagPhoto: null
+        priceTagPhoto: null,
+        isDeclaredBqp: false,
+        categoryId: null
     });
+    const [categories, setCategories] = useState([]);
     const productPhotoInputRef = useRef(null);
     const priceTagPhotoInputRef = useRef(null);
 
     // Auth context
-    const { user, userProfile, awardPoints, refreshProfile } = useAuth();
+    const { user, userProfile, awardPoints, refreshProfile, userFavorites, toggleFavorite } = useAuth();
 
     // Detect iOS device
     const isIOS = () => {
@@ -138,6 +141,14 @@ const App9 = () => {
         try {
             setLoading(true);
 
+            // Fetch categories for the selector
+            const { data: categoriesData } = await supabase
+                .from('categories')
+                .select('*')
+                .order('display_order', { ascending: true });
+
+            if (categoriesData) setCategories(categoriesData);
+
             // Join prices with products and stores to get all info
             const { data, error } = await supabase
                 .from('prices')
@@ -149,7 +160,7 @@ const App9 = () => {
           created_at,
           product_photo_url,
           price_tag_photo_url,
-          products (name, barcode),
+          products (id, name, barcode),
           stores (name, full_address)
         `)
                 .order('created_at', { ascending: false })
@@ -160,6 +171,7 @@ const App9 = () => {
             // Transform data for display
             const transformedPrices = data.map(item => ({
                 id: item.id,
+                productId: item.products?.id,
                 product: item.products?.name || 'Produit inconnu',
                 barcode: item.products?.barcode,
                 price: item.price,
@@ -393,10 +405,54 @@ const App9 = () => {
         }
     };
 
+    // Helper to toggle favorites
+    const handleToggleFavorite = async (productId) => {
+        if (!user) {
+            setShowAuthModal(true);
+            return;
+        }
+
+        // Optimistic update
+        const newFavorites = new Set(userFavorites);
+        const isFavorite = newFavorites.has(productId);
+
+        if (isFavorite) {
+            newFavorites.delete(productId);
+        } else {
+            newFavorites.add(productId);
+        }
+        setUserFavorites(newFavorites);
+
+        try {
+            if (isFavorite) {
+                await supabase
+                    .from('user_favorites')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('product_id', productId);
+            } else {
+                await supabase
+                    .from('user_favorites')
+                    .insert([{ user_id: user.id, product_id: productId }]);
+            }
+        } catch (err) {
+            console.error('Error toggling favorite:', err);
+            // Revert on error
+            if (isFavorite) newFavorites.add(productId);
+            else newFavorites.delete(productId);
+            setUserFavorites(new Set(newFavorites));
+        }
+    };
+
     const submitPrice = async () => {
         if (!manualEntry.productName || !manualEntry.price || !manualEntry.storeId) {
             alert('Veuillez remplir tous les champs obligatoires (produit, prix, magasin)');
             return;
+        }
+
+        if (!manualEntry.categoryId && !manualEntry.barcode) {
+            // Optional: Force category for new non-barcoded items?
+            // For now, let's make it optional but recommended in UI
         }
 
         try {
@@ -435,7 +491,9 @@ const App9 = () => {
                     .insert([{
                         name: manualEntry.productName,
                         barcode: manualEntry.barcode || null,
-                        category: null // Can be added later
+                        category: null, // Legacy field
+                        category_id: manualEntry.categoryId || null,
+                        is_declared_bqp: manualEntry.isDeclaredBqp || false
                     }])
                     .select()
                     .single();
@@ -574,7 +632,8 @@ const App9 = () => {
                 storeId: '',
                 userName: userProfile?.display_name || manualEntry.userName, // Keep username
                 productPhoto: null,
-                priceTagPhoto: null
+                priceTagPhoto: null,
+                isDeclaredBqp: false
             });
 
             if (showBqpPrompt && productForBqp) {
@@ -1010,6 +1069,32 @@ const App9 = () => {
                                 </div>
                             </div>
 
+
+
+                            {/* Category Selector */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Catégorie
+                                </label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {categories.map((cat) => (
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => setManualEntry({ ...manualEntry, categoryId: cat.id })}
+                                            className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors border ${manualEntry.categoryId === cat.id
+                                                ? 'bg-orange-100 border-orange-500 ring-2 ring-orange-200'
+                                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <span className="text-2xl" role="img" aria-label={cat.name}>{cat.icon}</span>
+                                            <span className="text-[10px] text-center leading-tight text-gray-600 line-clamp-2">
+                                                {cat.name}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Prix (EUR) *
@@ -1035,6 +1120,26 @@ const App9 = () => {
                                     className="mb-4"
                                 />
                             </div>
+
+                            {/* BQP Checkbox */}
+                            <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                                <input
+                                    type="checkbox"
+                                    id="isDeclaredBqp"
+                                    checked={manualEntry.isDeclaredBqp || false}
+                                    onChange={(e) => setManualEntry({ ...manualEntry, isDeclaredBqp: e.target.checked })}
+                                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <label htmlFor="isDeclaredBqp" className="text-sm text-blue-800">
+                                    <span className="font-semibold block">Ce produit est-il affiché "BQP" en rayon ?</span>
+                                    <span className="text-xs text-blue-600 block mt-0.5">Cochez cette case si vous voyez l'étiquette rouge BQP en magasin, même si l'application ne le reconnait pas encore.</span>
+                                </label>
+                            </div>
+
+
+
+
+
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1117,6 +1222,17 @@ const App9 = () => {
                                                                 <TrendingDown className="inline w-3 h-3" /> Meilleur prix
                                                             </span>
                                                         )}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleToggleFavorite(price.productId); // Ensure productId is available here. If not, use price.product_id
+                                                            }}
+                                                            className="mt-2 text-gray-400 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <Heart
+                                                                className={`w-6 h-6 ${userFavorites.has(price.productId || price.product_id) ? 'fill-red-500 text-red-500' : ''}`}
+                                                            />
+                                                        </button>
                                                     </div>
                                                 </div>
 
@@ -1252,7 +1368,7 @@ const App9 = () => {
                     Données crowdsourcées - Gratuit et ouvert à tous
                 </p>
             </div>
-        </div>
+        </div >
     );
 };
 

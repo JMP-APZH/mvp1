@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [userBadges, setUserBadges] = useState([]);
+  const [userFavorites, setUserFavorites] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
   // Fetch user profile from user_profiles table
@@ -64,6 +65,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Fetch user favorites
+  const fetchUserFavorites = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_favorites')
+        .select('product_id')
+        .eq('user_id', userId);
+
+      if (error) return new Set();
+      return new Set(data.map(item => item.product_id));
+    } catch (err) {
+      return new Set();
+    }
+  };
+
   // Initialize auth state
   useEffect(() => {
     let isMounted = true;
@@ -72,11 +88,12 @@ export const AuthProvider = ({ children }) => {
 
     // Helper to load user data
     const loadUserData = async (userId) => {
-      const [profile, badges] = await Promise.all([
+      const [profile, badges, favorites] = await Promise.all([
         fetchUserProfile(userId),
-        fetchUserBadges(userId)
+        fetchUserBadges(userId),
+        fetchUserFavorites(userId)
       ]);
-      return { profile, badges };
+      return { profile, badges, favorites };
     };
 
     // Set up auth state change listener first
@@ -109,6 +126,7 @@ export const AuthProvider = ({ children }) => {
             currentLoadedUserId = session.user.id;
             setUserProfile(profile);
             setUserBadges(badges);
+            setUserFavorites(favorites);
             setLoading(false);
           }
         }
@@ -139,6 +157,7 @@ export const AuthProvider = ({ children }) => {
             currentLoadedUserId = session.user.id;
             setUserProfile(profile);
             setUserBadges(badges);
+            setUserFavorites(favorites);
           }
         }
 
@@ -233,6 +252,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setUserProfile(null);
       setUserBadges([]);
+      setUserFavorites(new Set());
       return { error: null };
     } catch (error) {
       console.error('Sign out error:', error);
@@ -275,6 +295,44 @@ export const AuthProvider = ({ children }) => {
     setUserProfile(profile);
     const badges = await fetchUserBadges(user.id);
     setUserBadges(badges);
+    const favorites = await fetchUserFavorites(user.id);
+    setUserFavorites(favorites);
+  };
+
+  // Toggle Favorite
+  const toggleFavorite = async (productId) => {
+    if (!user) return { error: new Error('User not authenticated') };
+
+    // Optimistic Update
+    const previousFavorites = new Set(userFavorites);
+    const newFavorites = new Set(userFavorites);
+    const isAdding = !newFavorites.has(productId);
+
+    if (isAdding) newFavorites.add(productId);
+    else newFavorites.delete(productId);
+
+    setUserFavorites(newFavorites);
+
+    try {
+      if (isAdding) {
+        const { error } = await supabase
+          .from('user_favorites')
+          .insert([{ user_id: user.id, product_id: productId }]);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('user_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('product_id', productId);
+        if (error) throw error;
+      }
+      return { error: null };
+    } catch (error) {
+      console.error('Toggle favorite error:', error);
+      setUserFavorites(previousFavorites); // Revert
+      return { error };
+    }
   };
 
   const value = {
@@ -287,7 +345,9 @@ export const AuthProvider = ({ children }) => {
     signInWithGoogle,
     signOut,
     awardPoints,
-    refreshProfile
+    refreshProfile,
+    userFavorites,
+    toggleFavorite
   };
 
   return (
