@@ -1076,18 +1076,18 @@ const App9 = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Catégorie
                                 </label>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-3 gap-2">
                                     {categories.map((cat) => (
                                         <button
                                             key={cat.id}
                                             onClick={() => setManualEntry({ ...manualEntry, categoryId: cat.id })}
-                                            className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors border ${manualEntry.categoryId === cat.id
-                                                ? 'bg-orange-100 border-orange-500 ring-2 ring-orange-200'
-                                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                                            className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors border min-h-[80px] ${manualEntry.categoryId === cat.id
+                                                    ? 'bg-orange-100 border-orange-500 ring-2 ring-orange-200'
+                                                    : 'bg-white border-gray-200 hover:bg-gray-50'
                                                 }`}
                                         >
                                             <span className="text-2xl" role="img" aria-label={cat.name}>{cat.icon}</span>
-                                            <span className="text-[10px] text-center leading-tight text-gray-600 line-clamp-2">
+                                            <span className="text-xs text-center leading-tight text-gray-700">
                                                 {cat.name}
                                             </span>
                                         </button>
