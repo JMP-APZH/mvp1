@@ -3,9 +3,20 @@ import { User, LogOut, Trophy, Star, ChevronDown, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const UserMenu = ({ onSignInClick }) => {
-  const { user, userProfile, userBadges, loading, signOut } = useAuth();
+  const { user, userProfile, userBadges, loading, signOut, updateProfile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [isUpdatingCity, setIsUpdatingCity] = useState(false);
   const menuRef = useRef(null);
+
+  const martiniqueCities = [
+    "Fort-de-France", "Le Lamentin", "Le Robert", "Schoelcher", "Sainte-Marie",
+    "Le François", "Ducos", "Saint-Joseph", "La Trinité", "Rivière-Pilote",
+    "Rivière-Salée", "Gros-Morne", "Sainte-Luce", "Saint-Esprit", "Le Marin",
+    "Le Lorrain", "Le Diamant", "Le Vauclin", "Case-Pilote", "Saint-Pierre",
+    "Les Anses-d'Arlet", "Basse-Pointe", "Grand'Rivière", "Ajoupa-Bouillon",
+    "Le Morne-Rouge", "Le Morne-Vert", "Le Carbet", "Le Prêcheur",
+    "Fond-Saint-Denis", "Sainte-Anne", "Macouba", "Le Marigot", "Bellefontaine"
+  ].sort();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -22,6 +33,12 @@ const UserMenu = ({ onSignInClick }) => {
   const handleSignOut = async () => {
     await signOut();
     setIsOpen(false);
+  };
+
+  const handleCityChange = async (city) => {
+    setIsUpdatingCity(true);
+    await updateProfile({ city });
+    setIsUpdatingCity(false);
   };
 
   // Calculate progress to next level
@@ -152,26 +169,41 @@ const UserMenu = ({ onSignInClick }) => {
             </div>
           </div>
 
-          {/* Stats */}
+          {/* Main User Stats */}
           <div className="p-4 border-b border-gray-100">
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div className="bg-orange-50 p-3 rounded-xl border border-orange-100">
+                <div className="text-2xl font-bold text-orange-600">
+                  {((userProfile?.total_contributions || 0) * 0.85).toFixed(2)}€
+                </div>
+                <div className="text-[10px] uppercase tracking-wider font-bold text-orange-400">Mes Économies</div>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                <div className="text-2xl font-bold text-blue-600 flex items-center justify-center gap-1">
+                  🔥 {userProfile?.streak_count || 1}
+                </div>
+                <div className="text-[10px] uppercase tracking-wider font-bold text-blue-400">Série (Jours)</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mt-4 text-center border-t border-gray-50 pt-4">
               <div>
-                <div className="text-xl font-bold text-gray-900">
+                <div className="text-lg font-bold text-gray-900">
                   {userProfile?.points || 0}
                 </div>
-                <div className="text-xs text-gray-500">Points</div>
+                <div className="text-[10px] text-gray-500 uppercase">Points</div>
               </div>
               <div>
-                <div className="text-xl font-bold text-gray-900">
+                <div className="text-lg font-bold text-gray-900">
                   {userProfile?.total_contributions || 0}
                 </div>
-                <div className="text-xs text-gray-500">Prix</div>
+                <div className="text-[10px] text-gray-500 uppercase">Prix</div>
               </div>
               <div>
-                <div className="text-xl font-bold text-gray-900">
+                <div className="text-lg font-bold text-gray-900">
                   {userBadges.length}
                 </div>
-                <div className="text-xs text-gray-500">Badges</div>
+                <div className="text-[10px] text-gray-500 uppercase">Badges</div>
               </div>
             </div>
           </div>
@@ -199,6 +231,25 @@ const UserMenu = ({ onSignInClick }) => {
               </div>
             </div>
           )}
+
+          {/* City Selector */}
+          <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+            <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+              📍 Ma Ville
+              {isUpdatingCity && <span className="animate-pulse text-[10px] text-orange-500 ml-2">Mise à jour...</span>}
+            </p>
+            <select
+              value={userProfile?.city || ""}
+              onChange={(e) => handleCityChange(e.target.value)}
+              disabled={isUpdatingCity}
+              className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none disabled:opacity-50"
+            >
+              <option value="">Choisir ma ville...</option>
+              {martiniqueCities.map(city => (
+                <option key={city} value={city}>{city}</option>
+              ))}
+            </select>
+          </div>
 
           {/* Actions */}
           <div className="p-2">

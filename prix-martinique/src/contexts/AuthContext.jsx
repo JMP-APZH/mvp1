@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+
   // Fetch user favorites
   const fetchUserFavorites = async (userId) => {
     try {
@@ -86,7 +87,6 @@ export const AuthProvider = ({ children }) => {
     let isInitialized = false;
     let currentLoadedUserId = null; // Track which user's data we've loaded
 
-    // Helper to load user data
     const loadUserData = async (userId) => {
       const [profile, badges, favorites] = await Promise.all([
         fetchUserProfile(userId),
@@ -107,6 +107,7 @@ export const AuthProvider = ({ children }) => {
           setUser(null);
           setUserProfile(null);
           setUserBadges([]);
+          setUserFavorites(new Set());
           setLoading(false);
           return;
         }
@@ -121,7 +122,7 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           setLoading(true);
 
-          const { profile, badges } = await loadUserData(session.user.id);
+          const { profile, badges, favorites } = await loadUserData(session.user.id);
           if (isMounted) {
             currentLoadedUserId = session.user.id;
             setUserProfile(profile);
@@ -152,7 +153,7 @@ export const AuthProvider = ({ children }) => {
 
         if (session?.user && isMounted) {
           setUser(session.user);
-          const { profile, badges } = await loadUserData(session.user.id);
+          const { profile, badges, favorites } = await loadUserData(session.user.id);
           if (isMounted) {
             currentLoadedUserId = session.user.id;
             setUserProfile(profile);
@@ -260,26 +261,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Award points to user (calls the Supabase function)
-  const awardPoints = async (activityType, points, description) => {
-    if (!user) return { error: new Error('User not authenticated') };
-
+  // Award points
+  const awardPoints = async (points, description) => {
     try {
+      if (!user) return { data: null, error: 'Not authenticated' };
+
       const { data, error } = await supabase.rpc('award_points', {
         p_user_id: user.id,
-        p_activity_type: activityType,
         p_points: points,
         p_description: description
       });
 
       if (error) throw error;
-
-      // Refresh user profile and badges after awarding points
-      const profile = await fetchUserProfile(user.id);
-      setUserProfile(profile);
-      const badges = await fetchUserBadges(user.id);
-      setUserBadges(badges);
-
+      await refreshProfile();
       return { data, error: null };
     } catch (error) {
       console.error('Award points error:', error);
@@ -287,23 +281,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Refresh user profile (can be called after point updates)
-  const refreshProfile = async () => {
-    if (!user) return;
-
-    const profile = await fetchUserProfile(user.id);
-    setUserProfile(profile);
-    const badges = await fetchUserBadges(user.id);
-    setUserBadges(badges);
-    const favorites = await fetchUserFavorites(user.id);
-    setUserFavorites(favorites);
-  };
-
   // Toggle Favorite
   const toggleFavorite = async (productId) => {
     if (!user) return { error: new Error('User not authenticated') };
 
-    // Optimistic Update
     const previousFavorites = new Set(userFavorites);
     const newFavorites = new Set(userFavorites);
     const isAdding = !newFavorites.has(productId);
@@ -330,7 +311,38 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Toggle favorite error:', error);
-      setUserFavorites(previousFavorites); // Revert
+      setUserFavorites(previousFavorites);
+      return { error };
+    }
+  };
+
+  // Refresh profile data
+  const refreshProfile = async () => {
+    if (user) {
+      const profile = await fetchUserProfile(user.id);
+      setUserProfile(profile);
+      const badges = await fetchUserBadges(user.id);
+      setUserBadges(badges);
+      const favorites = await fetchUserFavorites(user.id);
+      setUserFavorites(favorites);
+    }
+  };
+
+  // Update user profile (e.g., city)
+  const updateProfile = async (updates) => {
+    try {
+      if (!user) return { error: 'Not authenticated' };
+
+      const { error } = await supabase
+        .from('user_profiles')
+        .update(updates)
+        .eq('id', user.id);
+
+      if (error) throw error;
+      await refreshProfile();
+      return { error: null };
+    } catch (error) {
+      console.error('Error updating profile:', error);
       return { error };
     }
   };
@@ -346,13 +358,14 @@ export const AuthProvider = ({ children }) => {
     signOut,
     awardPoints,
     refreshProfile,
+    updateProfile,
     userFavorites,
     toggleFavorite
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

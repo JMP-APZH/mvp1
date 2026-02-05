@@ -155,23 +155,22 @@ const App9 = () => {
             const { data, error } = await supabase
                 .from('prices')
                 .select(`
-          id,
-          price,
-          user_name,
-          user_id,
-          created_at,
-          product_photo_url,
-          price_tag_photo_url,
-          price_tag_photo_url,
-          products (id, name, barcode, category_id),
-          stores (name, full_address)
-        `)
+                  id,
+                  price,
+                  user_name,
+                  user_id,
+                  created_at,
+                  product_photo_url,
+                  price_tag_photo_url,
+                  products (id, name, barcode, category_id),
+                  stores (name, full_address),
+                  price_likes (user_id)
+                `)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
             if (error) throw error;
 
-            // Transform data for display
             const transformedPrices = data.map(item => ({
                 id: item.id,
                 productId: item.products?.id,
@@ -185,7 +184,9 @@ const App9 = () => {
                 userId: item.user_id,
                 date: new Date(item.created_at).toLocaleDateString('fr-FR'),
                 productPhotoUrl: item.product_photo_url,
-                priceTagPhotoUrl: item.price_tag_photo_url
+                priceTagPhotoUrl: item.price_tag_photo_url,
+                likesCount: item.price_likes?.length || 0,
+                isLikedByUser: item.price_likes?.some(l => l.user_id === user?.id)
             }));
 
             setRecentPrices(transformedPrices);
@@ -448,6 +449,35 @@ const App9 = () => {
         }
     };
 
+    const handleToggleLike = async (priceId, isLiked) => {
+        if (!user) {
+            setShowAuthModal(true);
+            return;
+        }
+
+        try {
+            if (isLiked) {
+                // Remove like
+                await supabase
+                    .from('price_likes')
+                    .delete()
+                    .eq('price_id', priceId)
+                    .eq('user_id', user.id);
+            } else {
+                // Add like
+                await supabase
+                    .from('price_likes')
+                    .insert([{ price_id: priceId, user_id: user.id }]);
+
+                // Award symbolic point for "gratefulness" or community spirit? 
+                // Maybe for the price owner? For now just refresh.
+            }
+            loadRecentPrices();
+        } catch (err) {
+            console.error('Error toggling like:', err);
+        }
+    };
+
     const submitPrice = async () => {
         if (!manualEntry.productName || !manualEntry.price || !manualEntry.storeId) {
             alert('Veuillez remplir tous les champs obligatoires (produit, prix, magasin)');
@@ -677,7 +707,59 @@ const App9 = () => {
         const max = Math.max(...prices);
         const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
 
-        return { min, max, avg, count: productPrices.length };
+        // Calculate variance percentage
+        const variance = min > 0 ? ((max - min) / min) * 100 : 0;
+
+        return { min, max, avg, count: productPrices.length, variance };
+    };
+
+    // Calculate Community Basket (Standard essential items)
+    const getCommunityBasket = () => {
+        // Essential items identifiers (keywords in name)
+        const essentials = [
+            { name: 'Lait', icon: '🥛' },
+            { name: 'Pain', icon: '🥖' },
+            { name: 'Oeufs', icon: '🥚' },
+            { name: 'Riz', icon: '🍚' },
+            { name: 'Pâtes', icon: '🍝' },
+            { name: 'Eau', icon: '💧' }
+        ];
+
+        // Group by chain (Carrefour, Super U, etc.)
+        const chainCosts = {};
+
+        recentPrices.forEach(p => {
+            const chain = p.store.split(' ')[0]; // Basic chain detection from store name
+            if (!chainCosts[chain]) chainCosts[chain] = { total: 0, items: new Set() };
+
+            essentials.forEach(ess => {
+                if (p.product.toLowerCase().includes(ess.name.toLowerCase())) {
+                    // Update if it's the latest price for this essential in this chain
+                    chainCosts[chain].total += p.price;
+                    chainCosts[chain].items.add(ess.name);
+                }
+            });
+        });
+
+        // Filter chains that have at least 3 essential items
+        return Object.entries(chainCosts)
+            .filter(([_, data]) => data.items.size >= 2)
+            .map(([chain, data]) => ({
+                chain,
+                total: data.total / data.items.size, // Average cost per item for fair comparison
+                count: data.items.size
+            }))
+            .sort((a, b) => a.total - b.total);
+    };
+
+    // Get Top Price Gaps (high variance)
+    const getPriceGaps = () => {
+        const uniqueProducts = [...new Set(recentPrices.map(p => p.product))];
+        return uniqueProducts
+            .map(name => ({ name, stats: getProductStats(name) }))
+            .filter(item => item.stats.count > 1 && item.stats.variance > 15) // At least 2 prices and 15% gap
+            .sort((a, b) => b.stats.variance - a.stats.variance)
+            .slice(0, 3);
     };
 
     return (
@@ -1236,12 +1318,13 @@ const App9 = () => {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                handleToggleFavorite(price.productId); // Ensure productId is available here. If not, use price.product_id
+                                                                handleToggleFavorite(price.productId);
                                                             }}
-                                                            className="mt-2 text-gray-400 hover:text-red-500 transition-colors"
+                                                            className="mt-2 text-gray-400 hover:text-yellow-500 transition-colors"
+                                                            title="Ajouter aux favoris"
                                                         >
-                                                            <Heart
-                                                                className={`w-6 h-6 ${userFavorites.has(price.productId || price.product_id) ? 'fill-red-500 text-red-500' : ''}`}
+                                                            <Star
+                                                                className={`w-5 h-5 ${userFavorites.has(price.productId) ? 'fill-yellow-400 text-yellow-400' : ''}`}
                                                             />
                                                         </button>
                                                     </div>
@@ -1283,11 +1366,21 @@ const App9 = () => {
                                                     </div>
                                                 )}
 
-                                                <div className="flex justify-between text-xs text-gray-500 mt-2 pt-2 border-t">
-                                                    <span>
-                                                        Par {price.userName}
-                                                        {isCurrentUser && <span className="text-orange-500 ml-1">(vous)</span>}
-                                                    </span>
+                                                <div className="flex justify-between items-center text-xs text-gray-500 mt-2 pt-2 border-t">
+                                                    <div className="flex items-center gap-4">
+                                                        <button
+                                                            onClick={() => handleToggleLike(price.id, price.isLikedByUser)}
+                                                            className={`flex items-center gap-1.5 transition-colors ${price.isLikedByUser ? 'text-red-500' : 'hover:text-red-500'}`}
+                                                        >
+                                                            <Heart className={`w-4 h-4 ${price.isLikedByUser ? 'fill-red-500' : ''}`} />
+                                                            <span className="font-bold">{price.likesCount || 0}</span>
+                                                            <span className="hidden sm:inline">Merci !</span>
+                                                        </button>
+                                                        <span>
+                                                            Par {price.userName}
+                                                            {isCurrentUser && <span className="text-orange-500 ml-1">(vous)</span>}
+                                                        </span>
+                                                    </div>
                                                     <span>{price.date}</span>
                                                 </div>
                                                 {stats && stats.count > 1 && (
@@ -1377,16 +1470,84 @@ const App9 = () => {
                         </div>
 
 
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                            <h3 className="font-semibold text-yellow-900 mb-2">Prochainement</h3>
-                            <ul className="text-sm text-yellow-800 space-y-1">
-                                <li>- Graphiques d'évolution des prix</li>
-                                <li>- Comparaison Martinique vs France métropolitaine</li>
-                                <li>- Alertes sur vos produits favoris</li>
-                                <li>- Classement des magasins les moins chers</li>
-                                <li>- Actions collectives et pétitions</li>
-                            </ul>
-                        </div>
+                        {/* Community Basket */}
+                        {getCommunityBasket().length > 0 && (
+                            <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+                                <h3 className="font-bold text-gray-800 mb-3 flex items-center">
+                                    <span className="bg-green-100 p-2 rounded-lg mr-2">🛒</span>
+                                    Panier Moyen par Enseigne
+                                </h3>
+                                <div className="space-y-4">
+                                    {getCommunityBasket().map((item, index) => (
+                                        <div key={item.chain} className="relative">
+                                            <div className="flex justify-between items-end mb-1">
+                                                <span className="font-bold text-gray-700">{item.chain}</span>
+                                                <span className="text-lg font-bold text-green-600">{item.total.toFixed(2)}€</span>
+                                            </div>
+                                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-1000 ${index === 0 ? 'bg-green-500' : 'bg-gray-300'}`}
+                                                    style={{ width: `${(getCommunityBasket()[0].total / item.total) * 100}%` }}
+                                                ></div>
+                                            </div>
+                                            <span className="text-[10px] text-gray-400">Indexé sur {item.count} articles essentiels</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Price Gaps */}
+                        {getPriceGaps().length > 0 && (
+                            <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-100">
+                                <h3 className="font-bold mb-3 flex items-center text-red-600">
+                                    <AlertCircle className="w-5 h-5 mr-2" />
+                                    Gros écarts détectés
+                                </h3>
+                                <div className="space-y-3">
+                                    {getPriceGaps().map((gap, index) => (
+                                        <div key={gap.name} className="flex flex-col p-3 bg-red-50 rounded-lg border border-red-100">
+                                            <div className="flex justify-between items-start">
+                                                <span className="font-bold text-sm text-gray-800 line-clamp-1">{gap.name}</span>
+                                                <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                                    {gap.stats.variance.toFixed(0)}% d'écart
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between mt-2 text-xs">
+                                                <span className="text-green-600">Min: {gap.stats.min.toFixed(2)}€</span>
+                                                <span className="text-red-600">Max: {gap.stats.max.toFixed(2)}€</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* City Ranking */}
+                        {userProfile?.city && (
+                            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-lg p-5 shadow-lg overflow-hidden relative">
+                                <div className="absolute -right-4 -bottom-4 opacity-10">
+                                    <BarChart3 className="w-24 h-24" />
+                                </div>
+                                <h3 className="font-bold mb-3 flex items-center gap-2">
+                                    📍 Top {userProfile.city}
+                                </h3>
+                                <div className="space-y-3">
+                                    {recentPrices
+                                        .filter(p => p.store.toLowerCase().includes(userProfile.city.toLowerCase()))
+                                        .slice(0, 3)
+                                        .map((p, idx) => (
+                                            <div key={idx} className="flex justify-between items-center bg-white/10 p-2 rounded-lg">
+                                                <span className="text-xs truncate max-w-[150px]">{p.product}</span>
+                                                <span className="font-bold">{p.price.toFixed(2)}€</span>
+                                            </div>
+                                        ))}
+                                    {recentPrices.filter(p => p.store.toLowerCase().includes(userProfile.city.toLowerCase())).length === 0 && (
+                                        <p className="text-xs text-blue-100 italic">Aucune donnée pour {userProfile.city} ce mois-ci. Soyez le premier !</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="space-y-3">
                             <h3 className="font-semibold text-gray-800">Produits les plus suivis</h3>
