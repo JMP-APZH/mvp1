@@ -5,7 +5,7 @@ const AboutPage = () => {
   const [view, setView] = useState('landing'); // 'landing', 'philosophy', 'rules'
 
   const SubHeader = ({ title }) => (
-    <div className="flex items-center gap-4 mb-6 sticky top-0 bg-white/80 backdrop-blur-md py-2 z-10 border-b border-gray-100">
+    <div className="flex items-center gap-4 mb-6 sticky top-0 bg-white/95 backdrop-blur-md py-4 z-[40] border-b border-gray-100 -mx-6 px-6">
       <button
         onClick={() => setView('landing')}
         className="p-2 hover:bg-gray-100 rounded-full transition-colors"
