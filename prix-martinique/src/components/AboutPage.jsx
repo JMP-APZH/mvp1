@@ -5,14 +5,14 @@ const AboutPage = () => {
   const [view, setView] = useState('landing'); // 'landing', 'philosophy', 'rules'
 
   const SubHeader = ({ title }) => (
-    <div className="flex items-center gap-4 mb-6 sticky top-0 bg-white/95 backdrop-blur-md py-4 z-[40] border-b border-gray-100 -mx-6 px-6">
-      <button
-        onClick={() => setView('landing')}
-        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-      >
+    <div
+      onClick={() => setView('landing')}
+      className="flex items-center gap-4 mb-6 sticky top-[61px] bg-white py-4 z-[50] border-b border-gray-100 -mx-6 px-6 cursor-pointer hover:bg-gray-50 transition-colors group"
+    >
+      <div className="p-2 group-hover:bg-gray-100 rounded-full transition-colors">
         <ChevronLeft className="w-6 h-6 text-gray-600" />
-      </button>
-      <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+      </div>
+      <h2 className="text-xl font-bold text-gray-900 flex-1">{title}</h2>
     </div>
   );
 
