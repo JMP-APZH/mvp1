@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megaphone, ChevronLeft, ArrowRight } from 'lucide-react';
+import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megaphone, ChevronLeft, ArrowRight, Star } from 'lucide-react';
 
 const AboutPage = () => {
   const [view, setView] = useState('landing'); // 'landing', 'philosophy', 'rules'
