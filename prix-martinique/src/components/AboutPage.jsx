@@ -19,16 +19,19 @@ const AboutPage = () => {
   if (view === 'landing') {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-4 leading-tight">
+        <div className="sticky top-[61px] bg-white py-4 z-[50] border-b border-gray-100 -mx-6 px-6 mb-4">
+          <h1 className="text-2xl font-bold text-center leading-tight">
             Notre <span className="text-red-600">engagement</span> communautaire
           </h1>
-          <div className="flex justify-center gap-2 my-4">
-            <div className="w-16 h-1 bg-red-600 rounded"></div>
-            <div className="w-16 h-1 bg-green-600 rounded"></div>
-            <div className="w-16 h-1 bg-black rounded"></div>
+          <div className="flex justify-center gap-2 mt-2">
+            <div className="w-12 h-1 bg-red-600 rounded"></div>
+            <div className="w-12 h-1 bg-green-600 rounded"></div>
+            <div className="w-12 h-1 bg-black rounded"></div>
           </div>
-          <p className="text-gray-600 mt-4 italic">
+        </div>
+
+        <div className="text-center mb-8">
+          <p className="text-gray-600 italic">
             "Tousèl nou pa ka pézé ayen, sé ansanm nou pi fò"
           </p>
         </div>
