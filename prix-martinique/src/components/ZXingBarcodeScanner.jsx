@@ -371,7 +371,7 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
 
   // Main scanner UI
   return (
-    <div className="fixed inset-0 bg-black z-50">
+    <div className="fixed inset-0 bg-black z-[200]">
       {/* Video element */}
       <video
         ref={videoRef}
@@ -410,8 +410,8 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
         {/* Scanner type badge */}
         {isInitialized && (
           <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold ${scannerType === 'native'
-              ? 'bg-green-500 bg-opacity-80 text-white'
-              : 'bg-blue-500 bg-opacity-80 text-white'
+            ? 'bg-green-500 bg-opacity-80 text-white'
+            : 'bg-blue-500 bg-opacity-80 text-white'
             }`}>
             {scannerType === 'native' ? '🤖 API Native' : '🍎 ZXing WASM'}
           </span>

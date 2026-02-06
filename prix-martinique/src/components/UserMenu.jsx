@@ -131,7 +131,7 @@ const UserMenu = ({ onSignInClick }) => {
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
+        <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-[110]">
           {/* User info header */}
           <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 p-4 text-white">
             <div className="flex items-center gap-3">

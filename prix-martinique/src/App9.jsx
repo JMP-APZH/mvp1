@@ -875,7 +875,7 @@ const App9 = () => {
             )}
 
             {/* Navigation - Fixed for mobile */}
-            <div className="flex border-b bg-white sticky top-0 shadow-sm z-10">
+            <div className="flex border-b bg-white sticky top-0 shadow-sm z-[100]">
                 <button
                     onClick={() => setActiveTab('scan')}
                     className={`flex-1 py-3 px-2 font-medium transition-colors ${activeTab === 'scan'
@@ -1606,7 +1606,7 @@ const App9 = () => {
             {/* Image Zoom Modal */}
             {selectedImage && (
                 <div
-                    className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200"
+                    className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200"
                     onClick={() => setSelectedImage(null)}
                 >
                     <button
