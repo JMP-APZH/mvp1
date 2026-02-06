@@ -1,8 +1,189 @@
-import { Heart, Users, Lightbulb, Target, Share2, BookOpen } from 'lucide-react';
+import React, { useState } from 'react';
+import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megaphone, ChevronLeft, ArrowRight } from 'lucide-react';
 
 const AboutPage = () => {
+  const [view, setView] = useState('landing'); // 'landing', 'philosophy', 'rules'
+
+  const SubHeader = ({ title }) => (
+    <div className="flex items-center gap-4 mb-6 sticky top-0 bg-white/80 backdrop-blur-md py-2 z-10 border-b border-gray-100">
+      <button
+        onClick={() => setView('landing')}
+        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+      >
+        <ChevronLeft className="w-6 h-6 text-gray-600" />
+      </button>
+      <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+    </div>
+  );
+
+  if (view === 'landing') {
+    return (
+      <div className="max-w-2xl mx-auto p-6 space-y-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold mb-4 leading-tight">
+            Notre <span className="text-red-600">engagement</span> communautaire
+          </h1>
+          <div className="flex justify-center gap-2 my-4">
+            <div className="w-16 h-1 bg-red-600 rounded"></div>
+            <div className="w-16 h-1 bg-green-600 rounded"></div>
+            <div className="w-16 h-1 bg-black rounded"></div>
+          </div>
+          <p className="text-gray-600 mt-4 italic">
+            "Sèl nou lwen, ansanm nou pi fò"
+          </p>
+        </div>
+
+        <div className="grid gap-6">
+          <button
+            onClick={() => setView('philosophy')}
+            className="group relative bg-white border-2 border-orange-100 hover:border-orange-500 p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all text-left overflow-hidden"
+          >
+            <div className="absolute right-0 top-0 opacity-5 -mr-4 -mt-4 group-hover:scale-110 transition-transform">
+              <Lightbulb className="w-32 h-32" />
+            </div>
+            <div className="relative z-10">
+              <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-500 transition-colors">
+                <Lightbulb className="w-7 h-7 text-orange-600 group-hover:text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Notre Philosophie</h3>
+              <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+                Découvrez la vision de prospérité et d'autonomie qui porte ce projet pour la Martinique.
+              </p>
+              <div className="flex items-center text-orange-600 font-bold text-sm">
+                Découvrir <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setView('rules')}
+            className="group relative bg-white border-2 border-red-500 p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all text-left overflow-hidden bg-gradient-to-br from-white to-red-50/30"
+          >
+            <div className="absolute right-0 top-0 opacity-5 -mr-4 -mt-4 group-hover:scale-110 transition-transform">
+              <ShieldCheck className="w-32 h-32" />
+            </div>
+            <div className="relative z-10">
+              <div className="w-14 h-14 bg-red-600 rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-red-200">
+                <ShieldCheck className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Citoyens Conscients & Activistes</h3>
+              <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+                Les règles fondamentales et les avantages de notre action collective contre la vie chère.
+              </p>
+              <div className="flex items-center text-red-600 font-bold text-sm">
+                Rejoindre le combat <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <div className="pt-12 border-t border-gray-100 text-center">
+          <div className="flex justify-center gap-2 mb-4">
+            <div className="w-8 h-8 bg-red-600 rounded-full"></div>
+            <div className="w-8 h-8 bg-green-600 rounded-full"></div>
+            <div className="w-8 h-8 bg-black rounded-full"></div>
+          </div>
+          <p className="text-xs text-gray-400 uppercase tracking-widest font-bold">
+            Martinique Consciente • 2026
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'rules') {
+    return (
+      <div className="max-w-2xl mx-auto p-6 space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+        <SubHeader title="Règles & Avantages" />
+
+        <div className="bg-red-600 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
+          <div className="absolute right-0 bottom-0 opacity-20 -mr-6 -mb-6">
+            <Megaphone className="w-32 h-32" />
+          </div>
+          <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
+            🚨 L'Appel des Citoyens Conscients
+          </h3>
+          <p className="text-red-50 leading-relaxed font-medium">
+            Ce n'est pas qu'une application de prix. C'est un instrument de pression populaire et de transparence totale.
+          </p>
+        </div>
+
+        <section className="space-y-6">
+          <h3 className="font-bold text-xl text-gray-900 border-b-2 border-red-100 pb-2">🛡️ Règles du "Chasseur"</h3>
+          <div className="grid gap-4">
+            <div className="flex gap-4 p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+              <div className="text-2xl">📸</div>
+              <div>
+                <h4 className="font-bold text-gray-800">Preuve par l'image</h4>
+                <p className="text-sm text-gray-600">Toujours photographier l'étiquette en rayon. Une donnée sans photo est une donnée qui peut être contestée.</p>
+              </div>
+            </div>
+            <div className="flex gap-4 p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+              <div className="text-2xl">⚡</div>
+              <div>
+                <h4 className="font-bold text-gray-800">Donnée en temps réel</h4>
+                <p className="text-sm text-gray-600">Publiez votre prix immédiatement. Un prix de la semaine dernière n'est plus utile au consommateur d'aujourd'hui.</p>
+              </div>
+            </div>
+            <div className="flex gap-4 p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+              <div className="text-2xl">🤝</div>
+              <div>
+                <h4 className="font-bold text-gray-800">Zéro manipulation</h4>
+                <p className="text-sm text-gray-600">Nous luttons contre les fausses promos. Signalez les erreurs d'étiquetage pour protéger la communauté.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <h3 className="font-bold text-xl border-b-2 border-green-100 pb-2 text-green-700">💎 Vos avantages d'Activiste</h3>
+          <div className="grid gap-4">
+            <div className="p-5 bg-green-50 rounded-2xl border border-green-100">
+              <h4 className="font-bold text-green-900 mb-2 flex items-center gap-2">
+                <Target className="w-5 h-5" /> Pouvoir de boycott ciblé
+              </h4>
+              <p className="text-sm text-green-800">
+                Grâce aux statistiques communautaires, nous identifions instantanément les abus et pouvons orienter nos achats vers les enseignes qui respectent réellement le consommateur.
+              </p>
+            </div>
+            <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
+              <h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
+                <Users className="w-5 h-5" /> Influence Collective
+              </h4>
+              <p className="text-sm text-blue-800">
+                Chaque prix scanné est une donnée qui sert aux associations et aux collectifs pour prouver la réalité de la vie chère avec des faits indiscutables.
+              </p>
+            </div>
+            <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100">
+              <h4 className="font-bold text-amber-900 mb-2 flex items-center gap-2">
+                <Star className="w-5 h-5" /> Récompense de l'expertise
+              </h4>
+              <p className="text-sm text-amber-800">
+                Gagnez en influence au sein de la communauté. Vos signalements "BQP" validés font de vous un expert reconnu de la consommation consciente.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <div className="bg-gray-900 text-white p-8 rounded-3xl text-center space-y-4">
+          <h4 className="text-2xl font-bold">"Batjé a boy' é pa pèd fwa"</h4>
+          <p className="text-gray-400">
+            Votre smartphone est votre arme. Utilisez-la pour la transparence et la justice sociale.
+          </p>
+          <button
+            onClick={() => setView('landing')}
+            className="bg-white text-gray-900 px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition-colors"
+          >
+            Compris !
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-8">
+    <div className="max-w-2xl mx-auto p-6 space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
+      <SubHeader title="Notre Philosophie" />
       {/* Hero Section with RVN Colors */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-4 leading-tight">
