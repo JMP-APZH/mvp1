@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import BQPVerifier from './components/BQPVerifier';
 
-import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf } from 'lucide-react';
+import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
@@ -1213,10 +1213,34 @@ const App10 = () => {
                             </div>
                         )}
 
-                        {/* Scanner Button */}
-                        <div>
+                        {/* Scanner UI */}
+                        <div className="space-y-4">
+                            {showScanner ? (
+                                <div className="relative rounded-xl overflow-hidden shadow-2xl bg-black aspect-square max-w-sm mx-auto animate-in zoom-in-95 duration-300">
+                                    <ZXingBarcodeScanner
+                                        onBarcodeDetected={handleBarcodeDetected}
+                                        onClose={() => setShowScanner(false)}
+                                    />
+                                    <button
+                                        onClick={() => setShowScanner(false)}
+                                        className="absolute top-4 right-4 z-10 bg-white/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-white/40 transition-colors"
+                                    >
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setShowScanner(true)}
+                                    className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl p-4 shadow-md flex items-center justify-center gap-3 hover:shadow-lg transition-all animate-in zoom-in-95 duration-300"
+                                >
+                                    <ScanLine className="w-6 h-6" />
+                                    <span className="text-lg font-bold">Scanner un produit</span>
+                                </button>
+                            )}
+
+                            {/* BQP & Price Results */}
                             {bqpCheckResult && bqpCheckResult.status === 'found' && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 flex items-center gap-3">
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
                                     <ShieldCheck className="w-8 h-8 text-green-600" />
                                     <div>
                                         <h3 className="font-bold text-green-800">Produit BQP Vérifié !</h3>
@@ -1229,7 +1253,7 @@ const App10 = () => {
                                             <button
                                                 onClick={() => handleToggleFavorite(bqpCheckResult.product.id)}
                                                 className="p-2 rounded-full bg-white border border-gray-200 hover:bg-yellow-50 hover:border-yellow-300 transition-colors"
-                                                title="Ajouter aux favoris (Sauvegarder)"
+                                                title="Ajouter aux favoris"
                                             >
                                                 <Bookmark className={`w-5 h-5 ${userFavorites.has(bqpCheckResult.product.id) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
                                             </button>
@@ -1237,176 +1261,136 @@ const App10 = () => {
                                                 onClick={() => addToShoppingList({
                                                     id: bqpCheckResult.product.id,
                                                     name: bqpCheckResult.product.name,
-                                                    productPhotoUrl: null // Specific photo unavailable here usually, could pass product photo if available
+                                                    productPhotoUrl: null
                                                 })}
                                                 className={`p-2 rounded-full border transition-colors ${shoppingList.some(item => item.productId === bqpCheckResult.product.id)
                                                     ? 'bg-green-100 border-green-500 text-green-700'
                                                     : 'bg-white border-gray-200 text-gray-400 hover:text-green-600'
                                                     }`}
-                                                title="Ajouter au panier"
                                             >
-                                                <ShoppingBasket className={`w-5 h-5 ${shoppingList.some(item => item.productId === bqpCheckResult.product.id) ? 'fill-green-100' : ''}`} />
+                                                <ShoppingBasket className="w-5 h-5" />
                                             </button>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => handleVote(1)}
                                                 className={`p-2 rounded-full border ${bqpVoteStats.userVote === 1 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-white border-gray-200 text-gray-400'}`}
-                                                title="Le produit correspond bien à cette catégorie"
                                             >
-                                                <ThumbsUp className="w-5 h-5" />
-                                                <span className="text-xs font-bold block text-center">{bqpVoteStats.upvotes}</span>
+                                                <ThumbsUp className="w-4 h-4" />
+                                                <span className="text-[10px] font-bold block text-center">{bqpVoteStats.upvotes}</span>
                                             </button>
                                             <button
                                                 onClick={() => handleVote(-1)}
                                                 className={`p-2 rounded-full border ${bqpVoteStats.userVote === -1 ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-200 text-gray-400'}`}
-                                                title="Ce n'est pas le bon produit BQP"
                                             >
-                                                <ThumbsDown className="w-5 h-5" />
-                                                <span className="text-xs font-bold block text-center">{bqpVoteStats.downvotes}</span>
+                                                <ThumbsDown className="w-4 h-4" />
+                                                <span className="text-[10px] font-bold block text-center">{bqpVoteStats.downvotes}</span>
                                             </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Quality Feedback Section */}
-                                    <div className="mt-3 pt-3 border-t border-green-100">
-                                        <p className="text-xs font-bold text-green-800 mb-2 uppercase tracking-wide">Qualité du produit BQP</p>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-green-700 font-medium">Le rapport qualité/prix est-il correct ?</span>
-                                            <div className="flex gap-4">
-                                                <button
-                                                    onClick={() => handleQualityVote(1)}
-                                                    className={`flex flex-col items-center gap-1 transition-colors ${bqpQualityStats.userVote === 1 ? 'text-green-600 scale-110' : 'text-gray-400 hover:text-green-500'}`}
-                                                >
-                                                    <ThumbsUp className={`w-6 h-6 ${bqpQualityStats.userVote === 1 ? 'fill-green-100' : ''}`} />
-                                                    <span className="text-[10px] font-bold">{bqpQualityStats.upvotes}</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleQualityVote(-1)}
-                                                    className={`flex flex-col items-center gap-1 transition-colors ${bqpQualityStats.userVote === -1 ? 'text-red-500 scale-110' : 'text-gray-400 hover:text-red-500'}`}
-                                                >
-                                                    <ThumbsDown className={`w-6 h-6 ${bqpQualityStats.userVote === -1 ? 'fill-red-100' : ''}`} />
-                                                    <span className="text-[10px] font-bold">{bqpQualityStats.downvotes}</span>
-                                                </button>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
                             {(bqpCheckResult && (bqpCheckResult.status === 'not_found' || bqpCheckResult.status === 'new_product')) && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Info className="w-5 h-5 text-blue-600" />
-                                        <h3 className="font-bold text-blue-800">
-                                            {bqpCheckResult.status === 'new_product' ? 'Nouveau produit' : 'Produit non classé'}
-                                        </h3>
+                                        <h3 className="font-bold text-blue-800 text-sm">Produit non classé BQP</h3>
                                     </div>
-                                    <p className="text-sm text-blue-700 mb-3">
-                                        {bqpCheckResult.status === 'new_product'
-                                            ? "Ce produit n'est pas encore dans notre base. Est-il BQP ?"
-                                            : "Est-ce un produit du Bouclier Qualité Prix ?"
-                                        }
+                                    <p className="text-xs text-blue-700 mb-3">
+                                        Voulez-vous lier ce produit à une catégorie BQP existante ?
                                     </p>
                                     <button
                                         onClick={() => setShowBqpSelector(true)}
-                                        className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700"
+                                        className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-blue-700 transition-colors"
                                     >
-                                        Oui, lier à une catégorie BQP
+                                        Lier à une catégorie BQP
                                     </button>
                                 </div>
                             )}
 
-                            {/* Price Verification Prompt */}
+                            {/* Verification & Price History logic continues... */}
+
                             {bqpCheckResult && bqpCheckResult.latestPrice && (
-                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
                                     <div className="flex items-center gap-2 mb-2">
                                         <TrendingDown className="w-5 h-5 text-orange-600" />
-                                        <h3 className="font-bold text-orange-800">Vérification du prix</h3>
+                                        <h3 className="font-bold text-orange-800 text-sm">Vérification du prix</h3>
                                     </div>
-                                    <p className="text-sm text-orange-700 mb-3">
-                                        Dernier prix trouvé : <strong>{bqpCheckResult.latestPrice.price.toFixed(2)}€</strong> chez <strong>{bqpCheckResult.latestPrice.stores?.name}</strong>.
-                                        Est-ce toujours le bon prix ?
+                                    <p className="text-xs text-orange-700 mb-3">
+                                        Dernier prix : <strong>{bqpCheckResult.latestPrice.price.toFixed(2)}€</strong> chez <strong>{bqpCheckResult.latestPrice.stores?.name}</strong>.
                                     </p>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={async () => {
                                                 setLoading(true);
                                                 try {
-                                                    // Duplicate the price with a new timestamp
-                                                    const { error } = await supabase
-                                                        .from('prices')
-                                                        .insert([{
-                                                            product_id: bqpCheckResult.latestPrice.product_id,
-                                                            store_id: bqpCheckResult.latestPrice.store_id,
-                                                            price: bqpCheckResult.latestPrice.price,
-                                                            user_name: userProfile?.display_name || 'Anonyme',
-                                                            user_id: user?.id,
-                                                            is_verified: true
-                                                        }]);
-
+                                                    const { error } = await supabase.from('prices').insert([{
+                                                        product_id: bqpCheckResult.latestPrice.product_id,
+                                                        store_id: bqpCheckResult.latestPrice.store_id,
+                                                        price: bqpCheckResult.latestPrice.price,
+                                                        user_name: userProfile?.display_name || 'Anonyme',
+                                                        user_id: user?.id,
+                                                        is_verified: true
+                                                    }]);
                                                     if (error) throw error;
-
-                                                    if (user) {
-                                                        await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
-                                                    }
-
-                                                    alert("Merci ! Prix confirmé.");
+                                                    if (user) await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
+                                                    alert("Prix confirmé !");
                                                     setBqpCheckResult(null);
                                                     loadRecentPrices();
-                                                } catch (err) {
-                                                    console.error('Error confirming price:', err);
-                                                    alert("Erreur lors de la confirmation.");
-                                                } finally {
-                                                    setLoading(false);
-                                                }
+                                                } catch (err) { console.error(err); }
+                                                finally { setLoading(false); }
                                             }}
-                                            className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 text-sm"
+                                            className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-green-700"
                                         >
-                                            Oui, c'est le même
+                                            C'est le même
                                         </button>
                                         <button
                                             onClick={() => {
-                                                // Pre-fill manual entry with known info
                                                 setManualEntry(prev => ({
                                                     ...prev,
                                                     productName: bqpCheckResult.product.name,
                                                     barcode: bqpCheckResult.product.barcode,
                                                     storeId: bqpCheckResult.latestPrice.store_id,
-                                                    isLocal: bqpCheckResult.product.is_local_production
+                                                    price: ''
                                                 }));
-                                                // Scroll to manual entry or just let the user fill the price
-                                                const el = document.getElementById('manual-entry-section');
-                                                el?.scrollIntoView({ behavior: 'smooth' });
+                                                document.getElementById('manual-entry-section')?.scrollIntoView({ behavior: 'smooth' });
                                             }}
-                                            className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-lg font-medium hover:bg-gray-50 text-sm"
+                                            className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-gray-50"
                                         >
-                                            Non, il a changé
+                                            Il a changé
                                         </button>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Price History Chart */}
-                            {(bqpCheckResult?.status === 'found' || bqpCheckResult?.status === 'not_found') && <PriceHistoryChart data={priceHistory} />}
+                            {(bqpCheckResult?.status === 'found' || bqpCheckResult?.status === 'not_found') && (
+                                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                                    <PriceHistoryChart data={priceHistory} />
+                                </div>
+                            )}
                         </div>
 
-                        {/* BQP Selector Modal */}
+                        {/* BQP Category Picker Overlay */}
                         {showBqpSelector && (
-                            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                                <div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-                                    <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                                        <h3 className="font-bold text-lg">Sélectionner la catégorie BQP</h3>
-                                        <button onClick={() => setShowBqpSelector(false)} className="p-1 hover:bg-gray-200 rounded">
-                                            <X className="w-6 h-6" />
+                            <div className="fixed inset-0 bg-black/60 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+                                <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-4 duration-300">
+                                    <div className="p-4 border-b flex justify-between items-center bg-gray-50/50 backdrop-blur-sm sticky top-0 z-10">
+                                        <div>
+                                            <h3 className="font-bold text-gray-900">Catégories BQP</h3>
+                                            <p className="text-xs text-gray-500">Choisissez la catégorie pour lier le produit</p>
+                                        </div>
+                                        <button onClick={() => setShowBqpSelector(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                            <X className="w-5 h-5 text-gray-500" />
                                         </button>
                                     </div>
-                                    <div className="overflow-y-auto p-4">
+                                    <div className="overflow-y-auto p-4 scrollbar-hide">
                                         <BQPVerifier onSelect={handleBqpSelect} />
                                     </div>
                                 </div>
                             </div>
                         )}
+
 
                         {/* Manual Entry Form */}
                         <div id="manual-entry-section" className="bg-gray-50 rounded-lg p-4 space-y-3">
