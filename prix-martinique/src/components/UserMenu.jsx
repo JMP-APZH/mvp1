@@ -41,6 +41,12 @@ const UserMenu = ({ onSignInClick }) => {
     setIsUpdatingCity(false);
   };
 
+  const handleBqpChange = async (val) => {
+    setIsUpdatingCity(true); // Re-use the same loading state for simplicity
+    await updateProfile({ consumes_bqp: val });
+    setIsUpdatingCity(false);
+  };
+
   // Calculate progress to next level
   const getNextLevelProgress = () => {
     if (!userProfile) return 0;
@@ -251,6 +257,29 @@ const UserMenu = ({ onSignInClick }) => {
             </select>
           </div>
 
+          {/* BQP Preference */}
+          <div className="p-4 border-b border-gray-100 bg-blue-50/50">
+            <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+              🛒 Consommez-vous BQP ?
+              {isUpdatingCity && <span className="animate-pulse text-[10px] text-orange-500 ml-2">Mise à jour...</span>}
+            </p>
+            <div className="grid grid-cols-3 gap-1">
+              {['yes', 'no', 'partial'].map((val) => (
+                <button
+                  key={val}
+                  onClick={() => handleBqpChange(val)}
+                  disabled={isUpdatingCity}
+                  className={`py-1 px-2 rounded-lg text-[10px] font-bold uppercase transition-colors border ${userProfile?.consumes_bqp === val
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                  {val === 'yes' ? 'Oui' : val === 'no' ? 'Non' : 'Un peu'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="p-2">
             <button
@@ -262,8 +291,9 @@ const UserMenu = ({ onSignInClick }) => {
             </button>
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 };
 

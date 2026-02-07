@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megaphone, ChevronLeft, ArrowRight, Star } from 'lucide-react';
+import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megaphone, ChevronLeft, ArrowRight, Star, Bookmark, ShoppingBasket, Leaf, TrendingDown } from 'lucide-react';
+
+const SubHeader = ({ title, onBack }) => (
+  <div
+    onClick={onBack}
+    className="flex items-center gap-4 mb-6 sticky top-[61px] bg-white py-4 z-[40] border-b border-gray-100 -mx-6 px-6 cursor-pointer hover:bg-gray-50 transition-colors group"
+  >
+    <div className="p-2 group-hover:bg-gray-100 rounded-full transition-colors">
+      <ChevronLeft className="w-6 h-6 text-gray-600" />
+    </div>
+    <h2 className="text-xl font-bold text-gray-900 flex-1">{title}</h2>
+  </div>
+);
 
 const AboutPage = () => {
   const [view, setView] = useState('landing'); // 'landing', 'philosophy', 'rules'
 
-  const SubHeader = ({ title }) => (
-    <div
-      onClick={() => setView('landing')}
-      className="flex items-center gap-4 mb-6 sticky top-[61px] bg-white py-4 z-[40] border-b border-gray-100 -mx-6 px-6 cursor-pointer hover:bg-gray-50 transition-colors group"
-    >
-      <div className="p-2 group-hover:bg-gray-100 rounded-full transition-colors">
-        <ChevronLeft className="w-6 h-6 text-gray-600" />
-      </div>
-      <h2 className="text-xl font-bold text-gray-900 flex-1">{title}</h2>
-    </div>
-  );
 
   if (view === 'landing') {
     return (
@@ -97,7 +98,7 @@ const AboutPage = () => {
   if (view === 'rules') {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-        <SubHeader title="Règles & Avantages" />
+        <SubHeader title="Règles & Avantages" onBack={() => setView('landing')} />
 
         <div className="bg-red-600 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
           <div className="absolute right-0 bottom-0 opacity-20 -mr-6 -mb-6">
@@ -112,7 +113,7 @@ const AboutPage = () => {
         </div>
 
         <section className="space-y-6">
-          <h3 className="font-bold text-xl text-gray-900 border-b-2 border-red-100 pb-2">🛡️ Règles du "Chasseur"</h3>
+          <h3 className="font-bold text-xl text-gray-900 border-b-2 border-red-100 pb-2">🛡️ Règles du "Chasseur de prix conscient"</h3>
           <div className="grid gap-4">
             <div className="flex gap-4 p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
               <div className="text-2xl">📸</div>
@@ -135,6 +136,48 @@ const AboutPage = () => {
                 <p className="text-sm text-gray-600">Nous luttons contre les fausses promos. Signalez les erreurs d'étiquetage pour protéger la communauté.</p>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <h3 className="font-bold text-xl text-gray-900 border-b-2 border-blue-100 pb-2">⚡ Guide d'Utilisation</h3>
+          <div className="bg-blue-50 rounded-xl p-4 space-y-4">
+            <div className="flex gap-4 items-start">
+              <div className="bg-white p-2 rounded-lg shadow-sm">
+                <Leaf className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900">Produits Locaux 🇲🇶</h4>
+                <p className="text-sm text-gray-700">
+                  Privilégiez la production locale ! Repérez le badge <strong>Feuille</strong> ou activez l'option lors de votre saisie.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="bg-white p-2 rounded-lg shadow-sm">
+                <ShieldCheck className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900">Expert BQP & Qualité</h4>
+                <p className="text-sm text-gray-700">
+                  Vérifiez si un produit est BQP et <strong>notez sa qualité</strong>. Vos retours aident la communauté à choisir le meilleur.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="bg-white p-2 rounded-lg shadow-sm">
+                <TrendingDown className="w-6 h-6 text-orange-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900">Historique des Prix</h4>
+                <p className="text-sm text-gray-700">
+                  Consultez le graphique d'évolution pour savoir si c'est le <strong>bon moment d'acheter</strong>.
+                </p>
+              </div>
+            </div>
+
           </div>
         </section>
 
@@ -180,14 +223,14 @@ const AboutPage = () => {
             Compris !
           </button>
         </div>
-      </div>
+      </div >
     );
   }
 
   if (view === 'philosophy') {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
-        <SubHeader title="Notre Philosophie" />
+        <SubHeader title="Notre Philosophie" onBack={() => setView('landing')} />
         {/* Hero Section with RVN Colors */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-4 leading-tight">
