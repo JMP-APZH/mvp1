@@ -1475,7 +1475,7 @@ const App10 = () => {
                                             className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
                                         >
                                             <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                                            <p className="text-sm text-orange-600">Ajouter une photo de l'étiquette</p>
+                                            <p className="text-sm text-orange-600">Ajouter une photo de l'étiquette (incluant le code barres et son numéro lisible)</p>
                                         </button>
                                     ) : (
                                         <div className="relative">
@@ -1796,7 +1796,7 @@ const App10 = () => {
                 )}
                 {/* List Tab */}
                 {activeTab === 'list' && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-8 px-4">
                         <ShoppingList
                             items={shoppingList}
                             onUpdateQuantity={updateQuantity}
@@ -1810,7 +1810,7 @@ const App10 = () => {
 
                 {/* BQP Tab */}
                 {activeTab === 'bqp' && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-8 px-4">
                         <BQPVerifier />
                     </div>
                 )}

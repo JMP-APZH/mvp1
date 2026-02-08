@@ -188,7 +188,7 @@ const UserMenu = ({ onSignInClick }) => {
                 <div className="text-2xl font-bold text-blue-600 flex items-center justify-center gap-1">
                   🔥 {userProfile?.streak_count || 1}
                 </div>
-                <div className="text-[10px] uppercase tracking-wider font-bold text-blue-400">Série (Jours)</div>
+                <div className="text-[10px] uppercase tracking-wider font-bold text-blue-400">Mes contributions à l'effort collectif</div>
               </div>
             </div>
 

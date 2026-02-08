@@ -74,8 +74,14 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
                     <ShieldCheck className="w-6 h-6" />
                     <h2 className="font-bold text-lg">Vérificateur BQP Officiel</h2>
                 </div>
-                <p className="text-blue-100 text-sm">
-                    Données officielles de la Préfecture (Database Connectée).
+                <p className="text-xs text-blue-100 italic mb-2">
+                    Ici on challenge la pertinence du BQP pour la population
+                </p>
+                <p className="text-blue-100 text-sm leading-tight">
+                    Données initiales provenant du dernier accord BQP en vigueur.
+                    De vos ajouts dépend la force de notre évaluation et son impact.
+                </p>
+                <p className="text-blue-100 text-sm mt-2 font-medium">
                     Recherchez un produit pour voir sa catégorie.
                 </p>
             </div>
@@ -134,8 +140,8 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
                                 key={item.id}
                                 onClick={() => onSelect && onSelect(item)}
                                 className={`border rounded-lg p-3 transition-colors ${onSelect
-                                        ? 'cursor-pointer hover:bg-blue-50 border-blue-200 hover:border-blue-400'
-                                        : 'hover:bg-gray-50'
+                                    ? 'cursor-pointer hover:bg-blue-50 border-blue-200 hover:border-blue-400'
+                                    : 'hover:bg-gray-50'
                                     }`}
                             >
                                 <div className="flex justify-between items-start">

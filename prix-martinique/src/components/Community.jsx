@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Vote, BarChart3, Plus, MessageSquare, ThumbsUp, ThumbsDown, CheckCircle2, Clock, Ban, Loader2, Sparkles, Target } from 'lucide-react';
+import { Trophy, Vote, BarChart3, Plus, MessageSquare, ThumbsUp, ThumbsDown, CheckCircle2, Clock, Ban, Loader2, Sparkles, Target, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import Leaderboard from './Leaderboard';
@@ -123,7 +123,7 @@ const Community = () => {
     return (
         <div className="flex flex-col h-full bg-white">
             {/* Header */}
-            <div className="bg-white border-b border-gray-100 p-6">
+            <div className="bg-white border-b border-gray-100 p-6 pt-10">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="bg-orange-100 p-2 rounded-xl text-orange-600">
                         <Sparkles className="w-6 h-6" />
@@ -135,30 +135,36 @@ const Community = () => {
                 </div>
 
                 {/* SubTabs Nav */}
-                <div className="flex gap-2 p-1 bg-gray-50 rounded-xl overflow-x-auto">
+                <div className="grid grid-cols-3 gap-2">
                     <button
                         onClick={() => setSubTab('ranking')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${subTab === 'ranking' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl text-xs font-bold transition-all ${subTab === 'ranking'
+                            ? 'bg-orange-500 text-white shadow-lg shadow-orange-200 border-none'
+                            : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-100'
                             }`}
                     >
-                        <Trophy className="w-4 h-4" />
+                        <Trophy className="w-5 h-5" />
                         Classement
                     </button>
                     <button
                         onClick={() => setSubTab('voting')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${subTab === 'voting' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl text-xs font-bold transition-all ${subTab === 'voting'
+                            ? 'bg-orange-500 text-white shadow-lg shadow-orange-200 border-none'
+                            : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-100'
                             }`}
                     >
-                        <Vote className="w-4 h-4" />
-                        Voter (Features)
+                        <Vote className="w-5 h-5" />
+                        Améliorations
                     </button>
                     <button
                         onClick={() => setSubTab('stats')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${subTab === 'stats' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl text-xs font-bold transition-all ${subTab === 'stats'
+                            ? 'bg-orange-500 text-white shadow-lg shadow-orange-200 border-none'
+                            : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-100'
                             }`}
                     >
-                        <BarChart3 className="w-4 h-4" />
-                        Impact Local
+                        <BarChart3 className="w-5 h-5" />
+                        Impact
                     </button>
                 </div>
             </div>
@@ -303,7 +309,7 @@ const Community = () => {
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-2xl font-bold text-gray-900 font-display">Nouvelle Idée</h3>
                             <button onClick={() => setShowSuggestModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
-                                <Loader2 className="w-6 h-6" />
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
 

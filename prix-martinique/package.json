@@ -14,6 +14,7 @@
     "@undecaf/barcode-detector-polyfill": "^0.9.23",
     "dotenv": "^17.2.3",
     "lucide-react": "^0.562.0",
+    "pdf-parse": "^2.4.5",
     "quagga": "^0.12.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
