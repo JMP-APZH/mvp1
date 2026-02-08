@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings } from 'lucide-react';
+import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const UserMenu = ({ onSignInClick, onOpenStats, stores }) => {
