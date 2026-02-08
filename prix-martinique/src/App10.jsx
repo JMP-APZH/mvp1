@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import BQPVerifier from './components/BQPVerifier';
 
-import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin } from 'lucide-react';
+import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
@@ -1241,7 +1241,7 @@ const App10 = () => {
                                         <div>
                                             <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Magasin Actuel</p>
                                             <h3 className="font-bold text-gray-900">
-                                                {recentPrices.find(p => p.storeId === manualEntry.storeId)?.store || "Magasin sélectionné"}
+                                                {stores.find(s => String(s.id) === String(manualEntry.storeId))?.name || "Magasin sélectionné"}
                                             </h3>
                                         </div>
                                     </div>
