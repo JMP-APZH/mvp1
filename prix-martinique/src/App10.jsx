@@ -1179,7 +1179,7 @@ const App10 = () => {
                 >
                     <div className="flex flex-col items-center gap-1">
                         <Info className="w-5 h-5" />
-                        <span className="text-xs">À Propos</span>
+                        <span className="text-xs">Info</span>
                     </div>
                 </button>
             </div>

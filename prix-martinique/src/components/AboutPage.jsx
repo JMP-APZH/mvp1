@@ -4,7 +4,7 @@ import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megapho
 const SubHeader = ({ title, onBack }) => (
   <div
     onClick={onBack}
-    className="flex items-center gap-4 mb-6 sticky top-[61px] bg-white py-4 z-[40] border-b border-gray-100 -mx-6 px-6 cursor-pointer hover:bg-gray-50 transition-colors group"
+    className="flex items-center gap-4 mb-6 sticky top-[61px] bg-white pt-8 pb-4 z-[40] border-b border-gray-100 -mx-6 px-6 cursor-pointer hover:bg-gray-50 transition-colors group"
   >
     <div className="p-2 group-hover:bg-gray-100 rounded-full transition-colors">
       <ChevronLeft className="w-6 h-6 text-gray-600" />
@@ -20,7 +20,7 @@ const AboutPage = () => {
   if (view === 'landing') {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-8">
-        <div className="sticky top-[61px] bg-white py-4 z-[40] border-b border-gray-100 -mx-6 px-6 mb-4">
+        <div className="sticky top-[61px] bg-white pt-8 pb-4 z-[40] border-b border-gray-100 -mx-6 px-6 mb-4">
           <h1 className="text-2xl font-bold text-center leading-tight">
             Notre <span className="text-red-600">engagement</span> communautaire
           </h1>
