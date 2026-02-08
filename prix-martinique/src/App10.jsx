@@ -886,16 +886,18 @@ const App10 = () => {
             alert(successMessage);
 
             // Reset form but conditionally set BQP prompt
-            setManualEntry({
+            setManualEntry(prev => ({
                 productName: '',
                 barcode: '',
                 price: '',
-                storeId: '',
-                userName: userProfile?.display_name || manualEntry.userName, // Keep username
+                storeId: prev.storeId, // Keep shop selection persistent!
+                userName: userProfile?.display_name || prev.userName, // Keep username
                 productPhoto: null,
                 priceTagPhoto: null,
-                isDeclaredBqp: false
-            });
+                isDeclaredBqp: false,
+                categoryId: null,
+                isLocal: false
+            }));
 
             if (showBqpPrompt && productForBqp) {
                 setBqpCheckResult({
@@ -1213,607 +1215,677 @@ const App10 = () => {
                             </div>
                         )}
 
-                        {/* Scanner UI */}
-                        <div className="space-y-4">
-                            {showScanner ? (
-                                <div className="relative rounded-xl overflow-hidden shadow-2xl bg-black aspect-square max-w-sm mx-auto animate-in zoom-in-95 duration-300">
-                                    <ZXingBarcodeScanner
-                                        onBarcodeDetected={handleBarcodeDetected}
-                                        onClose={() => setShowScanner(false)}
+                        {/* Shop Selection - NOW FIRST */}
+                        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm mb-4">
+                            {!manualEntry.storeId ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-orange-600 mb-2">
+                                        <MapPin className="w-5 h-5" />
+                                        <h3 className="font-bold">Où êtes-vous ?</h3>
+                                    </div>
+                                    <p className="text-sm text-gray-600 italic">
+                                        Sélectionnez votre magasin pour commencer à scanner
+                                    </p>
+                                    <StoreSelectionWizard
+                                        supabase={supabase}
+                                        selectedStoreId={manualEntry.storeId}
+                                        onStoreSelect={(storeId) => setManualEntry({ ...manualEntry, storeId })}
                                     />
-                                    <button
-                                        onClick={() => setShowScanner(false)}
-                                        className="absolute top-4 right-4 z-10 bg-white/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-white/40 transition-colors"
-                                    >
-                                        <X className="w-6 h-6" />
-                                    </button>
                                 </div>
                             ) : (
-                                <button
-                                    onClick={() => setShowScanner(true)}
-                                    className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl p-4 shadow-md flex items-center justify-center gap-3 hover:shadow-lg transition-all animate-in zoom-in-95 duration-300"
-                                >
-                                    <ScanLine className="w-6 h-6" />
-                                    <span className="text-lg font-bold">Scanner un produit</span>
-                                </button>
-                            )}
-
-                            {/* BQP & Price Results */}
-                            {bqpCheckResult && bqpCheckResult.status === 'found' && (
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
-                                    <ShieldCheck className="w-8 h-8 text-green-600" />
-                                    <div>
-                                        <h3 className="font-bold text-green-800">Produit BQP Vérifié !</h3>
-                                        <p className="text-sm text-green-700">
-                                            {bqpCheckResult.category.code} - {bqpCheckResult.category.label}
-                                        </p>
-                                    </div>
-                                    <div className="ml-auto flex flex-col items-end gap-2">
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleToggleFavorite(bqpCheckResult.product.id)}
-                                                className="p-2 rounded-full bg-white border border-gray-200 hover:bg-yellow-50 hover:border-yellow-300 transition-colors"
-                                                title="Ajouter aux favoris"
-                                            >
-                                                <Bookmark className={`w-5 h-5 ${userFavorites.has(bqpCheckResult.product.id) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
-                                            </button>
-                                            <button
-                                                onClick={() => addToShoppingList({
-                                                    id: bqpCheckResult.product.id,
-                                                    name: bqpCheckResult.product.name,
-                                                    productPhotoUrl: null
-                                                })}
-                                                className={`p-2 rounded-full border transition-colors ${shoppingList.some(item => item.productId === bqpCheckResult.product.id)
-                                                    ? 'bg-green-100 border-green-500 text-green-700'
-                                                    : 'bg-white border-gray-200 text-gray-400 hover:text-green-600'
-                                                    }`}
-                                            >
-                                                <ShoppingBasket className="w-5 h-5" />
-                                            </button>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-green-100 p-2 rounded-lg text-green-600">
+                                            <MapPin className="w-5 h-5" />
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleVote(1)}
-                                                className={`p-2 rounded-full border ${bqpVoteStats.userVote === 1 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-white border-gray-200 text-gray-400'}`}
-                                            >
-                                                <ThumbsUp className="w-4 h-4" />
-                                                <span className="text-[10px] font-bold block text-center">{bqpVoteStats.upvotes}</span>
-                                            </button>
-                                            <button
-                                                onClick={() => handleVote(-1)}
-                                                className={`p-2 rounded-full border ${bqpVoteStats.userVote === -1 ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-200 text-gray-400'}`}
-                                            >
-                                                <ThumbsDown className="w-4 h-4" />
-                                                <span className="text-[10px] font-bold block text-center">{bqpVoteStats.downvotes}</span>
-                                            </button>
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Magasin Actuel</p>
+                                            <h3 className="font-bold text-gray-900">
+                                                {recentPrices.find(p => p.storeId === manualEntry.storeId)?.store || "Magasin sélectionné"}
+                                            </h3>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-
-                            {(bqpCheckResult && (bqpCheckResult.status === 'not_found' || bqpCheckResult.status === 'new_product')) && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Info className="w-5 h-5 text-blue-600" />
-                                        <h3 className="font-bold text-blue-800 text-sm">Produit non classé BQP</h3>
-                                    </div>
-                                    <p className="text-xs text-blue-700 mb-3">
-                                        Voulez-vous lier ce produit à une catégorie BQP existante ?
-                                    </p>
                                     <button
-                                        onClick={() => setShowBqpSelector(true)}
-                                        className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-blue-700 transition-colors"
+                                        onClick={() => setManualEntry({ ...manualEntry, storeId: '' })}
+                                        className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100 transition-colors"
                                     >
-                                        Lier à une catégorie BQP
+                                        Changer
                                     </button>
-                                </div>
-                            )}
-
-                            {/* Verification & Price History logic continues... */}
-
-                            {bqpCheckResult && bqpCheckResult.latestPrice && (
-                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <TrendingDown className="w-5 h-5 text-orange-600" />
-                                        <h3 className="font-bold text-orange-800 text-sm">Vérification du prix</h3>
-                                    </div>
-                                    <p className="text-xs text-orange-700 mb-3">
-                                        Dernier prix : <strong>{bqpCheckResult.latestPrice.price.toFixed(2)}€</strong> chez <strong>{bqpCheckResult.latestPrice.stores?.name}</strong>.
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={async () => {
-                                                setLoading(true);
-                                                try {
-                                                    const { error } = await supabase.from('prices').insert([{
-                                                        product_id: bqpCheckResult.latestPrice.product_id,
-                                                        store_id: bqpCheckResult.latestPrice.store_id,
-                                                        price: bqpCheckResult.latestPrice.price,
-                                                        user_name: userProfile?.display_name || 'Anonyme',
-                                                        user_id: user?.id,
-                                                        is_verified: true
-                                                    }]);
-                                                    if (error) throw error;
-                                                    if (user) await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
-                                                    alert("Prix confirmé !");
-                                                    setBqpCheckResult(null);
-                                                    loadRecentPrices();
-                                                } catch (err) { console.error(err); }
-                                                finally { setLoading(false); }
-                                            }}
-                                            className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-green-700"
-                                        >
-                                            C'est le même
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setManualEntry(prev => ({
-                                                    ...prev,
-                                                    productName: bqpCheckResult.product.name,
-                                                    barcode: bqpCheckResult.product.barcode,
-                                                    storeId: bqpCheckResult.latestPrice.store_id,
-                                                    price: ''
-                                                }));
-                                                document.getElementById('manual-entry-section')?.scrollIntoView({ behavior: 'smooth' });
-                                            }}
-                                            className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-gray-50"
-                                        >
-                                            Il a changé
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {(bqpCheckResult?.status === 'found' || bqpCheckResult?.status === 'not_found') && (
-                                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                                    <PriceHistoryChart data={priceHistory} />
                                 </div>
                             )}
                         </div>
 
-                        {/* BQP Category Picker Overlay */}
-                        {showBqpSelector && (
-                            <div className="fixed inset-0 bg-black/60 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
-                                <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-4 duration-300">
-                                    <div className="p-4 border-b flex justify-between items-center bg-gray-50/50 backdrop-blur-sm sticky top-0 z-10">
-                                        <div>
-                                            <h3 className="font-bold text-gray-900">Catégories BQP</h3>
-                                            <p className="text-xs text-gray-500">Choisissez la catégorie pour lier le produit</p>
+                        {manualEntry.storeId && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                                {/* Scanner UI */}
+                                <div className="space-y-4">
+                                    {showScanner ? (
+                                        <div className="relative rounded-xl overflow-hidden shadow-2xl bg-black aspect-square max-w-sm mx-auto">
+                                            <ZXingBarcodeScanner
+                                                onBarcodeDetected={handleBarcodeDetected}
+                                                onClose={() => setShowScanner(false)}
+                                            />
+                                            <button
+                                                onClick={() => setShowScanner(false)}
+                                                className="absolute top-4 right-4 z-10 bg-white/20 backdrop-blur-md text-white p-2 rounded-full hover:bg-white/40 transition-colors"
+                                            >
+                                                <X className="w-6 h-6" />
+                                            </button>
                                         </div>
-                                        <button onClick={() => setShowBqpSelector(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                                            <X className="w-5 h-5 text-gray-500" />
+                                    ) : (
+                                        <button
+                                            onClick={() => setShowScanner(true)}
+                                            className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl p-4 shadow-md flex items-center justify-center gap-3 hover:shadow-lg transition-all"
+                                        >
+                                            <ScanLine className="w-6 h-6" />
+                                            <span className="text-lg font-bold">Scanner un produit</span>
                                         </button>
+                                    )}
+
+                                    {/* BQP & Price Results */}
+                                    {bqpCheckResult && bqpCheckResult.status === 'found' && (
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3 animate-in slide-in-from-top-4 duration-300">
+                                            <ShieldCheck className="w-8 h-8 text-green-600" />
+                                            <div>
+                                                <h3 className="font-bold text-green-800">Produit BQP Vérifié !</h3>
+                                                <p className="text-sm text-green-700">
+                                                    {bqpCheckResult.category.code} - {bqpCheckResult.category.label}
+                                                </p>
+                                            </div>
+                                            <div className="ml-auto flex flex-col items-end gap-2">
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleToggleFavorite(bqpCheckResult.product.id)}
+                                                        className="p-2 rounded-full bg-white border border-gray-200 hover:bg-yellow-50 hover:border-yellow-300 transition-colors"
+                                                        title="Ajouter aux favoris"
+                                                    >
+                                                        <Bookmark className={`w-5 h-5 ${userFavorites.has(bqpCheckResult.product.id) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => addToShoppingList({
+                                                            id: bqpCheckResult.product.id,
+                                                            name: bqpCheckResult.product.name,
+                                                            productPhotoUrl: null
+                                                        })}
+                                                        className={`p-2 rounded-full border transition-colors ${shoppingList.some(item => item.productId === bqpCheckResult.product.id)
+                                                            ? 'bg-green-100 border-green-500 text-green-700'
+                                                            : 'bg-white border-gray-200 text-gray-400 hover:text-green-600'
+                                                            }`}
+                                                    >
+                                                        <ShoppingBasket className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleVote(1)}
+                                                        className={`p-2 rounded-full border ${bqpVoteStats.userVote === 1 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-white border-gray-200 text-gray-400'}`}
+                                                    >
+                                                        <ThumbsUp className="w-4 h-4" />
+                                                        <span className="text-[10px] font-bold block text-center">{bqpVoteStats.upvotes}</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleVote(-1)}
+                                                        className={`p-2 rounded-full border ${bqpVoteStats.userVote === -1 ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-200 text-gray-400'}`}
+                                                    >
+                                                        <ThumbsDown className="w-4 h-4" />
+                                                        <span className="text-[10px] font-bold block text-center">{bqpVoteStats.downvotes}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(bqpCheckResult && (bqpCheckResult.status === 'not_found' || bqpCheckResult.status === 'new_product')) && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Info className="w-5 h-5 text-blue-600" />
+                                                <h3 className="font-bold text-blue-800 text-sm">Produit non classé BQP</h3>
+                                            </div>
+                                            <p className="text-xs text-blue-700 mb-3">
+                                                Voulez-vous lier ce produit à une catégorie BQP existante ?
+                                            </p>
+                                            <button
+                                                onClick={() => setShowBqpSelector(true)}
+                                                className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-xs hover:bg-blue-700 transition-colors"
+                                            >
+                                                Lier à une catégorie BQP
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {bqpCheckResult && bqpCheckResult.latestPrice && (
+                                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <TrendingDown className="w-5 h-5 text-orange-600" />
+                                                <h3 className="font-bold text-orange-800 text-sm">Vérification du prix</h3>
+                                            </div>
+                                            <p className="text-xs text-orange-700 mb-3">
+                                                Dernier prix : <strong>{bqpCheckResult.latestPrice.price.toFixed(2)}€</strong> chez <strong>{bqpCheckResult.latestPrice.stores?.name}</strong>.
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={async () => {
+                                                        setLoading(true);
+                                                        try {
+                                                            const { error } = await supabase.from('prices').insert([{
+                                                                product_id: bqpCheckResult.latestPrice.product_id,
+                                                                store_id: bqpCheckResult.latestPrice.store_id,
+                                                                price: bqpCheckResult.latestPrice.price,
+                                                                user_name: userProfile?.display_name || 'Anonyme',
+                                                                user_id: user?.id,
+                                                                is_verified: true
+                                                            }]);
+                                                            if (error) throw error;
+                                                            if (user) await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
+                                                            alert("Prix confirmé !");
+                                                            setBqpCheckResult(null);
+                                                            loadRecentPrices();
+                                                        } catch (err) { console.error(err); }
+                                                        finally { setLoading(false); }
+                                                    }}
+                                                    className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-green-700"
+                                                >
+                                                    C'est le même
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setManualEntry(prev => ({
+                                                            ...prev,
+                                                            productName: bqpCheckResult.product.name,
+                                                            barcode: bqpCheckResult.product.barcode,
+                                                            storeId: bqpCheckResult.latestPrice.store_id,
+                                                            price: ''
+                                                        }));
+                                                        document.getElementById('manual-entry-section')?.scrollIntoView({ behavior: 'smooth' });
+                                                    }}
+                                                    className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-gray-50"
+                                                >
+                                                    Il a changé
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(bqpCheckResult?.status === 'found' || bqpCheckResult?.status === 'not_found' || bqpCheckResult?.status === 'new_product') && (
+                                        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                                            <PriceHistoryChart data={priceHistory} />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* BQP Category Picker Overlay */}
+                                {showBqpSelector && (
+                                    <div className="fixed inset-0 bg-black/60 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+                                        <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-4 duration-300">
+                                            <div className="p-4 border-b flex justify-between items-center bg-gray-50/50 backdrop-blur-sm sticky top-0 z-10">
+                                                <div>
+                                                    <h3 className="font-bold text-gray-900">Catégories BQP</h3>
+                                                    <p className="text-xs text-gray-500">Choisissez la catégorie pour lier le produit</p>
+                                                </div>
+                                                <button onClick={() => setShowBqpSelector(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                                    <X className="w-5 h-5 text-gray-500" />
+                                                </button>
+                                            </div>
+                                            <div className="overflow-y-auto p-4 scrollbar-hide">
+                                                <BQPVerifier onSelect={handleBqpSelect} />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="overflow-y-auto p-4 scrollbar-hide">
-                                        <BQPVerifier onSelect={handleBqpSelect} />
+                                )}
+
+
+                                {/* Manual Entry Form */}
+                                <div id="manual-entry-section" className="bg-gray-50 rounded-lg p-4 space-y-3">
+                                    <h3 className="font-semibold text-gray-800 mb-3">Saisie manuelle</h3>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Nom du produit *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={manualEntry.productName}
+                                            onChange={(e) => setManualEntry({ ...manualEntry, productName: e.target.value })}
+                                            placeholder="Ex: Lait Lactel 1L"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        />
                                     </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Code-barres (optionnel)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={manualEntry.barcode}
+                                            onChange={(e) => setManualEntry({ ...manualEntry, barcode: e.target.value })}
+                                            placeholder="Ex: 3254567890123"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        />
+                                    </div>
+
+                                    {/* Photo Upload Section */}
+                                    <div className="space-y-3 pt-2 border-t">
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Photos (optionnel)
+                                        </label>
+
+                                        {/* Product Photo */}
+                                        <div>
+                                            <p className="text-xs text-gray-600 mb-2">Photo du produit</p>
+                                            {!manualEntry.productPhoto ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handlePhotoCapture('product')}
+                                                    className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
+                                                >
+                                                    <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
+                                                    <p className="text-sm text-orange-600">Ajouter une photo du produit</p>
+                                                </button>
+                                            ) : (
+                                                <div className="relative">
+                                                    <img
+                                                        src={manualEntry.productPhoto}
+                                                        alt="Produit"
+                                                        className="w-full h-40 object-cover rounded-lg"
+                                                    />
+                                                    <button
+                                                        onClick={() => removePhoto('product')}
+                                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <input
+                                                ref={productPhotoInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                onChange={(e) => handlePhotoChange(e, 'product')}
+                                                className="hidden"
+                                            />
+                                        </div>
+
+                                        {/* Price Tag Photo */}
+                                        <div>
+                                            <p className="text-xs text-gray-600 mb-2">Photo de l'étiquette de prix</p>
+                                            {!manualEntry.priceTagPhoto ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handlePhotoCapture('priceTag')}
+                                                    className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
+                                                >
+                                                    <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
+                                                    <p className="text-sm text-orange-600">Ajouter une photo de l'étiquette (incluant le code barres et son numéro lisible)</p>
+                                                </button>
+                                            ) : (
+                                                <div className="relative">
+                                                    <img
+                                                        src={manualEntry.priceTagPhoto}
+                                                        alt="Etiquette de prix"
+                                                        className="w-full h-40 object-cover rounded-lg"
+                                                    />
+                                                    <button
+                                                        onClick={() => removePhoto('priceTag')}
+                                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <input
+                                                ref={priceTagPhotoInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                onChange={(e) => handlePhotoChange(e, 'priceTag')}
+                                                className="hidden"
+                                            />
+                                        </div>
+                                    </div>
+
+
+
+                                    {/* Category Selector */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Catégorie
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {categories.map((cat) => (
+                                                <button
+                                                    key={cat.id}
+                                                    onClick={() => setManualEntry({ ...manualEntry, categoryId: cat.id })}
+                                                    className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors border min-h-[80px] ${manualEntry.categoryId === cat.id
+                                                        ? 'bg-orange-100 border-orange-500 ring-2 ring-orange-200'
+                                                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    <span className="text-2xl" role="img" aria-label={cat.name}>{cat.icon}</span>
+                                                    <span className="text-xs text-center leading-tight text-gray-700">
+                                                        {cat.name}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Local Production Toggle */}
+                                    <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                                        <div className="bg-green-100 p-2 rounded-full">
+                                            <Leaf className="w-5 h-5 text-green-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label htmlFor="isLocal" className="block text-sm font-bold text-green-900">
+                                                Produit Local ? 🇲🇶
+                                            </label>
+                                            <p className="text-xs text-green-700">Cochez si produit en Martinique</p>
+                                        </div>
+                                        <input
+                                            id="isLocal"
+                                            type="checkbox"
+                                            checked={manualEntry.isLocal || false}
+                                            onChange={(e) => setManualEntry({ ...manualEntry, isLocal: e.target.checked })}
+                                            className="w-6 h-6 text-green-600 rounded border-green-300 focus:ring-green-500 cursor-pointer"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Prix (EUR) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={manualEntry.price}
+                                            onChange={(e) => setManualEntry({ ...manualEntry, price: e.target.value })}
+                                            placeholder="Ex: 2.45"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        />
+                                    </div>
+
+                                    {/* BQP Check in Manual Entry */}
+                                    <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <ShieldCheck className={`w-5 h-5 ${manualEntry.isDeclaredBqp ? 'text-green-600' : 'text-gray-400'}`} />
+                                                <span className="text-sm font-medium text-gray-700">Produit BQP ?</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setManualEntry({ ...manualEntry, isDeclaredBqp: !manualEntry.isDeclaredBqp })}
+                                                className={`w-12 h-6 rounded-full transition-colors relative ${manualEntry.isDeclaredBqp ? 'bg-green-500' : 'bg-gray-300'}`}
+                                            >
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${manualEntry.isDeclaredBqp ? 'left-7' : 'left-1'}`} />
+                                            </button>
+                                        </div>
+
+                                        {manualEntry.isDeclaredBqp && (
+                                            <div className="animate-in slide-in-from-top-2 duration-300">
+                                                <button
+                                                    onClick={() => setShowBqpSelector(true)}
+                                                    className="w-full py-2 px-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold flex items-center justify-between hover:bg-blue-100 transition-colors"
+                                                >
+                                                    <span>
+                                                        {manualEntry.categoryId
+                                                            ? `Catégorie: ${categories.find(c => c.id === manualEntry.categoryId)?.name || 'Sélectionnée'}`
+                                                            : 'Choisir la catégorie BQP...'}
+                                                    </span>
+                                                    <Plus className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+
+
+
+
+
+
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Votre nom {user ? '' : '(optionnel)'}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={manualEntry.userName}
+                                            onChange={(e) => setManualEntry({ ...manualEntry, userName: e.target.value })}
+                                            placeholder="Ex: Marie L."
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            disabled={user && userProfile?.display_name}
+                                        />
+                                        {user && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Connecté en tant que {userProfile?.display_name || user.email}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        onClick={submitPrice}
+                                        disabled={loading}
+                                        className={`w-full py-3 rounded-lg font-medium transition-colors shadow-md ${loading
+                                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
+                                            }`}
+                                    >
+                                        {loading ? 'Enregistrement...' : user ? 'Enregistrer le prix (+10 pts)' : 'Enregistrer le prix'}
+                                    </button>
                                 </div>
                             </div>
                         )}
-
-
-                        {/* Manual Entry Form */}
-                        <div id="manual-entry-section" className="bg-gray-50 rounded-lg p-4 space-y-3">
-                            <h3 className="font-semibold text-gray-800 mb-3">Saisie manuelle</h3>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Nom du produit *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={manualEntry.productName}
-                                    onChange={(e) => setManualEntry({ ...manualEntry, productName: e.target.value })}
-                                    placeholder="Ex: Lait Lactel 1L"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Code-barres (optionnel)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={manualEntry.barcode}
-                                    onChange={(e) => setManualEntry({ ...manualEntry, barcode: e.target.value })}
-                                    placeholder="Ex: 3254567890123"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            {/* Photo Upload Section */}
-                            <div className="space-y-3 pt-2 border-t">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Photos (optionnel)
-                                </label>
-
-                                {/* Product Photo */}
-                                <div>
-                                    <p className="text-xs text-gray-600 mb-2">Photo du produit</p>
-                                    {!manualEntry.productPhoto ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => handlePhotoCapture('product')}
-                                            className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
-                                        >
-                                            <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                                            <p className="text-sm text-orange-600">Ajouter une photo du produit</p>
-                                        </button>
-                                    ) : (
-                                        <div className="relative">
-                                            <img
-                                                src={manualEntry.productPhoto}
-                                                alt="Produit"
-                                                className="w-full h-40 object-cover rounded-lg"
-                                            />
-                                            <button
-                                                onClick={() => removePhoto('product')}
-                                                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    )}
-                                    <input
-                                        ref={productPhotoInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        capture="environment"
-                                        onChange={(e) => handlePhotoChange(e, 'product')}
-                                        className="hidden"
-                                    />
-                                </div>
-
-                                {/* Price Tag Photo */}
-                                <div>
-                                    <p className="text-xs text-gray-600 mb-2">Photo de l'étiquette de prix</p>
-                                    {!manualEntry.priceTagPhoto ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => handlePhotoCapture('priceTag')}
-                                            className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
-                                        >
-                                            <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                                            <p className="text-sm text-orange-600">Ajouter une photo de l'étiquette (incluant le code barres et son numéro lisible)</p>
-                                        </button>
-                                    ) : (
-                                        <div className="relative">
-                                            <img
-                                                src={manualEntry.priceTagPhoto}
-                                                alt="Etiquette de prix"
-                                                className="w-full h-40 object-cover rounded-lg"
-                                            />
-                                            <button
-                                                onClick={() => removePhoto('priceTag')}
-                                                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    )}
-                                    <input
-                                        ref={priceTagPhotoInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        capture="environment"
-                                        onChange={(e) => handlePhotoChange(e, 'priceTag')}
-                                        className="hidden"
-                                    />
-                                </div>
-                            </div>
-
-
-
-                            {/* Category Selector */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Catégorie
-                                </label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {categories.map((cat) => (
-                                        <button
-                                            key={cat.id}
-                                            onClick={() => setManualEntry({ ...manualEntry, categoryId: cat.id })}
-                                            className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors border min-h-[80px] ${manualEntry.categoryId === cat.id
-                                                ? 'bg-orange-100 border-orange-500 ring-2 ring-orange-200'
-                                                : 'bg-white border-gray-200 hover:bg-gray-50'
-                                                }`}
-                                        >
-                                            <span className="text-2xl" role="img" aria-label={cat.name}>{cat.icon}</span>
-                                            <span className="text-xs text-center leading-tight text-gray-700">
-                                                {cat.name}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Local Production Toggle */}
-                            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                                <div className="bg-green-100 p-2 rounded-full">
-                                    <Leaf className="w-5 h-5 text-green-600" />
-                                </div>
-                                <div className="flex-1">
-                                    <label htmlFor="isLocal" className="block text-sm font-bold text-green-900">
-                                        Produit Local ? 🇲🇶
-                                    </label>
-                                    <p className="text-xs text-green-700">Cochez si produit en Martinique</p>
-                                </div>
-                                <input
-                                    id="isLocal"
-                                    type="checkbox"
-                                    checked={manualEntry.isLocal || false}
-                                    onChange={(e) => setManualEntry({ ...manualEntry, isLocal: e.target.checked })}
-                                    className="w-6 h-6 text-green-600 rounded border-green-300 focus:ring-green-500 cursor-pointer"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Prix (EUR) *
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={manualEntry.price}
-                                    onChange={(e) => setManualEntry({ ...manualEntry, price: e.target.value })}
-                                    placeholder="Ex: 2.45"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Magasin *
-                                </label>
-                                <StoreSelectionWizard
-                                    supabase={supabase}
-                                    selectedStoreId={manualEntry.storeId}
-                                    onStoreSelect={(storeId) => setManualEntry({ ...manualEntry, storeId })}
-                                    className="mb-4"
-                                />
-                            </div>
-
-
-
-
-
-
-
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Votre nom {user ? '' : '(optionnel)'}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={manualEntry.userName}
-                                    onChange={(e) => setManualEntry({ ...manualEntry, userName: e.target.value })}
-                                    placeholder="Ex: Marie L."
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    disabled={user && userProfile?.display_name}
-                                />
-                                {user && (
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Connecté en tant que {userProfile?.display_name || user.email}
-                                    </p>
-                                )}
-                            </div>
-
-                            <button
-                                onClick={submitPrice}
-                                disabled={loading}
-                                className={`w-full py-3 rounded-lg font-medium transition-colors shadow-md ${loading
-                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                    : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
-                                    }`}
-                            >
-                                {loading ? 'Enregistrement...' : user ? 'Enregistrer le prix (+10 pts)' : 'Enregistrer le prix'}
-                            </button>
-                        </div>
                     </div>
                 )}
                 {/* Search/Compare Tab */}
-                {activeTab === 'search' && (
-                    <div className="space-y-4">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Chercher un produit ou magasin..."
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                {
+                    activeTab === 'search' && (
+                        <div className="space-y-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Chercher un produit ou magasin..."
+                                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                />
+                            </div>
+
+                            {categoryFilter && (
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xl">{categories.find(c => c.id === categoryFilter)?.icon}</span>
+                                        <span className="text-sm font-medium text-orange-800">
+                                            Filtré par: <span className="font-bold">{categories.find(c => c.id === categoryFilter)?.name}</span>
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => setCategoryFilter(null)}
+                                        className="p-1 hover:bg-orange-100 rounded-full text-orange-600 transition-colors"
+                                        title="Réinitialiser le filtre"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+
+                            {loading ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                                    <p>Chargement...</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {filteredPrices.length === 0 ? (
+                                        <div className="text-center py-8 text-gray-500">
+                                            <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                            <p>Aucun prix trouvé</p>
+                                        </div>
+                                    ) : (
+                                        filteredPrices.map(price => {
+                                            const stats = getProductStats(price.product);
+                                            const isLowest = stats && price.price === stats.min;
+                                            const isCurrentUser = user && price.userId === user.id;
+
+                                            return (
+                                                <div key={price.id} className={`bg-white border rounded-lg p-4 shadow-sm ${isCurrentUser ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div className="flex-1">
+                                                            <h3 className="font-semibold text-gray-900 flex items-center gap-1">
+                                                                {price.product}
+                                                                {price.isLocal && <Leaf className="w-4 h-4 text-green-600 fill-green-100" title="Produit Local" />}
+                                                            </h3>
+                                                            <p className="text-sm text-gray-600">{price.store}</p>
+                                                        </div>
+                                                        <div className="text-right flex flex-col items-end gap-1 pl-2">
+                                                            <div className={`text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900'}`}>
+                                                                {price.price.toFixed(2)}€
+                                                            </div>
+                                                            {isLowest && (
+                                                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap mb-1">
+                                                                    <TrendingDown className="inline w-3 h-3" /> Meilleur prix
+                                                                </span>
+                                                            )}
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleToggleFavorite(price.productId);
+                                                                    }}
+                                                                    className={`p-2 rounded-full transition-colors border ${userFavorites.has(price.productId)
+                                                                        ? 'bg-yellow-50 border-yellow-200 text-yellow-500'
+                                                                        : 'bg-transparent border-transparent text-gray-300 hover:text-yellow-400'
+                                                                        }`}
+                                                                    title="Ajouter aux favoris (Sauvegarder)"
+                                                                >
+                                                                    <Bookmark
+                                                                        className={`w-5 h-5 ${userFavorites.has(price.productId) ? 'fill-yellow-400' : ''}`}
+                                                                    />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        addToShoppingList({
+                                                                            id: price.productId,
+                                                                            name: price.product,
+                                                                            productPhotoUrl: price.productPhotoUrl
+                                                                        });
+                                                                    }}
+                                                                    className={`p-2 rounded-full transition-colors border ${shoppingList.some(item => item.productId === price.productId)
+                                                                        ? 'bg-green-100 border-green-200 text-green-600'
+                                                                        : 'bg-transparent border-transparent text-gray-300 hover:text-green-500'
+                                                                        }`}
+                                                                    title="Ajouter au panier (Liste de courses)"
+                                                                >
+                                                                    <ShoppingBasket className={`w-5 h-5 ${shoppingList.some(item => item.productId === price.productId) ? 'fill-green-100' : ''}`} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Photos display */}
+                                                    {(price.productPhotoUrl || price.priceTagPhotoUrl) && (
+                                                        <div className="flex gap-2 mt-3 mb-2 overflow-x-auto pb-1 no-scrollbar">
+                                                            {price.productPhotoUrl && (
+                                                                <div
+                                                                    onClick={() => setSelectedImage(price.productPhotoUrl)}
+                                                                    className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
+                                                                >
+                                                                    <ImageWithSkeleton
+                                                                        src={price.productPhotoUrl}
+                                                                        alt="Produit"
+                                                                        className="rounded border border-gray-200 group-hover:opacity-90"
+                                                                    />
+                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
+                                                                        <Search className="w-5 h-5 text-white" />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {price.priceTagPhotoUrl && (
+                                                                <div
+                                                                    onClick={() => setSelectedImage(price.priceTagPhotoUrl)}
+                                                                    className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
+                                                                >
+                                                                    <ImageWithSkeleton
+                                                                        src={price.priceTagPhotoUrl}
+                                                                        alt="Etiquette"
+                                                                        className="rounded border border-gray-200 group-hover:opacity-90"
+                                                                    />
+                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
+                                                                        <Search className="w-5 h-5 text-white" />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex justify-between items-center text-xs text-gray-500 mt-2 pt-2 border-t">
+                                                        <div className="flex items-center gap-4">
+                                                            <button
+                                                                onClick={() => handleToggleLike(price.id, price.isLikedByUser)}
+                                                                className={`flex items-center gap-1.5 transition-colors ${price.isLikedByUser ? 'text-red-500' : 'hover:text-red-500'}`}
+                                                            >
+                                                                <Heart className={`w-4 h-4 ${price.isLikedByUser ? 'fill-red-500' : ''}`} />
+                                                                <span className="font-bold">{price.likesCount || 0}</span>
+                                                                <span className="hidden sm:inline">Merci !</span>
+                                                            </button>
+                                                            <span>
+                                                                Par {price.userName}
+                                                                {isCurrentUser && <span className="text-orange-500 ml-1">(vous)</span>}
+                                                            </span>
+                                                        </div>
+                                                        <span>{price.date}</span>
+                                                    </div>
+                                                    {stats && stats.count > 1 && (
+                                                        <div className="mt-2 pt-2 border-t text-xs text-gray-600">
+                                                            <span>Prix moyen: {stats.avg.toFixed(2)}€</span>
+                                                            <span className="mx-2">-</span>
+                                                            <span>De {stats.min.toFixed(2)}€ à {stats.max.toFixed(2)}€</span>
+                                                            <span className="mx-2">-</span>
+                                                            <span>{stats.count} magasins</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
+                {/* Community Tab */}
+                {
+                    activeTab === 'community' && (
+                        <Community />
+                    )
+                }
+                {/* List Tab */}
+                {
+                    activeTab === 'list' && (
+                        <div className="space-y-4 pt-8 px-4">
+                            <ShoppingList
+                                items={shoppingList}
+                                onUpdateQuantity={updateQuantity}
+                                onRemoveItem={removeFromShoppingList}
+                                onClearList={clearShoppingList}
+                                supabase={supabase}
+                                user={user}
                             />
                         </div>
-
-                        {categoryFilter && (
-                            <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xl">{categories.find(c => c.id === categoryFilter)?.icon}</span>
-                                    <span className="text-sm font-medium text-orange-800">
-                                        Filtré par: <span className="font-bold">{categories.find(c => c.id === categoryFilter)?.name}</span>
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={() => setCategoryFilter(null)}
-                                    className="p-1 hover:bg-orange-100 rounded-full text-orange-600 transition-colors"
-                                    title="Réinitialiser le filtre"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                        )}
-
-                        {loading ? (
-                            <div className="text-center py-8 text-gray-500">
-                                <div className="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                                <p>Chargement...</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {filteredPrices.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-500">
-                                        <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                        <p>Aucun prix trouvé</p>
-                                    </div>
-                                ) : (
-                                    filteredPrices.map(price => {
-                                        const stats = getProductStats(price.product);
-                                        const isLowest = stats && price.price === stats.min;
-                                        const isCurrentUser = user && price.userId === user.id;
-
-                                        return (
-                                            <div key={price.id} className={`bg-white border rounded-lg p-4 shadow-sm ${isCurrentUser ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div className="flex-1">
-                                                        <h3 className="font-semibold text-gray-900 flex items-center gap-1">
-                                                            {price.product}
-                                                            {price.isLocal && <Leaf className="w-4 h-4 text-green-600 fill-green-100" title="Produit Local" />}
-                                                        </h3>
-                                                        <p className="text-sm text-gray-600">{price.store}</p>
-                                                    </div>
-                                                    <div className="text-right flex flex-col items-end gap-1 pl-2">
-                                                        <div className={`text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900'}`}>
-                                                            {price.price.toFixed(2)}€
-                                                        </div>
-                                                        {isLowest && (
-                                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap mb-1">
-                                                                <TrendingDown className="inline w-3 h-3" /> Meilleur prix
-                                                            </span>
-                                                        )}
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleToggleFavorite(price.productId);
-                                                                }}
-                                                                className={`p-2 rounded-full transition-colors border ${userFavorites.has(price.productId)
-                                                                    ? 'bg-yellow-50 border-yellow-200 text-yellow-500'
-                                                                    : 'bg-transparent border-transparent text-gray-300 hover:text-yellow-400'
-                                                                    }`}
-                                                                title="Ajouter aux favoris (Sauvegarder)"
-                                                            >
-                                                                <Bookmark
-                                                                    className={`w-5 h-5 ${userFavorites.has(price.productId) ? 'fill-yellow-400' : ''}`}
-                                                                />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    addToShoppingList({
-                                                                        id: price.productId,
-                                                                        name: price.product,
-                                                                        productPhotoUrl: price.productPhotoUrl
-                                                                    });
-                                                                }}
-                                                                className={`p-2 rounded-full transition-colors border ${shoppingList.some(item => item.productId === price.productId)
-                                                                    ? 'bg-green-100 border-green-200 text-green-600'
-                                                                    : 'bg-transparent border-transparent text-gray-300 hover:text-green-500'
-                                                                    }`}
-                                                                title="Ajouter au panier (Liste de courses)"
-                                                            >
-                                                                <ShoppingBasket className={`w-5 h-5 ${shoppingList.some(item => item.productId === price.productId) ? 'fill-green-100' : ''}`} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Photos display */}
-                                                {(price.productPhotoUrl || price.priceTagPhotoUrl) && (
-                                                    <div className="flex gap-2 mt-3 mb-2 overflow-x-auto pb-1 no-scrollbar">
-                                                        {price.productPhotoUrl && (
-                                                            <div
-                                                                onClick={() => setSelectedImage(price.productPhotoUrl)}
-                                                                className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
-                                                            >
-                                                                <ImageWithSkeleton
-                                                                    src={price.productPhotoUrl}
-                                                                    alt="Produit"
-                                                                    className="rounded border border-gray-200 group-hover:opacity-90"
-                                                                />
-                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
-                                                                    <Search className="w-5 h-5 text-white" />
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        {price.priceTagPhotoUrl && (
-                                                            <div
-                                                                onClick={() => setSelectedImage(price.priceTagPhotoUrl)}
-                                                                className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
-                                                            >
-                                                                <ImageWithSkeleton
-                                                                    src={price.priceTagPhotoUrl}
-                                                                    alt="Etiquette"
-                                                                    className="rounded border border-gray-200 group-hover:opacity-90"
-                                                                />
-                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
-                                                                    <Search className="w-5 h-5 text-white" />
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                <div className="flex justify-between items-center text-xs text-gray-500 mt-2 pt-2 border-t">
-                                                    <div className="flex items-center gap-4">
-                                                        <button
-                                                            onClick={() => handleToggleLike(price.id, price.isLikedByUser)}
-                                                            className={`flex items-center gap-1.5 transition-colors ${price.isLikedByUser ? 'text-red-500' : 'hover:text-red-500'}`}
-                                                        >
-                                                            <Heart className={`w-4 h-4 ${price.isLikedByUser ? 'fill-red-500' : ''}`} />
-                                                            <span className="font-bold">{price.likesCount || 0}</span>
-                                                            <span className="hidden sm:inline">Merci !</span>
-                                                        </button>
-                                                        <span>
-                                                            Par {price.userName}
-                                                            {isCurrentUser && <span className="text-orange-500 ml-1">(vous)</span>}
-                                                        </span>
-                                                    </div>
-                                                    <span>{price.date}</span>
-                                                </div>
-                                                {stats && stats.count > 1 && (
-                                                    <div className="mt-2 pt-2 border-t text-xs text-gray-600">
-                                                        <span>Prix moyen: {stats.avg.toFixed(2)}€</span>
-                                                        <span className="mx-2">-</span>
-                                                        <span>De {stats.min.toFixed(2)}€ à {stats.max.toFixed(2)}€</span>
-                                                        <span className="mx-2">-</span>
-                                                        <span>{stats.count} magasins</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
-                {/* Community Tab */}
-                {activeTab === 'community' && (
-                    <Community />
-                )}
-                {/* List Tab */}
-                {activeTab === 'list' && (
-                    <div className="space-y-4 pt-8 px-4">
-                        <ShoppingList
-                            items={shoppingList}
-                            onUpdateQuantity={updateQuantity}
-                            onRemoveItem={removeFromShoppingList}
-                            onClearList={clearShoppingList}
-                            supabase={supabase}
-                            user={user}
-                        />
-                    </div>
-                )}
+                    )
+                }
 
                 {/* BQP Tab */}
-                {activeTab === 'bqp' && (
-                    <div className="space-y-4 pt-8 px-4">
-                        <BQPVerifier />
-                    </div>
-                )}
+                {
+                    activeTab === 'bqp' && (
+                        <div className="space-y-4 pt-8 px-4">
+                            <BQPVerifier />
+                        </div>
+                    )
+                }
 
                 {/* À Propos Tab */}
                 {activeTab === 'about' && <AboutPage />}
@@ -1825,7 +1897,7 @@ const App10 = () => {
                         Données crowdsourcées - Gratuit et ouvert à tous
                     </p>
                 </div>
-            </div>
+            </div >
 
             {/* Image Zoom Modal */}
             {

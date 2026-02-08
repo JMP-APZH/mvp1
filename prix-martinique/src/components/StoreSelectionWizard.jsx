@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { detectUserLocation, getCityList } from '../utils/geocoding';
+import { detectUserLocation, getCityList, getStoresSortedByDistance } from '../utils/geocoding';
 
 // Chain icons for visual recognition
 const CHAIN_ICONS = {
@@ -53,6 +53,7 @@ export default function StoreSelectionWizard({
 
     // GPS state
     const [gpsDetecting, setGpsDetecting] = useState(false);
+    const [userLocation, setUserLocation] = useState(null);
     const [gpsCity, setGpsCity] = useState(null);
 
     // Load stores and cities on mount
@@ -88,10 +89,13 @@ export default function StoreSelectionWizard({
         setGpsDetecting(true);
         const location = await detectUserLocation();
 
-        if (location && location.city) {
-            setGpsCity(location.city);
-            setSelectedCity(location.city);
-            setStep(2); // Skip to chain selection
+        if (location) {
+            setUserLocation({ lat: location.latitude, lon: location.longitude });
+            if (location.city) {
+                setGpsCity(location.city);
+                setSelectedCity(location.city);
+                setStep(2); // Skip to chain selection
+            }
         }
 
         setGpsDetecting(false);
@@ -105,6 +109,12 @@ export default function StoreSelectionWizard({
             city.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(search)
         );
     }, [cities, citySearch]);
+
+    // Nearest stores (if GPS available)
+    const nearestStores = useMemo(() => {
+        if (!userLocation) return [];
+        return getStoresSortedByDistance(stores, userLocation.lat, userLocation.lon).slice(0, 3);
+    }, [stores, userLocation]);
 
     // Get chains available in selected city
     const availableChains = useMemo(() => {
@@ -300,6 +310,38 @@ export default function StoreSelectionWizard({
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                             />
                         </div>
+
+                        {nearestStores.length > 0 && !citySearch && (
+                            <div className="mb-4">
+                                <label className="block text-xs font-bold text-green-600 uppercase tracking-wider mb-2">
+                                    📍 À proximité ({nearestStores.length})
+                                </label>
+                                <div className="space-y-2">
+                                    {nearestStores.map(store => (
+                                        <button
+                                            key={`near-${store.id}`}
+                                            onClick={() => {
+                                                setSelectedCity(store.city);
+                                                setSelectedChain(store.chain);
+                                                onStoreSelect(store.id);
+                                                setStep(3);
+                                            }}
+                                            className="w-full text-left p-3 bg-green-50 rounded-lg border border-green-200 hover:border-green-400 transition-colors group"
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <span className="font-bold text-gray-900">{store.chain} {store.name}</span>
+                                                    <p className="text-xs text-gray-500">{store.city} ({store.distance.toFixed(1)} km)</p>
+                                                </div>
+                                                <span className="text-xl group-hover:scale-110 transition-transform">
+                                                    {CHAIN_ICONS[store.chain] || '🏪'}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-2">
                             {filteredCities.length === 0 ? (

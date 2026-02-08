@@ -150,8 +150,33 @@ export async function getCityList(supabase) {
     }
 }
 
+/**
+ * Sort stores by distance from coordinates
+ * @param {Array} stores - List of stores from database
+ * @param {number} latitude - User latitude
+ * @param {number} longitude - User longitude
+ * @returns {Array} Stores with distance field, sorted
+ */
+export function getStoresSortedByDistance(stores, latitude, longitude) {
+    if (!latitude || !longitude || !stores.length) return stores;
+
+    return stores
+        .map(store => ({
+            ...store,
+            distance: calculateDistance(
+                latitude,
+                longitude,
+                parseFloat(store.latitude),
+                parseFloat(store.longitude)
+            )
+        }))
+        .sort((a, b) => a.distance - b.distance);
+}
+
 export default {
     detectUserLocation,
     getCityFromCoordinates,
-    getCityList
+    getCityList,
+    getStoresSortedByDistance,
+    calculateDistance
 };
