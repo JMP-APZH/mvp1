@@ -16,6 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [userBadges, setUserBadges] = useState([]);
   const [userFavorites, setUserFavorites] = useState(new Set());
+  const [userFavoriteStores, setUserFavoriteStores] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
   // Fetch user profile from user_profiles table
@@ -81,6 +82,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Fetch user favorite stores
+  const fetchUserFavoriteStores = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_favorite_stores')
+        .select('store_id')
+        .eq('user_id', userId);
+
+      if (error) return new Set();
+      return new Set(data.map(item => item.store_id));
+    } catch (err) {
+      return new Set();
+    }
+  };
+
   // Initialize auth state
   useEffect(() => {
     let isMounted = true;
@@ -88,12 +104,13 @@ export const AuthProvider = ({ children }) => {
     let currentLoadedUserId = null; // Track which user's data we've loaded
 
     const loadUserData = async (userId) => {
-      const [profile, badges, favorites] = await Promise.all([
+      const [profile, badges, favorites, favoriteStores] = await Promise.all([
         fetchUserProfile(userId),
         fetchUserBadges(userId),
-        fetchUserFavorites(userId)
+        fetchUserFavorites(userId),
+        fetchUserFavoriteStores(userId)
       ]);
-      return { profile, badges, favorites };
+      return { profile, badges, favorites, favoriteStores };
     };
 
     // Set up auth state change listener first
@@ -122,12 +139,13 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           setLoading(true);
 
-          const { profile, badges, favorites } = await loadUserData(session.user.id);
+          const { profile, badges, favorites, favoriteStores } = await loadUserData(session.user.id);
           if (isMounted) {
             currentLoadedUserId = session.user.id;
             setUserProfile(profile);
             setUserBadges(badges);
             setUserFavorites(favorites);
+            setUserFavoriteStores(favoriteStores);
             setLoading(false);
           }
         }
@@ -153,12 +171,13 @@ export const AuthProvider = ({ children }) => {
 
         if (session?.user && isMounted) {
           setUser(session.user);
-          const { profile, badges, favorites } = await loadUserData(session.user.id);
+          const { profile, badges, favorites, favoriteStores } = await loadUserData(session.user.id);
           if (isMounted) {
             currentLoadedUserId = session.user.id;
             setUserProfile(profile);
             setUserBadges(badges);
             setUserFavorites(favorites);
+            setUserFavoriteStores(favoriteStores);
           }
         }
 
@@ -254,6 +273,7 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(null);
       setUserBadges([]);
       setUserFavorites(new Set());
+      setUserFavoriteStores(new Set());
       return { error: null };
     } catch (error) {
       console.error('Sign out error:', error);
@@ -316,6 +336,46 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Toggle Favorite Store
+  const toggleFavoriteStore = async (storeId) => {
+    if (!user) return { error: new Error('User not authenticated') };
+
+    const previousFavoriteStores = new Set(userFavoriteStores || []);
+    const newFavoriteStores = new Set(userFavoriteStores || []);
+
+    // Allow max 3
+    const isAdding = !newFavoriteStores.has(storeId);
+    if (isAdding && newFavoriteStores.size >= 3) {
+      return { error: new Error('Maximum 3 magasins favoris autorisés') };
+    }
+
+    if (isAdding) newFavoriteStores.add(storeId);
+    else newFavoriteStores.delete(storeId);
+
+    setUserFavoriteStores(newFavoriteStores);
+
+    try {
+      if (isAdding) {
+        const { error } = await supabase
+          .from('user_favorite_stores')
+          .insert([{ user_id: user.id, store_id: storeId }]);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('user_favorite_stores')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('store_id', storeId);
+        if (error) throw error;
+      }
+      return { error: null };
+    } catch (error) {
+      console.error('Toggle favorite store error:', error);
+      setUserFavoriteStores(previousFavoriteStores);
+      return { error };
+    }
+  };
+
   // Refresh profile data
   const refreshProfile = async () => {
     if (user) {
@@ -325,6 +385,8 @@ export const AuthProvider = ({ children }) => {
       setUserBadges(badges);
       const favorites = await fetchUserFavorites(user.id);
       setUserFavorites(favorites);
+      const favoriteStores = await fetchUserFavoriteStores(user.id);
+      setUserFavoriteStores(favoriteStores);
     }
   };
 
@@ -360,7 +422,9 @@ export const AuthProvider = ({ children }) => {
     refreshProfile,
     updateProfile,
     userFavorites,
-    toggleFavorite
+    toggleFavorite,
+    userFavoriteStores,
+    toggleFavoriteStore
   };
 
   return (

@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, LogOut, Trophy, Star, ChevronDown, Award } from 'lucide-react';
+import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const UserMenu = ({ onSignInClick }) => {
-  const { user, userProfile, userBadges, loading, signOut, updateProfile } = useAuth();
+const UserMenu = ({ onSignInClick, onOpenStats, stores }) => {
+  const { user, userProfile, userBadges, loading, signOut, updateProfile, userFavoriteStores, toggleFavoriteStore } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdatingCity, setIsUpdatingCity] = useState(false);
+  const [showStoreSearch, setShowStoreSearch] = useState(false);
+  const [storeSearchQuery, setStoreSearchQuery] = useState("");
   const menuRef = useRef(null);
 
   const martiniqueCities = [
@@ -46,6 +48,17 @@ const UserMenu = ({ onSignInClick }) => {
     await updateProfile({ consumes_bqp: val });
     setIsUpdatingCity(false);
   };
+
+  const handleBudgetChange = async (type, value) => {
+    setIsUpdatingCity(true);
+    await updateProfile({ [type]: parseFloat(value) || 0 });
+    setIsUpdatingCity(false);
+  };
+
+  const filteredStores = stores.filter(s =>
+    s.name.toLowerCase().includes(storeSearchQuery.toLowerCase()) ||
+    s.chain?.toLowerCase().includes(storeSearchQuery.toLowerCase())
+  ).slice(0, 5);
 
   // Calculate progress to next level
   const getNextLevelProgress = () => {
@@ -192,103 +205,191 @@ const UserMenu = ({ onSignInClick }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mt-4 text-center border-t border-gray-50 pt-4">
-              <div>
-                <div className="text-lg font-bold text-gray-900">
-                  {userProfile?.points || 0}
+          </div>
+          <div className="p-2 border-b border-gray-100">
+            <button
+              onClick={() => {
+                onOpenStats();
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center justify-between p-3 bg-orange-50 hover:bg-orange-100 rounded-xl transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-orange-500 p-2 rounded-lg text-white shadow-sm group-hover:scale-110 transition-transform">
+                  <TrendingUp className="w-5 h-5" />
                 </div>
-                <div className="text-[10px] text-gray-500 uppercase">Points</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-gray-900">
-                  {userProfile?.total_contributions || 0}
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-900">Mon Impact</p>
+                  <p className="text-[10px] text-orange-600 font-medium tracking-tight">Vérifier mon score et mes badges</p>
                 </div>
-                <div className="text-[10px] text-gray-500 uppercase">Prix</div>
               </div>
-              <div>
-                <div className="text-lg font-bold text-gray-900">
-                  {userBadges.length}
-                </div>
-                <div className="text-[10px] text-gray-500 uppercase">Badges</div>
-              </div>
-            </div>
+              <ChevronRight className="w-5 h-5 text-orange-300" />
+            </button>
           </div>
 
-          {/* Badges */}
-          {userBadges.length > 0 && (
+          <div className="max-h-[350px] overflow-y-auto">
+            {/* Badges section remains similar but maybe moved... I'll keep it as is for now or move it to PersoStats */}
+
+            {/* Budget Settings */}
+            <div className="p-4 border-b border-gray-100 bg-green-50/30">
+              <p className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-1 uppercase tracking-wider">
+                <Wallet className="w-3.5 h-3.5 text-green-600" /> Budget Courses (Mensuel)
+              </p>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[9px] text-gray-400 uppercase font-black ml-1">Min (€)</label>
+                  <input
+                    type="number"
+                    value={userProfile?.budget_min || ""}
+                    onChange={(e) => handleBudgetChange('budget_min', e.target.value)}
+                    className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-2 text-xs focus:ring-2 focus:ring-green-500 outline-none"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[9px] text-gray-400 uppercase font-black ml-1">Max (€)</label>
+                  <input
+                    type="number"
+                    value={userProfile?.budget_max || ""}
+                    onChange={(e) => handleBudgetChange('budget_max', e.target.value)}
+                    className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-2 text-xs focus:ring-2 focus:ring-green-500 outline-none"
+                    placeholder="500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Favorite Shops (Top 3) */}
             <div className="p-4 border-b border-gray-100">
-              <p className="text-xs font-medium text-gray-500 mb-2">Badges obtenus</p>
-              <div className="flex flex-wrap gap-2">
-                {userBadges.slice(0, 5).map((ub) => (
-                  <div
-                    key={ub.id}
-                    className="flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-1 rounded-full text-xs"
-                    title={ub.badges?.description}
-                  >
-                    <span>{ub.badges?.icon}</span>
-                    <span>{ub.badges?.name}</span>
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-xs font-bold text-gray-500 flex items-center gap-1 uppercase tracking-wider">
+                  <Store className="w-3.5 h-3.5 text-blue-600" /> Mes 3 Magasins Top
+                </p>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 rounded">
+                  {userFavoriteStores?.size || 0}/3
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                {stores.filter(s => userFavoriteStores?.has(s.id)).map(s => (
+                  <div key={s.id} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <div className="w-6 h-6 flex-shrink-0 bg-white rounded border flex items-center justify-center text-[10px] font-bold">
+                        {s.chain?.[0] || 'M'}
+                      </div>
+                      <span className="text-xs text-gray-700 truncate">{s.name}</span>
+                    </div>
+                    <button
+                      onClick={() => toggleFavoriteStore(s.id)}
+                      className="text-gray-400 hover:text-red-500 p-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 ))}
-                {userBadges.length > 5 && (
-                  <div className="text-xs text-gray-500 px-2 py-1">
-                    +{userBadges.length - 5} autres
+
+                {(!userFavoriteStores || userFavoriteStores.size < 3) && (
+                  <div className="relative">
+                    {!showStoreSearch ? (
+                      <button
+                        onClick={() => setShowStoreSearch(true)}
+                        className="w-full py-2 border-2 border-dashed border-gray-100 rounded-lg text-gray-400 text-xs hover:border-blue-200 hover:text-blue-500 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Ajouter un magasin
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-2 w-3.5 h-3.5 text-gray-400" />
+                          <input
+                            autoFocus
+                            type="text"
+                            value={storeSearchQuery}
+                            onChange={(e) => setStoreSearchQuery(e.target.value)}
+                            className="w-full pl-7 pr-8 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="Chercher un magasin..."
+                          />
+                          <button onClick={() => { setShowStoreSearch(false); setStoreSearchQuery(""); }} className="absolute right-2 top-2">
+                            <X className="w-3.5 h-3.5 text-gray-400" />
+                          </button>
+                        </div>
+                        {storeSearchQuery && (
+                          <div className="bg-white border border-gray-100 rounded-lg shadow-sm overflow-hidden divide-y">
+                            {filteredStores.map(s => (
+                              <button
+                                key={s.id}
+                                onClick={() => {
+                                  toggleFavoriteStore(s.id);
+                                  setStoreSearchQuery("");
+                                  setShowStoreSearch(false);
+                                }}
+                                className="w-full text-left p-2 hover:bg-blue-50 transition-colors flex items-center gap-2"
+                              >
+                                <span className="text-[10px] font-bold text-gray-400">{s.chain}</span>
+                                <span className="text-xs text-gray-700 font-medium">{s.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
-          )}
 
-          {/* City Selector */}
-          <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-            <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-              📍 Ma Ville
-              {isUpdatingCity && <span className="animate-pulse text-[10px] text-orange-500 ml-2">Mise à jour...</span>}
-            </p>
-            <select
-              value={userProfile?.city || ""}
-              onChange={(e) => handleCityChange(e.target.value)}
-              disabled={isUpdatingCity}
-              className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none disabled:opacity-50"
-            >
-              <option value="">Choisir ma ville...</option>
-              {martiniqueCities.map(city => (
-                <option key={city} value={city}>{city}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* BQP Preference */}
-          <div className="p-4 border-b border-gray-100 bg-blue-50/50">
-            <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-              🛒 Consommez-vous BQP ?
-              {isUpdatingCity && <span className="animate-pulse text-[10px] text-orange-500 ml-2">Mise à jour...</span>}
-            </p>
-            <div className="grid grid-cols-3 gap-1">
-              {['yes', 'no', 'partial'].map((val) => (
-                <button
-                  key={val}
-                  onClick={() => handleBqpChange(val)}
-                  disabled={isUpdatingCity}
-                  className={`py-1 px-2 rounded-lg text-[10px] font-bold uppercase transition-colors border ${userProfile?.consumes_bqp === val
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                    }`}
-                >
-                  {val === 'yes' ? 'Oui' : val === 'no' ? 'Non' : 'Un peu'}
-                </button>
-              ))}
+            {/* City Selector */}
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+              <p className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1 uppercase tracking-wider">
+                <MapPin className="w-3.5 h-3.5 text-orange-500" /> Ma Ville
+                {isUpdatingCity && <span className="animate-pulse text-[10px] text-orange-500 ml-2">Mise à jour...</span>}
+              </p>
+              <select
+                value={userProfile?.city || ""}
+                onChange={(e) => handleCityChange(e.target.value)}
+                disabled={isUpdatingCity}
+                className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none disabled:opacity-50"
+              >
+                <option value="">Choisir ma ville...</option>
+                {martiniqueCities.map(city => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          {/* Actions */}
-          <div className="p-2">
-            <button
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              <LogOut className="w-5 h-5 text-gray-400" />
-              <span>Deconnexion</span>
-            </button>
+            {/* BQP Preference */}
+            <div className="p-4 border-b border-gray-100 bg-blue-50/50">
+              <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                🛒 Consommez-vous BQP ?
+                {isUpdatingCity && <span className="animate-pulse text-[10px] text-orange-500 ml-2">Mise à jour...</span>}
+              </p>
+              <div className="grid grid-cols-3 gap-1">
+                {['yes', 'no', 'partial'].map((val) => (
+                  <button
+                    key={val}
+                    onClick={() => handleBqpChange(val)}
+                    disabled={isUpdatingCity}
+                    className={`py-1 px-2 rounded-lg text-[10px] font-bold uppercase transition-colors border ${userProfile?.consumes_bqp === val
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                  >
+                    {val === 'yes' ? 'Oui' : val === 'no' ? 'Non' : 'Un peu'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-2">
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <LogOut className="w-5 h-5 text-gray-400" />
+                <span>Deconnexion</span>
+              </button>
+            </div>
           </div>
         </div>
       )
