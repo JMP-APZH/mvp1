@@ -123,7 +123,7 @@ const Community = () => {
     return (
         <div className="flex flex-col h-full bg-white">
             {/* Header */}
-            <div className="bg-white border-b border-gray-100 p-6 pt-10">
+            <div className="bg-white border-b border-gray-100 p-4 pt-10">
                 <div className="flex items-center gap-3 mb-6">
                     <div className="bg-orange-100 p-2 rounded-xl text-orange-600">
                         <Sparkles className="w-6 h-6" />
@@ -154,7 +154,7 @@ const Community = () => {
                             }`}
                     >
                         <Vote className="w-5 h-5" />
-                        Améliorations
+                        Améliorations et ajouts
                     </button>
                     <button
                         onClick={() => setSubTab('stats')}
@@ -170,7 +170,7 @@ const Community = () => {
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide pb-24">
+            <div className="flex-1 overflow-y-auto p-4 scrollbar-hide pb-24">
                 {subTab === 'ranking' && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <Leaderboard />
@@ -308,7 +308,10 @@ const Community = () => {
                     <div className="bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-2xl font-bold text-gray-900 font-display">Nouvelle Idée</h3>
-                            <button onClick={() => setShowSuggestModal(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
+                            <button
+                                onClick={() => setShowSuggestModal(false)}
+                                className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors text-gray-400"
+                            >
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
