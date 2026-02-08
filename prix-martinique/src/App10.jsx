@@ -1787,7 +1787,7 @@ const App10 = () => {
 
                                                     {/* Photos display */}
                                                     {(price.productPhotoUrl || price.priceTagPhotoUrl) && (
-                                                        <div className="flex gap-2 mt-3 mb-2 overflow-x-auto pb-1 no-scrollbar">
+                                                        <div className="flex gap-2 mt-3 mb-2 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar">
                                                             {price.productPhotoUrl && (
                                                                 <div
                                                                     onClick={() => setSelectedImage(price.productPhotoUrl)}
