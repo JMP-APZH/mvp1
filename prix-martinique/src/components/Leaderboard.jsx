@@ -3,7 +3,7 @@ import { Trophy, Medal, Star, TrendingUp, Crown } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
-const Leaderboard = () => {
+const Leaderboard = ({ city }) => {
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('all'); // 'all', 'month', 'week'
@@ -11,16 +11,20 @@ const Leaderboard = () => {
 
   useEffect(() => {
     loadLeaderboard();
-  }, [timeframe]);
+  }, [timeframe, city]);
 
   const loadLeaderboard = async () => {
     setLoading(true);
     try {
       let query = supabase
-        .from('user_profiles')
-        .select('id, display_name, points, level, total_contributions')
+        .from('profiles')
+        .select('id, display_name, points, level, total_contributions, city')
         .order('points', { ascending: false })
         .limit(10);
+
+      if (city) {
+        query = query.eq('city', city);
+      }
 
       const { data, error } = await query;
 
@@ -195,9 +199,8 @@ const Leaderboard = () => {
           return (
             <div
               key={leader.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border ${getRankBackground(rank)} ${
-                isCurrentUser ? 'ring-2 ring-orange-400' : ''
-              }`}
+              className={`flex items-center gap-3 p-3 rounded-lg border ${getRankBackground(rank)} ${isCurrentUser ? 'ring-2 ring-orange-400' : ''
+                }`}
             >
               {/* Rank */}
               <div className="flex-shrink-0 w-8">

@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X } from 'lucide-react';
+import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const UserMenu = ({ onSignInClick, onOpenStats, stores }) => {
-  const { user, userProfile, userBadges, loading, signOut, updateProfile, userFavoriteStores, toggleFavoriteStore } = useAuth();
+const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
+  const { user, userProfile, userBadges, userRoles, loading, signOut, updateProfile, userFavoriteStores, toggleFavoriteStore } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdatingCity, setIsUpdatingCity] = useState(false);
   const [showStoreSearch, setShowStoreSearch] = useState(false);
@@ -381,7 +381,30 @@ const UserMenu = ({ onSignInClick, onOpenStats, stores }) => {
             </div>
 
             {/* Actions */}
-            <div className="p-2">
+            <div className="p-2 space-y-1">
+              {userRoles.length > 0 && (
+                <div className="px-3 py-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Accès Professionnels</p>
+                  <div className="space-y-1">
+                    {userRoles.includes('admin') && (
+                      <button
+                        onClick={() => { onOpenAdmin(); setIsOpen(false); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                      >
+                        <ShieldCheck className="w-5 h-5" />
+                        <span>Console Admin</span>
+                      </button>
+                    )}
+                    {userRoles.includes('journalist') && (
+                      <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
+                        <BarChart3 className="w-5 h-5" />
+                        <span>Portail Journaliste</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handleSignOut}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"

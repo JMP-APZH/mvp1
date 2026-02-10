@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [userBadges, setUserBadges] = useState([]);
+  const [userRoles, setUserRoles] = useState([]);
   const [userFavorites, setUserFavorites] = useState(new Set());
   const [userFavoriteStores, setUserFavoriteStores] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,21 @@ export const AuthProvider = ({ children }) => {
   };
 
 
+  // Fetch user roles
+  const fetchUserRoles = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+
+      if (error) return [];
+      return data.map(r => r.role);
+    } catch (err) {
+      return [];
+    }
+  };
+
   // Fetch user favorites
   const fetchUserFavorites = async (userId) => {
     try {
@@ -104,13 +120,14 @@ export const AuthProvider = ({ children }) => {
     let currentLoadedUserId = null; // Track which user's data we've loaded
 
     const loadUserData = async (userId) => {
-      const [profile, badges, favorites, favoriteStores] = await Promise.all([
+      const [profile, badges, roles, favorites, favoriteStores] = await Promise.all([
         fetchUserProfile(userId),
         fetchUserBadges(userId),
+        fetchUserRoles(userId),
         fetchUserFavorites(userId),
         fetchUserFavoriteStores(userId)
       ]);
-      return { profile, badges, favorites, favoriteStores };
+      return { profile, badges, roles, favorites, favoriteStores };
     };
 
     // Set up auth state change listener first
@@ -124,7 +141,9 @@ export const AuthProvider = ({ children }) => {
           setUser(null);
           setUserProfile(null);
           setUserBadges([]);
+          setUserRoles([]);
           setUserFavorites(new Set());
+          setUserFavoriteStores(new Set());
           setLoading(false);
           return;
         }
@@ -139,11 +158,12 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           setLoading(true);
 
-          const { profile, badges, favorites, favoriteStores } = await loadUserData(session.user.id);
+          const { profile, badges, roles, favorites, favoriteStores } = await loadUserData(session.user.id);
           if (isMounted) {
             currentLoadedUserId = session.user.id;
             setUserProfile(profile);
             setUserBadges(badges);
+            setUserRoles(roles);
             setUserFavorites(favorites);
             setUserFavoriteStores(favoriteStores);
             setLoading(false);
@@ -171,11 +191,12 @@ export const AuthProvider = ({ children }) => {
 
         if (session?.user && isMounted) {
           setUser(session.user);
-          const { profile, badges, favorites, favoriteStores } = await loadUserData(session.user.id);
+          const { profile, badges, roles, favorites, favoriteStores } = await loadUserData(session.user.id);
           if (isMounted) {
             currentLoadedUserId = session.user.id;
             setUserProfile(profile);
             setUserBadges(badges);
+            setUserRoles(roles || []);
             setUserFavorites(favorites);
             setUserFavoriteStores(favoriteStores);
           }
@@ -272,6 +293,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setUserProfile(null);
       setUserBadges([]);
+      setUserRoles([]);
       setUserFavorites(new Set());
       setUserFavoriteStores(new Set());
       return { error: null };
@@ -383,6 +405,8 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(profile);
       const badges = await fetchUserBadges(user.id);
       setUserBadges(badges);
+      const roles = await fetchUserRoles(user.id);
+      setUserRoles(roles || []);
       const favorites = await fetchUserFavorites(user.id);
       setUserFavorites(favorites);
       const favoriteStores = await fetchUserFavoriteStores(user.id);
@@ -413,6 +437,8 @@ export const AuthProvider = ({ children }) => {
     user,
     userProfile,
     userBadges,
+    userRoles,
+    isAdmin: userRoles.includes('admin'),
     loading,
     signUp,
     signIn,

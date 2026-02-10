@@ -14,6 +14,7 @@ import StoreSelectionWizard from './components/StoreSelectionWizard';
 import ShoppingList from './components/ShoppingList';
 import Community from './components/Community';
 import PersoStats from './components/PersoStats';
+import AdminDashboard from './components/AdminDashboard';
 
 const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     const [loaded, setLoaded] = useState(false);
@@ -100,6 +101,7 @@ const App10 = () => {
     const [error, setError] = useState(null);
     const [bqpCheckResult, setBqpCheckResult] = useState(null); // { status: 'loading' | 'found' | 'not_found', product: ..., category: ... }
     const [showPersoStats, setShowPersoStats] = useState(false);
+    const [showAdminDashboard, setShowAdminDashboard] = useState(false);
     const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
     const [bqpQualityStats, setBqpQualityStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 });
     const [priceHistory, setPriceHistory] = useState([]);
@@ -1010,10 +1012,14 @@ const App10 = () => {
                     <UserMenu
                         onSignInClick={() => setShowAuthModal(true)}
                         onOpenStats={() => setShowPersoStats(true)}
+                        onOpenAdmin={() => setShowAdminDashboard(true)}
                         stores={stores}
                     />
                 </div>
                 <p className="text-orange-100 text-sm">Quid de votre pouvoir d'achat</p>
+
+                {/* Admin Dashboard View */}
+                {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
 
                 {/* Perso Stats View */}
                 {showPersoStats && <PersoStats onClose={() => setShowPersoStats(false)} />}

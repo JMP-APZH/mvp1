@@ -11,13 +11,64 @@ const Community = () => {
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const [newFeature, setNewFeature] = useState({ title: '', description: '', category: 'General' });
     const [submitting, setSubmitting] = useState(false);
+    const [communityStats, setCommunityStats] = useState({
+        sovereigntyScore: 0,
+        verifiedPrices: 0,
+        localProducts: 0
+    });
+    const [loadingStats, setLoadingStats] = useState(false);
+    const [selectedCity, setSelectedCity] = useState("");
     const { user } = useAuth();
+
+    const martiniqueCities = [
+        "Fort-de-France", "Le Lamentin", "Le Robert", "Schoelcher", "Sainte-Marie",
+        "Le François", "Ducos", "Saint-Joseph", "La Trinité", "Rivière-Pilote",
+        "Rivière-Salée", "Gros-Morne", "Sainte-Luce", "Saint-Esprit", "Le Marin",
+        "Le Lorrain", "Le Diamant", "Le Vauclin", "Case-Pilote", "Saint-Pierre",
+        "Les Anses-d'Arlet", "Basse-Pointe", "Grand'Rivière", "Ajoupa-Bouillon",
+        "Le Morne-Rouge", "Le Morne-Vert", "Le Carbet", "Le Prêcheur",
+        "Fond-Saint-Denis", "Sainte-Anne", "Macouba", "Le Marigot", "Bellefontaine"
+    ].sort();
 
     useEffect(() => {
         if (subTab === 'voting') {
             loadFeatureRequests();
+        } else if (subTab === 'stats') {
+            loadCommunityStats();
         }
     }, [subTab]);
+
+    const loadCommunityStats = async () => {
+        setLoadingStats(true);
+        try {
+            // Calculate Sovereignty Score: (BQP or Local products) / Total unique products in last 30 days
+            // For now: basic count comparison
+            const { count: totalProducts } = await supabase
+                .from('products')
+                .select('*', { count: 'exact', head: true });
+
+            const { count: bqpProducts } = await supabase
+                .from('products')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_bqp', true);
+
+            const { count: pricesCount } = await supabase
+                .from('prices')
+                .select('*', { count: 'exact', head: true });
+
+            const score = totalProducts > 0 ? Math.round((bqpProducts / totalProducts) * 100) : 0;
+
+            setCommunityStats({
+                sovereigntyScore: score,
+                verifiedPrices: pricesCount || 0,
+                localProducts: bqpProducts || 0
+            });
+        } catch (err) {
+            console.error('Error loading community stats:', err);
+        } finally {
+            setLoadingStats(false);
+        }
+    };
 
     const loadFeatureRequests = async () => {
         setLoadingFeatures(true);
@@ -154,7 +205,7 @@ const Community = () => {
                             }`}
                     >
                         <Vote className="w-5 h-5" />
-                        Améliorations et ajouts
+                        Améliorations
                     </button>
                     <button
                         onClick={() => setSubTab('stats')}
@@ -172,8 +223,21 @@ const Community = () => {
             {/* Scrollable Content Area */}
             <div className="flex-1 overflow-y-auto p-4 scrollbar-hide pb-24">
                 {subTab === 'ranking' && (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <Leaderboard />
+                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <h3 className="font-bold text-gray-900 border-l-4 border-orange-500 pl-3">Top Chasseurs</h3>
+                            <select
+                                value={selectedCity}
+                                onChange={(e) => setSelectedCity(e.target.value)}
+                                className="bg-gray-100 border-none rounded-lg text-[11px] font-bold py-1.5 px-3 outline-none focus:ring-2 focus:ring-orange-500 transition-all shadow-sm"
+                            >
+                                <option value="">Toute la Martinique</option>
+                                {martiniqueCities.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <Leaderboard city={selectedCity} />
                     </div>
                 )}
 
@@ -182,7 +246,7 @@ const Community = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <h3 className="font-bold text-gray-900 border-l-4 border-orange-500 pl-3">Développement Participatif</h3>
-                                <p className="text-xs text-gray-500 mt-1 pl-4">Voted pour les prochaines fonctionnalités</p>
+                                <p className="text-xs text-gray-500 mt-1 pl-4">Votez pour les prochaines fonctionnalités</p>
                             </div>
                             <button
                                 onClick={() => setShowSuggestModal(true)}
@@ -209,7 +273,6 @@ const Community = () => {
                                 {featureRequests.map((feature) => (
                                     <div key={feature.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:border-orange-200 transition-colors">
                                         <div className="flex gap-4">
-                                            {/* Voting arrows */}
                                             <div className="flex flex-col items-center gap-1 bg-gray-50 rounded-xl p-2 min-w-[3.5rem] self-start">
                                                 <button
                                                     onClick={() => handleVote(feature.id, 1)}
@@ -264,13 +327,24 @@ const Community = () => {
                             <h3 className="text-lg font-bold mb-1">Score de Souveraineté</h3>
                             <p className="text-indigo-100 text-sm mb-4">Progression vers l'autonomie alimentaire</p>
 
-                            <div className="flex items-end gap-3 mb-2">
-                                <span className="text-4xl font-black">28%</span>
-                                <span className="text-indigo-200 text-xs pb-1 mb-1">+2% ce mois</span>
-                            </div>
-                            <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
-                                <div className="h-full bg-white rounded-full w-[28%] shadow-sm shadow-white/50"></div>
-                            </div>
+                            {loadingStats ? (
+                                <div className="h-20 flex items-center justify-center">
+                                    <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-end gap-3 mb-2">
+                                        <span className="text-4xl font-black">{communityStats.sovereigntyScore}%</span>
+                                        <span className="text-indigo-200 text-xs pb-1 mb-1">+2% ce mois</span>
+                                    </div>
+                                    <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-white rounded-full transition-all duration-1000"
+                                            style={{ width: `${communityStats.sovereigntyScore}%` }}
+                                        ></div>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -278,14 +352,18 @@ const Community = () => {
                                 <div className="bg-green-100 w-10 h-10 rounded-xl flex items-center justify-center text-green-600 mb-3">
                                     <Target className="w-6 h-6" />
                                 </div>
-                                <p className="text-2xl font-bold text-gray-900 leading-none">156</p>
-                                <p className="text-xs text-gray-500 mt-1 uppercase font-bold tracking-tight">Produits Locaux</p>
+                                <p className="text-2xl font-bold text-gray-900 leading-none">
+                                    {loadingStats ? "..." : communityStats.localProducts}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1 uppercase font-bold tracking-tight">Produits BQP/Locaux</p>
                             </div>
                             <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
                                 <div className="bg-blue-100 w-10 h-10 rounded-xl flex items-center justify-center text-blue-600 mb-3">
                                     <MessageSquare className="w-6 h-6" />
                                 </div>
-                                <p className="text-2xl font-bold text-gray-900 leading-none">842</p>
+                                <p className="text-2xl font-bold text-gray-900 leading-none">
+                                    {loadingStats ? "..." : communityStats.verifiedPrices}
+                                </p>
                                 <p className="text-xs text-gray-500 mt-1 uppercase font-bold tracking-tight">Prix Vérifiés</p>
                             </div>
                         </div>
