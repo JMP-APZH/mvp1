@@ -266,7 +266,7 @@ const App10 = () => {
         try {
             const { data, error } = await supabase
                 .from('stores')
-                .select('id, name')
+                .select('id, name, chain')
                 .order('name', { ascending: true });
 
             if (error) throw error;

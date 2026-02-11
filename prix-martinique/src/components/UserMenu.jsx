@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 const CHAIN_ICONS = {
   'Carrefour': '🔵',
   'E.Leclerc': '🔴',
+  'Leclerc': '🔴',
   'Euromarché': '🟠',
   'Auchan': '🔴',
   'Pli Bel Price': '🟡',
