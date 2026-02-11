@@ -40,6 +40,8 @@ export default function StoreSelectionWizard({
     const [step, setStep] = useState(1);
     const [selectedCity, setSelectedCity] = useState(null);
     const [selectedChain, setSelectedChain] = useState(null);
+    const [userFavorites, setUserFavorites] = useState([]);
+    const [loadingFavorites, setLoadingFavorites] = useState(false);
 
     // Data state
     const [stores, setStores] = useState([]);
@@ -61,7 +63,31 @@ export default function StoreSelectionWizard({
         loadStores();
         loadCities();
         attemptGPSDetection();
+        loadUserFavorites();
     }, []);
+
+    async function loadUserFavorites() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            setLoadingFavorites(true);
+            const { data, error } = await supabase
+                .from('user_favorite_stores')
+                .select(`
+                    store_id,
+                    stores (*)
+                `)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+            setUserFavorites(data?.map(f => f.stores) || []);
+        } catch (err) {
+            console.error('Error loading favorite stores:', err);
+        } finally {
+            setLoadingFavorites(false);
+        }
+    }
 
     async function loadStores() {
         try {
@@ -182,10 +208,18 @@ export default function StoreSelectionWizard({
     }, [onStoreSelect]);
 
     const handleChainSelect = useCallback((chain) => {
-        setSelectedChain(chain);
-        onStoreSelect(null);
-        setStep(3);
-    }, [onStoreSelect]);
+        const cityStores = stores.filter(s => s.city === selectedCity && s.chain === chain);
+
+        if (cityStores.length === 1) {
+            // Only one store in this city/chain - select it automatically and finish
+            onStoreSelect(cityStores[0].id);
+            // No need to setStep(3) if it's already selected and we want to skip
+        } else {
+            setSelectedChain(chain);
+            onStoreSelect(null);
+            setStep(3);
+        }
+    }, [stores, selectedCity, onStoreSelect]);
 
     const handleStoreSelect = useCallback((store) => {
         onStoreSelect(store.id);
@@ -228,7 +262,7 @@ export default function StoreSelectionWizard({
             {/* Progress Indicator */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2 sm:gap-0">
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 1 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 1 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-500'
                         }`}>
                         {step > 1 ? '✓' : '1'}
                     </div>
@@ -236,7 +270,7 @@ export default function StoreSelectionWizard({
 
                     <div className="w-4 sm:w-8 h-0.5 bg-gray-300"></div>
 
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 2 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 2 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-500'
                         }`}>
                         {step > 2 ? '✓' : '2'}
                     </div>
@@ -244,7 +278,7 @@ export default function StoreSelectionWizard({
 
                     <div className="w-4 sm:w-8 h-0.5 bg-gray-300"></div>
 
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 3 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= 3 ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-500'
                         }`}>
                         3
                     </div>
@@ -311,9 +345,45 @@ export default function StoreSelectionWizard({
                             />
                         </div>
 
+                        {/* Favorite Shortcuts */}
+                        {userFavorites.length > 0 && !citySearch && (
+                            <div className="mb-6">
+                                <label className="block text-xs font-bold text-orange-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                    ⭐ Mes magasins habituels
+                                </label>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {userFavorites.map(store => (
+                                        <button
+                                            key={`fav-${store.id}`}
+                                            onClick={() => {
+                                                setSelectedCity(store.city);
+                                                setSelectedChain(store.chain);
+                                                onStoreSelect(store.id);
+                                                setStep(3); // Go directly to summary/confirmation
+                                            }}
+                                            className="w-full text-left p-3 bg-orange-50 rounded-xl border-2 border-orange-100 hover:border-orange-400 transition-all group flex items-center justify-between"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
+                                                    {CHAIN_ICONS[store.chain] || '🏪'}
+                                                </div>
+                                                <div>
+                                                    <span className="font-bold text-gray-900 block">{store.name}</span>
+                                                    <span className="text-[10px] text-orange-600 font-bold uppercase tracking-tight">{store.city}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                Go →
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {nearestStores.length > 0 && !citySearch && (
                             <div className="mb-4">
-                                <label className="block text-xs font-bold text-green-600 uppercase tracking-wider mb-2">
+                                <label className="block text-xs font-bold text-blue-600 uppercase tracking-wider mb-2 flex items-center gap-1">
                                     📍 À proximité ({nearestStores.length})
                                 </label>
                                 <div className="space-y-2">
@@ -326,17 +396,18 @@ export default function StoreSelectionWizard({
                                                 onStoreSelect(store.id);
                                                 setStep(3);
                                             }}
-                                            className="w-full text-left p-3 bg-green-50 rounded-lg border border-green-200 hover:border-green-400 transition-colors group"
+                                            className="w-full text-left p-3 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-400 transition-colors group flex items-center justify-between"
                                         >
-                                            <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-lg shadow-sm">
+                                                    {CHAIN_ICONS[store.chain] || '🏪'}
+                                                </div>
                                                 <div>
                                                     <span className="font-bold text-gray-900">{store.chain} {store.name}</span>
                                                     <p className="text-xs text-gray-500">{store.city} ({store.distance.toFixed(1)} km)</p>
                                                 </div>
-                                                <span className="text-xl group-hover:scale-110 transition-transform">
-                                                    {CHAIN_ICONS[store.chain] || '🏪'}
-                                                </span>
                                             </div>
+                                            <span className="text-blue-300">→</span>
                                         </button>
                                     ))}
                                 </div>

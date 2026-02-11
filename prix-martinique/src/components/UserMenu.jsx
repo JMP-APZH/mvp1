@@ -242,7 +242,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
                     type="number"
                     value={userProfile?.budget_min || ""}
                     onChange={(e) => handleBudgetChange('budget_min', e.target.value)}
-                    className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-2 text-xs focus:ring-2 focus:ring-green-500 outline-none"
+                    className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-2 text-xs text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
                     placeholder="0"
                   />
                 </div>
@@ -252,7 +252,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
                     type="number"
                     value={userProfile?.budget_max || ""}
                     onChange={(e) => handleBudgetChange('budget_max', e.target.value)}
-                    className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-2 text-xs focus:ring-2 focus:ring-green-500 outline-none"
+                    className="w-full bg-white border border-gray-100 rounded-lg py-1.5 px-2 text-xs text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
                     placeholder="500"
                   />
                 </div>
@@ -263,7 +263,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
             <div className="p-4 border-b border-gray-100">
               <div className="flex justify-between items-center mb-2">
                 <p className="text-xs font-bold text-gray-500 flex items-center gap-1 uppercase tracking-wider">
-                  <Store className="w-3.5 h-3.5 text-blue-600" /> Mes 3 Magasins Top
+                  <Store className="w-3.5 h-3.5 text-blue-600" /> Mes 3 magasins habituels
                 </p>
                 <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 rounded">
                   {userFavoriteStores?.size || 0}/3
@@ -306,7 +306,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
                             type="text"
                             value={storeSearchQuery}
                             onChange={(e) => setStoreSearchQuery(e.target.value)}
-                            className="w-full pl-7 pr-8 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full pl-7 pr-8 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs text-gray-900 outline-none focus:ring-1 focus:ring-blue-500"
                             placeholder="Chercher un magasin..."
                           />
                           <button onClick={() => { setShowStoreSearch(false); setStoreSearchQuery(""); }} className="absolute right-2 top-2">
