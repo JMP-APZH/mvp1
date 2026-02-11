@@ -2,6 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
+const CHAIN_ICONS = {
+  'Carrefour': '🔵',
+  'E.Leclerc': '🔴',
+  'Euromarché': '🟠',
+  'Auchan': '🔴',
+  'Pli Bel Price': '🟡',
+  'Caraïbe Price': '🟢',
+  'U Express': '🔵',
+  '8 à Huit': '🟣',
+  'MACK 2': '🟤',
+  'Proxi': '🟠',
+  'Carrefour Market': '🔵',
+  'Carrefour Express': '🔵',
+};
+
 const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
   const { user, userProfile, userBadges, userRoles, loading, signOut, updateProfile, userFavoriteStores, toggleFavoriteStore } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -275,9 +290,9 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
                   <div key={s.id} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-100">
                     <div className="flex items-center gap-2 overflow-hidden">
                       <div className="w-6 h-6 flex-shrink-0 bg-white rounded border flex items-center justify-center text-[10px] font-bold">
-                        {s.chain?.[0] || 'M'}
+                        {CHAIN_ICONS[s.chain] || (s.chain?.[0] || 'M')}
                       </div>
-                      <span className="text-xs text-gray-700 truncate">{s.name}</span>
+                      <span className="text-xs text-gray-900 font-medium truncate">{s.name}</span>
                     </div>
                     <button
                       onClick={() => toggleFavoriteStore(s.id)}
