@@ -24,6 +24,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
   const [isUpdatingCity, setIsUpdatingCity] = useState(false);
   const [showStoreSearch, setShowStoreSearch] = useState(false);
   const [storeSearchQuery, setStoreSearchQuery] = useState("");
+  const [cityInput, setCityInput] = useState(userProfile?.city || "");
   const menuRef = useRef(null);
 
   const martiniqueCities = [
@@ -53,9 +54,23 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
     setIsOpen(false);
   };
 
+  // Sync cityInput when userProfile changes
+  useEffect(() => {
+    if (userProfile?.city) {
+      setCityInput(userProfile.city);
+    }
+  }, [userProfile?.city]);
+
   const handleCityChange = async (city) => {
     setIsUpdatingCity(true);
     await updateProfile({ city });
+    setIsUpdatingCity(false);
+  };
+
+  const handleRegionChange = async (region_code) => {
+    setIsUpdatingCity(true);
+    const is_diaspora = region_code === 'Hexagone';
+    await updateProfile({ region_code, is_diaspora });
     setIsUpdatingCity(false);
   };
 
@@ -354,23 +369,53 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
               </div>
             </div>
 
-            {/* City Selector */}
+            {/* Geography Selector */}
             <div className="p-4 border-b border-gray-100 bg-gray-50/50">
               <p className="text-xs font-bold text-gray-500 mb-2 flex items-center gap-1 uppercase tracking-wider">
-                <MapPin className="w-3.5 h-3.5 text-orange-500" /> Ma Ville
+                <MapPin className="w-3.5 h-3.5 text-orange-500" /> Géographie
                 {isUpdatingCity && <span className="animate-pulse text-[10px] text-orange-500 ml-2">Mise à jour...</span>}
               </p>
-              <select
-                value={userProfile?.city || ""}
-                onChange={(e) => handleCityChange(e.target.value)}
-                disabled={isUpdatingCity}
-                className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none disabled:opacity-50"
-              >
-                <option value="">Choisir ma ville...</option>
-                {martiniqueCities.map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <select
+                  value={userProfile?.region_code || "972"}
+                  onChange={(e) => handleRegionChange(e.target.value)}
+                  disabled={isUpdatingCity}
+                  className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-700 focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50"
+                >
+                  <option value="972">Martinique (972)</option>
+                  <option value="971">Guadeloupe (971)</option>
+                  <option value="973">Guyane (973)</option>
+                  <option value="974">La Réunion (974)</option>
+                  <option value="976">Mayotte (976)</option>
+                  <option value="Hexagone">France Hexagonale</option>
+                  <option value="Autre">Autre</option>
+                </select>
+
+                <div className="relative">
+                  {userProfile?.region_code === '972' ? (
+                    <select
+                      value={userProfile?.city || ""}
+                      onChange={(e) => handleCityChange(e.target.value)}
+                      disabled={isUpdatingCity}
+                      className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-700 focus:ring-2 focus:ring-orange-500 outline-none disabled:opacity-50"
+                    >
+                      <option value="">Ma Ville (972)...</option>
+                      {martiniqueCities.map(city => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={userProfile?.city || ""}
+                      onChange={(e) => setCityInput(e.target.value)}
+                      onBlur={() => handleCityChange(cityInput)}
+                      placeholder="Ma Ville..."
+                      className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-700 focus:ring-2 focus:ring-orange-500 outline-none"
+                    />
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* BQP Preference */}

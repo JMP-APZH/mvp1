@@ -8,6 +8,8 @@ const AuthModal = ({ isOpen, onClose }) => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [regionCode, setRegionCode] = useState('972');
+  const [city, setCity] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
@@ -18,6 +20,8 @@ const AuthModal = ({ isOpen, onClose }) => {
     setEmail('');
     setPassword('');
     setDisplayName('');
+    setRegionCode('972');
+    setCity('');
     setError(null);
     setSuccessMessage(null);
   };
@@ -38,9 +42,13 @@ const AuthModal = ({ isOpen, onClose }) => {
         if (!displayName.trim()) {
           throw new Error('Veuillez entrer votre nom');
         }
-        const { error } = await signUp(email, password, displayName);
+        const { error } = await signUp(email, password, displayName, regionCode, city);
         if (error) throw error;
-        setSuccessMessage('Compte cree! Verifiez votre email pour confirmer votre inscription.');
+
+        // After signup success, update the profile with region/city (handled by AuthContext/Trigger)
+        // Note: The handle_new_user trigger creates the profile. 
+        // We might need to wait for it or use the refreshProfile later.
+        setSuccessMessage('Compte créé ! Vérifiez votre email pour confirmer votre inscription.');
         // Don't close modal - show success message
       } else {
         const { error } = await signIn(email, password);
@@ -171,6 +179,42 @@ const AuthModal = ({ isOpen, onClose }) => {
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Ex: Marie L."
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            {mode === 'signup' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Région
+                  </label>
+                  <select
+                    value={regionCode}
+                    onChange={(e) => setRegionCode(e.target.value)}
+                    className="w-full bg-white border border-gray-300 rounded-lg py-3 px-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                  >
+                    <option value="972">Martinique (972)</option>
+                    <option value="971">Guadeloupe (971)</option>
+                    <option value="973">Guyane (973)</option>
+                    <option value="974">La Réunion (974)</option>
+                    <option value="976">Mayotte (976)</option>
+                    <option value="Hexagone">France Hexagonale</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ville
+                  </label>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Ex: Paris"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                     required
                   />
                 </div>

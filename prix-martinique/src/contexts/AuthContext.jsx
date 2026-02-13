@@ -224,14 +224,16 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Sign up with email
-  const signUp = async (email, password, displayName) => {
+  const signUp = async (email, password, displayName, regionCode, city) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            display_name: displayName
+            display_name: displayName,
+            region_code: regionCode,
+            city: city
           }
         }
       });

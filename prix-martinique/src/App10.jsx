@@ -15,6 +15,7 @@ import ShoppingList from './components/ShoppingList';
 import Community from './components/Community';
 import PersoStats from './components/PersoStats';
 import AdminDashboard from './components/AdminDashboard';
+import PriceDuel from './components/PriceDuel';
 
 const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     const [loaded, setLoaded] = useState(false);
@@ -120,7 +121,8 @@ const App10 = () => {
         priceTagPhoto: null,
         isDeclaredBqp: false,
         categoryId: null,
-        isLocal: false
+        isLocal: false,
+        isMdd: false
     });
     const [categories, setCategories] = useState([]);
     const [selectedImage, setSelectedImage] = useState(null);
@@ -375,6 +377,16 @@ const App10 = () => {
                     .limit(1)
                     .single();
 
+                // 2. Fetch Mainland Counterpart (Live Diaspora Scan)
+                const { data: mainlandPriceData } = await supabase
+                    .from('prices')
+                    .select('*, stores(name)')
+                    .eq('product_id', product.id)
+                    .eq('origin_region_code', 'Hexagone')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
                 // 2. Check for BQP association
                 const { data: association, error: assocError } = await supabase
                     .from('product_bqp_associations')
@@ -390,7 +402,8 @@ const App10 = () => {
                         category: association.bqp_categories,
                         product: product,
                         associationId: association.id, // Store association ID for voting
-                        latestPrice: latestPriceData
+                        latestPrice: latestPriceData,
+                        mainlandPrice: mainlandPriceData
                     });
                     setActiveTab('scan'); // stay on scan
 
@@ -404,7 +417,8 @@ const App10 = () => {
                     setBqpCheckResult({
                         status: 'not_found',
                         product: product,
-                        latestPrice: latestPriceData
+                        latestPrice: latestPriceData,
+                        mainlandPrice: mainlandPriceData
                     });
                     fetchPriceHistory(product.id);
                 }
@@ -758,7 +772,8 @@ const App10 = () => {
                         category: null, // Legacy field
                         category_id: manualEntry.categoryId || null,
                         is_local_production: manualEntry.isLocal || false,
-                        is_declared_bqp: manualEntry.isDeclaredBqp || false
+                        is_declared_bqp: manualEntry.isDeclaredBqp || false,
+                        is_mdd: manualEntry.isMdd || false
                     }])
                     .select()
                     .single();
@@ -831,9 +846,14 @@ const App10 = () => {
                 price_tag_photo_url: priceTagPhotoUrl
             };
 
-            // Add user_id if authenticated
+            // Add user_id if authenticated and tag origin
             if (user) {
                 priceData.user_id = user.id;
+                // Add geographical origin for backend analysis
+                if (userProfile) {
+                    priceData.origin_region_code = userProfile.region_code;
+                    priceData.origin_city = userProfile.city;
+                }
             }
 
             const { error: priceError } = await supabase
@@ -1422,8 +1442,18 @@ const App10 = () => {
                                     )}
 
                                     {(bqpCheckResult?.status === 'found' || bqpCheckResult?.status === 'not_found' || bqpCheckResult?.status === 'new_product') && (
-                                        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                                            <PriceHistoryChart data={priceHistory} />
+                                        <div className="space-y-4">
+                                            {bqpCheckResult.mainlandPrice && (
+                                                <PriceDuel
+                                                    localPrice={bqpCheckResult.latestPrice?.price || parseFloat(manualEntry.price) || 0}
+                                                    mainlandPrice={bqpCheckResult.mainlandPrice.price}
+                                                    productName={bqpCheckResult.product?.name || manualEntry.productName}
+                                                    mainlandOrigin="France Continentale"
+                                                />
+                                            )}
+                                            <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                                                <PriceHistoryChart data={priceHistory} />
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1603,6 +1633,26 @@ const App10 = () => {
                                             checked={manualEntry.isLocal || false}
                                             onChange={(e) => setManualEntry({ ...manualEntry, isLocal: e.target.checked })}
                                             className="w-6 h-6 text-green-600 rounded border-green-300 focus:ring-green-500 cursor-pointer"
+                                        />
+                                    </div>
+
+                                    {/* MDD (Marque Distributeur) Toggle */}
+                                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                        <div className="bg-blue-100 p-2 rounded-full">
+                                            <Store className="w-5 h-5 text-blue-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label htmlFor="isMdd" className="block text-sm font-bold text-blue-900">
+                                                Marque Distributeur (MDD) ? 🛒
+                                            </label>
+                                            <p className="text-xs text-blue-700">Ex: Carrefour, U, Marque Repère...</p>
+                                        </div>
+                                        <input
+                                            id="isMdd"
+                                            type="checkbox"
+                                            checked={manualEntry.isMdd || false}
+                                            onChange={(e) => setManualEntry({ ...manualEntry, isMdd: e.target.checked })}
+                                            className="w-6 h-6 text-blue-600 rounded border-blue-300 focus:ring-blue-500 cursor-pointer"
                                         />
                                     </div>
 

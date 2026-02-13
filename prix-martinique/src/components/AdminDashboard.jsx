@@ -18,7 +18,10 @@ const AdminDashboard = ({ onClose }) => {
         totalScans: 0,
         uniqueUsers: 0,
         uniqueProducts: 0,
+        diasporaScans: 0,
+        mddProducts: 0,
         topStores: [],
+        diasporaRegions: [],
         recentActivity: []
     });
     const [loading, setLoading] = useState(true);
@@ -46,7 +49,30 @@ const AdminDashboard = ({ onClose }) => {
                 .from('products')
                 .select('*', { count: 'exact', head: true });
 
-            // 4. Activity by store (mock logic for grouping since join/grouping is harder in simple select)
+            // 4. Diaspora Scans
+            const { count: diasporaScans } = await supabase
+                .from('prices')
+                .select('*', { count: 'exact', head: true })
+                .eq('origin_region_code', 'Hexagone');
+
+            // 5. MDD Products
+            const { count: mddProducts } = await supabase
+                .from('products')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_mdd', true);
+
+            // 6. Diaspora Regions (summary of where scans come from)
+            const { data: regionData } = await supabase
+                .from('prices')
+                .select('origin_region_code')
+                .not('origin_region_code', 'is', null);
+
+            const regionCounts = regionData.reduce((acc, curr) => {
+                acc[curr.origin_region_code] = (acc[curr.origin_region_code] || 0) + 1;
+                return acc;
+            }, {});
+
+            // 7. Activity by store
             const { data: activity } = await supabase
                 .from('prices')
                 .select('stores(name)')
@@ -57,7 +83,10 @@ const AdminDashboard = ({ onClose }) => {
                 totalScans: totalScans || 0,
                 uniqueUsers: uniqueUsers || 0,
                 uniqueProducts: uniqueProducts || 0,
-                topStores: [], // Can be enhanced with views
+                diasporaScans: diasporaScans || 0,
+                mddProducts: mddProducts || 0,
+                topStores: [],
+                diasporaRegions: Object.entries(regionCounts).map(([code, count]) => ({ code, count })),
                 recentActivity: activity || []
             });
         } catch (err) {
@@ -121,10 +150,38 @@ const AdminDashboard = ({ onClose }) => {
                         <div className="bg-orange-100 w-10 h-10 rounded-2xl flex items-center justify-center text-orange-600 mb-3">
                             <Store className="w-5 h-5" />
                         </div>
-                        <div className="text-2xl font-black text-gray-900">42</div>
-                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Magasins Actifs</p>
+                        <div className="text-2xl font-black text-gray-900">{stats.mddProducts}</div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Produits MDD</p>
                     </div>
                 </div>
+
+                {/* Diaspora Watch */}
+                <section className="bg-blue-600 rounded-3xl p-6 text-white shadow-lg overflow-hidden relative">
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold flex items-center gap-2">
+                                <MapPin className="w-5 h-5" /> Diaspora Watch
+                            </h3>
+                            <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Live Tracking</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <div className="text-3xl font-black">{stats.diasporaScans}</div>
+                                <p className="text-blue-100 text-[10px] uppercase font-bold tracking-widest mt-1">Total Scans Diaspora</p>
+                            </div>
+                            <div className="space-y-2">
+                                {stats.diasporaRegions.slice(0, 3).map((reg, i) => (
+                                    <div key={i} className="flex items-center justify-between text-[10px]">
+                                        <span className="font-bold opacity-80">{reg.code === 'Hexagone' ? 'France Hex.' : reg.code}</span>
+                                        <span className="bg-white/20 px-2 rounded-full font-black">{reg.count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    {/* Decorative Map Pattern could go here */}
+                    <Activity className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 rotate-12" />
+                </section>
 
                 {/* System Health */}
                 <section>
