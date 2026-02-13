@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import BQPVerifier from './components/BQPVerifier';
 
-import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus } from 'lucide-react';
+import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';

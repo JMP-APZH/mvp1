@@ -9,6 +9,7 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     ShieldCheck,
+    MapPin,
     X
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
@@ -67,8 +68,10 @@ const AdminDashboard = ({ onClose }) => {
                 .select('origin_region_code')
                 .not('origin_region_code', 'is', null);
 
-            const regionCounts = regionData.reduce((acc, curr) => {
-                acc[curr.origin_region_code] = (acc[curr.origin_region_code] || 0) + 1;
+            const regionCounts = (regionData || []).reduce((acc, curr) => {
+                if (curr.origin_region_code) {
+                    acc[curr.origin_region_code] = (acc[curr.origin_region_code] || 0) + 1;
+                }
                 return acc;
             }, {});
 
