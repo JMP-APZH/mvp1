@@ -1,0 +1,6 @@
+# MCP server config (may contain API tokens — never commit)
+.mcp.json
+
+# Environment variables
+.env
+.env.local
