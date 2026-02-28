@@ -19,6 +19,7 @@ export const AuthProvider = ({ children }) => {
   const [userFavorites, setUserFavorites] = useState(new Set());
   const [userFavoriteStores, setUserFavoriteStores] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
 
   // Fetch user profile from user_profiles table
   const fetchUserProfile = async (userId) => {
@@ -134,6 +135,13 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
+
+        // Handle password recovery (user clicked reset link in email)
+        if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecoveryMode(true);
+          setLoading(false);
+          return;
+        }
 
         // Handle sign out
         if (event === 'SIGNED_OUT') {
@@ -305,6 +313,33 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Send password reset email
+  const resetPasswordForEmail = async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return { error };
+    }
+  };
+
+  // Update password (called after user clicks reset link or from profile settings)
+  const updatePassword = async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPasswordRecoveryMode(false);
+      return { error: null };
+    } catch (error) {
+      console.error('Update password error:', error);
+      return { error };
+    }
+  };
+
   // Award points
   const awardPoints = async (points, description) => {
     try {
@@ -446,6 +481,9 @@ export const AuthProvider = ({ children }) => {
     signIn,
     signInWithGoogle,
     signOut,
+    resetPasswordForEmail,
+    updatePassword,
+    passwordRecoveryMode,
     awardPoints,
     refreshProfile,
     updateProfile,

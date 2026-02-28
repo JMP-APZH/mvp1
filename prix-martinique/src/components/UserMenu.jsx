@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3 } from 'lucide-react';
+import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const CHAIN_ICONS = {
@@ -19,12 +19,18 @@ const CHAIN_ICONS = {
 };
 
 const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
-  const { user, userProfile, userBadges, userRoles, loading, signOut, updateProfile, userFavoriteStores, toggleFavoriteStore } = useAuth();
+  const { user, userProfile, userBadges, userRoles, loading, signOut, updateProfile, updatePassword, userFavoriteStores, toggleFavoriteStore } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdatingCity, setIsUpdatingCity] = useState(false);
   const [showStoreSearch, setShowStoreSearch] = useState(false);
   const [storeSearchQuery, setStoreSearchQuery] = useState("");
   const [cityInput, setCityInput] = useState(userProfile?.city || "");
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const menuRef = useRef(null);
 
   const martiniqueCities = [
@@ -84,6 +90,35 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
     setIsUpdatingCity(true);
     await updateProfile({ [type]: parseFloat(value) || 0 });
     setIsUpdatingCity(false);
+  };
+
+  // Only email/password users can change their password (not Google OAuth users)
+  const isEmailUser = user?.identities?.some(id => id.provider === 'email');
+
+  const handleChangePassword = async () => {
+    setPasswordError(null);
+    if (newPassword.length < 6) {
+      setPasswordError('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Les mots de passe ne correspondent pas');
+      return;
+    }
+    setIsChangingPassword(true);
+    const { error } = await updatePassword(newPassword);
+    if (error) {
+      setPasswordError('Erreur : ' + error.message);
+    } else {
+      setPasswordSuccess(true);
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setShowChangePassword(false);
+        setPasswordSuccess(false);
+      }, 2000);
+    }
+    setIsChangingPassword(false);
   };
 
   const filteredStores = stores.filter(s =>
@@ -443,6 +478,62 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, stores }) => {
 
             {/* Actions */}
             <div className="p-2 space-y-1">
+              {/* Password change — only for email/password accounts */}
+              {isEmailUser && (
+                <div>
+                  {!showChangePassword ? (
+                    <button
+                      onClick={() => { setShowChangePassword(true); setPasswordError(null); setPasswordSuccess(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <Lock className="w-5 h-5 text-gray-400" />
+                      <span>Changer mon mot de passe</span>
+                    </button>
+                  ) : (
+                    <div className="px-4 py-3 space-y-2 bg-gray-50 rounded-xl">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                        <Lock className="w-3.5 h-3.5" /> Nouveau mot de passe
+                      </p>
+                      {passwordError && (
+                        <p className="text-xs text-red-600">{passwordError}</p>
+                      )}
+                      {passwordSuccess && (
+                        <p className="text-xs text-green-600 font-medium">Mot de passe modifié !</p>
+                      )}
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Nouveau mot de passe"
+                        className="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                      />
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirmer le mot de passe"
+                        className="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                      />
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleChangePassword}
+                          disabled={isChangingPassword}
+                          className="flex-1 bg-orange-500 text-white py-2 rounded-lg text-xs font-bold hover:bg-orange-600 transition-colors disabled:opacity-50"
+                        >
+                          {isChangingPassword ? 'En cours...' : 'Confirmer'}
+                        </button>
+                        <button
+                          onClick={() => { setShowChangePassword(false); setNewPassword(''); setConfirmPassword(''); setPasswordError(null); }}
+                          className="flex-1 bg-gray-200 text-gray-600 py-2 rounded-lg text-xs font-bold hover:bg-gray-300 transition-colors"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {userRoles.length > 0 && (
                 <div className="px-3 py-2">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Accès Professionnels</p>

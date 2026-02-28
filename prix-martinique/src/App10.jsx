@@ -112,6 +112,7 @@ const App10 = () => {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
+    const [authModalMode, setAuthModalMode] = useState('signin');
     const [manualEntry, setManualEntry] = useState({
         productName: '',
         barcode: '',
@@ -133,7 +134,15 @@ const App10 = () => {
     const priceTagPhotoInputRef = useRef(null);
 
     // Auth context
-    const { user, userProfile, awardPoints, refreshProfile, userFavorites, toggleFavorite } = useAuth();
+    const { user, userProfile, awardPoints, refreshProfile, userFavorites, toggleFavorite, passwordRecoveryMode } = useAuth();
+
+    // Open modal in password-reset mode when user arrives via reset email link
+    useEffect(() => {
+        if (passwordRecoveryMode) {
+            setAuthModalMode('set_password');
+            setShowAuthModal(true);
+        }
+    }, [passwordRecoveryMode]);
 
     // Shopping list — Supabase-backed for authenticated users, localStorage for anonymous
     const { shoppingList, addToShoppingList, removeFromShoppingList, updateQuantity, clearShoppingList } = useShoppingList(supabase, user);
@@ -1013,7 +1022,8 @@ const App10 = () => {
             {/* Auth Modal */}
             <AuthModal
                 isOpen={showAuthModal}
-                onClose={() => setShowAuthModal(false)}
+                onClose={() => { setShowAuthModal(false); setAuthModalMode('signin'); }}
+                initialMode={authModalMode}
             />
 
             {/* Error Alert */}

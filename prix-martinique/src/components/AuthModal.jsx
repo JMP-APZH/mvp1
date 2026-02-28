@@ -1,24 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const AuthModal = ({ isOpen, onClose }) => {
-  const [mode, setMode] = useState('signin'); // 'signin' or 'signup'
+const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
+  const [mode, setMode] = useState(initialMode); // 'signin' | 'signup' | 'forgot_password' | 'set_password'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [regionCode, setRegionCode] = useState('972');
   const [city, setCity] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPasswordForEmail, updatePassword } = useAuth();
+
+  // Sync mode when modal is opened with a specific initialMode (e.g. password recovery)
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setError(null);
+      setSuccessMessage(null);
+    }
+  }, [isOpen, initialMode]);
 
   const resetForm = () => {
     setEmail('');
     setPassword('');
+    setConfirmPassword('');
     setDisplayName('');
     setRegionCode('972');
     setCity('');
@@ -44,16 +55,22 @@ const AuthModal = ({ isOpen, onClose }) => {
         }
         const { error } = await signUp(email, password, displayName, regionCode, city);
         if (error) throw error;
-
-        // After signup success, update the profile with region/city (handled by AuthContext/Trigger)
-        // Note: The handle_new_user trigger creates the profile. 
-        // We might need to wait for it or use the refreshProfile later.
         setSuccessMessage('Compte créé ! Vérifiez votre email pour confirmer votre inscription.');
-        // Don't close modal - show success message
-      } else {
+      } else if (mode === 'signin') {
         const { error } = await signIn(email, password);
         if (error) throw error;
         handleClose();
+      } else if (mode === 'forgot_password') {
+        const { error } = await resetPasswordForEmail(email);
+        if (error) throw error;
+        setSuccessMessage(`Un lien de réinitialisation a été envoyé à ${email}. Vérifiez votre boîte de réception.`);
+      } else if (mode === 'set_password') {
+        if (password.length < 6) throw new Error('Le mot de passe doit contenir au moins 6 caracteres');
+        if (password !== confirmPassword) throw new Error('Les mots de passe ne correspondent pas');
+        const { error } = await updatePassword(password);
+        if (error) throw error;
+        setSuccessMessage('Mot de passe modifié avec succès !');
+        setTimeout(() => handleClose(), 1500);
       }
     } catch (err) {
       console.error('Auth error:', err);
@@ -102,12 +119,16 @@ const AuthModal = ({ isOpen, onClose }) => {
             <X className="w-6 h-6" />
           </button>
           <h2 className="text-xl font-bold">
-            {mode === 'signin' ? 'Connexion' : 'Creer un compte'}
+            {mode === 'signin' ? 'Connexion'
+              : mode === 'signup' ? 'Creer un compte'
+              : mode === 'forgot_password' ? 'Mot de passe oublié'
+              : 'Nouveau mot de passe'}
           </h2>
           <p className="text-orange-100 text-sm mt-1">
-            {mode === 'signin'
-              ? 'Connectez-vous pour gagner des points!'
-              : 'Rejoignez la communaute et gagnez des badges!'}
+            {mode === 'signin' ? 'Connectez-vous pour gagner des points!'
+              : mode === 'signup' ? 'Rejoignez la communaute et gagnez des badges!'
+              : mode === 'forgot_password' ? 'Recevez un lien de réinitialisation par email'
+              : 'Choisissez un nouveau mot de passe pour votre compte'}
           </p>
         </div>
 
@@ -128,41 +149,45 @@ const AuthModal = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Google Sign In */}
-          <button
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg py-3 px-4 font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
-            Continuer avec Google
-          </button>
+          {/* Google Sign In — only for signin / signup */}
+          {(mode === 'signin' || mode === 'signup') && (
+            <>
+              <button
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-lg py-3 px-4 font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                Continuer avec Google
+              </button>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-gray-500">ou</span>
-            </div>
-          </div>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-white text-gray-500">ou</span>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Email form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -221,47 +246,86 @@ const AuthModal = ({ isOpen, onClose }) => {
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="votre@email.com"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  required
-                />
+            {/* Email field — hidden in set_password mode */}
+            {mode !== 'set_password' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="votre@email.com"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    required
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mot de passe
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimum 6 caracteres"
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
+            {/* Password field — hidden in forgot_password mode */}
+            {mode !== 'forgot_password' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {mode === 'set_password' ? 'Nouveau mot de passe' : 'Mot de passe'}
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Minimum 6 caracteres"
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {/* Forgot password link — only in signin mode */}
+                {mode === 'signin' && (
+                  <div className="text-right mt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setMode('forgot_password'); setError(null); setSuccessMessage(null); }}
+                      className="text-sm text-orange-600 hover:underline"
+                    >
+                      Mot de passe oublié ?
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            {/* Confirm password field — only in set_password mode */}
+            {mode === 'set_password' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirmer le mot de passe
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Répétez le mot de passe"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -273,11 +337,10 @@ const AuthModal = ({ isOpen, onClose }) => {
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Chargement...
                 </span>
-              ) : mode === 'signin' ? (
-                'Se connecter'
-              ) : (
-                'Creer mon compte'
-              )}
+              ) : mode === 'signin' ? 'Se connecter'
+                : mode === 'signup' ? 'Creer mon compte'
+                : mode === 'forgot_password' ? 'Envoyer le lien'
+                : 'Enregistrer le nouveau mot de passe'}
             </button>
           </form>
 
@@ -287,31 +350,30 @@ const AuthModal = ({ isOpen, onClose }) => {
               <>
                 Pas encore de compte?{' '}
                 <button
-                  onClick={() => {
-                    setMode('signup');
-                    setError(null);
-                    setSuccessMessage(null);
-                  }}
+                  onClick={() => { setMode('signup'); setError(null); setSuccessMessage(null); }}
                   className="text-orange-600 font-medium hover:underline"
                 >
                   Creer un compte
                 </button>
               </>
-            ) : (
+            ) : mode === 'signup' ? (
               <>
                 Deja un compte?{' '}
                 <button
-                  onClick={() => {
-                    setMode('signin');
-                    setError(null);
-                    setSuccessMessage(null);
-                  }}
+                  onClick={() => { setMode('signin'); setError(null); setSuccessMessage(null); }}
                   className="text-orange-600 font-medium hover:underline"
                 >
                   Se connecter
                 </button>
               </>
-            )}
+            ) : (mode === 'forgot_password' || mode === 'set_password') ? (
+              <button
+                onClick={() => { setMode('signin'); setError(null); setSuccessMessage(null); }}
+                className="text-orange-600 font-medium hover:underline"
+              >
+                ← Retour à la connexion
+              </button>
+            ) : null}
           </div>
 
           {/* Benefits info */}
