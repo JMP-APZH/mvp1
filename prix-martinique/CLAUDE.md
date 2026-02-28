@@ -45,10 +45,11 @@ This file provides guidance to Claude Code (claude.ai/code) for the Prix Martini
 - **Shopping List (Cloud Sync)**: Implemented via `src/hooks/useShoppingList.js`. Supabase-backed for authenticated users, localStorage fallback for anonymous users. Auto-migrates localStorage items on login.
 
 ### Feb 28, 2026 — Security Audit & Shopping List Milestone
-Three Supabase database migrations applied:
+Four Supabase database migrations applied:
 1. **`enable_rls_on_public_tables`** — RLS enabled on `stores`, `prices`, `products` with correct public-read / authenticated-write policies.
 2. **`fix_function_search_paths_and_view`** — Fixed mutable `search_path` on 6 DB functions; `increment_store_popularity` promoted to `SECURITY DEFINER`; `feature_request_stats` view recreated without `SECURITY DEFINER`.
 3. **`fix_rls_policy_duplicates_and_auth_uid`** — Removed 7 duplicate RLS policies; fixed `auth.uid()` per-row evaluation → `(select auth.uid())` across 30+ policies on 12 tables.
+4. **`add_missing_fk_indexes_and_drop_redundant`** — Added 9 missing FK indexes (`bqp_quality_votes`, `bqp_votes`, `feature_requests`, `feature_votes`, `price_likes`, `shopping_lists`, `user_badges`, `user_favorite_stores`, `user_favorites`); dropped `idx_bqp_code` (duplicate of existing unique constraint).
 
 Frontend:
 - **Shopping List** migrated from `localStorage` to Supabase via `src/hooks/useShoppingList.js`.
@@ -103,10 +104,9 @@ Required in `.env.local`:
 - `VITE_SUPABASE_ANON_KEY`
 
 ## Next Priorities (Post-Launch)
-1. **DB index cleanup**: Add missing FK indexes (9 tables) and remove unused indexes (11 total) — 1 migration, low risk.
-2. **Bundle splitting**: Archive legacy `App*.jsx` files and configure Vite `manualChunks` to reduce the 890 KB bundle.
-3. **Quagga replacement**: Evaluate `@ericblade/quagga2` with dedicated iOS regression testing.
-4. **Shopping List photos**: Join `prices` table to display product photos in the shopping list when loading from Supabase.
+1. **Bundle splitting**: Archive legacy `App*.jsx` files and configure Vite `manualChunks` to reduce the 890 KB bundle.
+2. **Quagga replacement**: Evaluate `@ericblade/quagga2` with dedicated iOS regression testing.
+3. **Shopping List photos**: Join `prices` table to display product photos in the shopping list when loading from Supabase.
 
 ---
 **Last Updated**: 2026-02-28
