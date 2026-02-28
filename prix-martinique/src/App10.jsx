@@ -12,6 +12,7 @@ import AboutPage from './components/AboutPage';
 import ZXingBarcodeScanner from './components/ZXingBarcodeScanner';
 import StoreSelectionWizard from './components/StoreSelectionWizard';
 import ShoppingList from './components/ShoppingList';
+import { useShoppingList } from './hooks/useShoppingList';
 import Community from './components/Community';
 import PersoStats from './components/PersoStats';
 import AdminDashboard from './components/AdminDashboard';
@@ -128,63 +129,14 @@ const App10 = () => {
     const [selectedImage, setSelectedImage] = useState(null);
     const [categoryFilter, setCategoryFilter] = useState(null);
 
-    const [shoppingList, setShoppingList] = useState(() => {
-        // Initialize from localStorage to prevent overwriting
-        const savedList = localStorage.getItem('shoppingList');
-        return savedList ? JSON.parse(savedList) : [];
-    });
     const productPhotoInputRef = useRef(null);
     const priceTagPhotoInputRef = useRef(null);
 
-    // Save Shopping List to LocalStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
-    }, [shoppingList]);
-
-    const addToShoppingList = (product) => {
-        setShoppingList(prev => {
-            const existing = prev.find(item => item.productId === product.id);
-            if (existing) {
-                return prev.map(item =>
-                    item.productId === product.id
-                        ? { ...item, quantity: item.quantity + 1 }
-                        : item
-                );
-            } else {
-                return [...prev, {
-                    productId: product.id,
-                    name: product.name || product.product, // Handle different objects
-                    quantity: 1,
-                    photo: product.productPhotoUrl || null // Handle unavailable photo
-                }];
-            }
-        });
-        // Feedback
-        // alert("Produit ajouté au panier !"); // Too intrusive?
-    };
-
-    const removeFromShoppingList = (productId) => {
-        setShoppingList(prev => prev.filter(item => item.productId !== productId));
-    };
-
-    const updateQuantity = (productId, newQuantity) => {
-        if (newQuantity <= 0) {
-            removeFromShoppingList(productId);
-            return;
-        }
-        setShoppingList(prev => prev.map(item =>
-            item.productId === productId ? { ...item, quantity: newQuantity } : item
-        ));
-    };
-
-    const clearShoppingList = () => {
-        if (window.confirm("Voulez-vous vraiment vider votre panier ?")) {
-            setShoppingList([]);
-        }
-    };
-
     // Auth context
     const { user, userProfile, awardPoints, refreshProfile, userFavorites, toggleFavorite } = useAuth();
+
+    // Shopping list — Supabase-backed for authenticated users, localStorage for anonymous
+    const { shoppingList, addToShoppingList, removeFromShoppingList, updateQuantity, clearShoppingList } = useShoppingList(supabase, user);
 
     // Detect iOS device
     const isIOS = () => {
