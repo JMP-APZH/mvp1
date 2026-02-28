@@ -55,6 +55,18 @@ Recent development focused on maturation and community scaling:
 - **Storage**: `localStorage` is used for the Shopping List and UI state. This prevents cross-device sync and is a priority for migration to Supabase.
 - **Store Database**: Currently uses a subset of stores; requires full CSV import for 100% coverage of Martinique.
 
+## Accepted Risks & Frozen Dependencies
+
+### Quagga CVEs — Do Not Auto-Fix
+`quagga ≥ 0.7.0` carries transitive CVEs via its dependency chain:
+`get-pixels` → `request` (abandoned) → `form-data`, `qs`, `tough-cookie`, `lodash`.
+
+**These vulnerabilities are NOT exploitable in production.** All affected packages are Node.js server-side libraries. Vite excludes them from the browser bundle — they are never executed on the user's device. The app has no server process running Quagga.
+
+**Do NOT run `npm audit fix --force`** to address these. Doing so installs `quagga@0.6.16` (a breaking API change) and risks breaking the iOS barcode scanner — a critical, hard-won feature that took multiple development iterations to stabilize.
+
+**Post-launch plan**: evaluate replacing `quagga` with `@ericblade/quagga2` (a maintained drop-in fork that patches all these CVEs) during a dedicated sprint with physical iOS device testing available.
+
 ## Technical Details
 
 ### Tech Stack & Dependencies
@@ -83,6 +95,6 @@ Required in `.env.local`:
 3. **iOS Validation**: Dedicated testing and refinement of the `ZXingBarcodeScanner` on physical iOS devices to resolve remaining black-screen edge cases.
 
 ---
-**Last Updated**: 2026-02-21
+**Last Updated**: 2026-02-28
 **Current Version**: MVP v1.5 (App10)
 **Next Milestone**: Cloud Shopping List & Full Store Expansion
