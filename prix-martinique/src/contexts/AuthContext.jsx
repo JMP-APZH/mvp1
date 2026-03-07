@@ -131,6 +131,14 @@ export const AuthProvider = ({ children }) => {
       return { profile, badges, roles, favorites, favoriteStores };
     };
 
+    // Bridge the PASSWORD_RECOVERY race condition: supabaseClient.js stored a flag
+    // in sessionStorage if the URL hash contained type=recovery at module load time
+    // (before Supabase cleared it and before this listener could be registered).
+    if (sessionStorage.getItem('supabase_recovery_pending') === '1') {
+      sessionStorage.removeItem('supabase_recovery_pending');
+      setPasswordRecoveryMode(true);
+    }
+
     // Set up auth state change listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
