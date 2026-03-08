@@ -2,7 +2,19 @@ import { createClient } from '@supabase/supabase-js'
 
 // PASSWORD_RECOVERY detection — must run BEFORE createClient() which starts _initialize()
 // and will consume (delete) the code verifier from localStorage during the PKCE exchange.
-//
+
+// --- Diagnostic (temporary) ---
+// Store URL details in sessionStorage so the UI can surface them if recovery fails.
+sessionStorage.setItem('_dbg_url_search', window.location.search);
+sessionStorage.setItem('_dbg_url_hash', window.location.hash.slice(0, 60));
+const _dbgVerifiers = [];
+for (let i = 0; i < localStorage.length; i++) {
+  const k = localStorage.key(i);
+  if (k?.endsWith('-code-verifier')) _dbgVerifiers.push(`${k}=${localStorage.getItem(k)?.slice(-20)}`);
+}
+sessionStorage.setItem('_dbg_verifiers', JSON.stringify(_dbgVerifiers));
+// --- End diagnostic ---
+
 // PKCE flow (project-enforced): when the user clicks the reset link (?code=XXX),
 // the verifier stored by resetPasswordForEmail has the format "<verifier>/PASSWORD_RECOVERY".
 // We read it here before _initialize() removes it, then bridge via sessionStorage.
