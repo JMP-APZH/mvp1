@@ -55,7 +55,7 @@ Frontend:
 - **Shopping List** migrated from `localStorage` to Supabase via `src/hooks/useShoppingList.js`.
 
 ## Known Issues & Limitations
-- **Shopping List photos**: When loading list items from Supabase, product photos show the fallback Package icon. Product photos live in the `prices` table (not `products`), so an additional join is needed to display them. Low priority — the list functions correctly without them.
+- **Shopping List photos**: ✅ Fixed. `fetchItems` in `useShoppingList.js` now fires a second query on `prices` to retrieve the most recent `product_photo_url` per product and merges it into each list item.
 - **Bundle size**: Single JS bundle is ~890 KB (255 KB gzipped). Caused by 9 legacy `App*.jsx` files being included in the build. Address post-launch by archiving legacy files and adding Vite code-splitting.
 
 ## Accepted Risks & Frozen Dependencies

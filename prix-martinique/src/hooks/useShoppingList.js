@@ -74,12 +74,30 @@ export function useShoppingList(supabase, user) {
             .order('added_at', { ascending: true });
 
         if (error) throw error;
+        if (!data || data.length === 0) return [];
 
-        return (data || []).map(row => ({
+        const productIds = data.map(row => row.product_id);
+
+        const { data: photoRows } = await supabase
+            .from('prices')
+            .select('product_id, product_photo_url')
+            .in('product_id', productIds)
+            .not('product_photo_url', 'is', null)
+            .order('created_at', { ascending: false });
+
+        // Keep only the most recent photo per product (first row wins due to sort)
+        const photoByProduct = {};
+        (photoRows || []).forEach(row => {
+            if (!photoByProduct[row.product_id]) {
+                photoByProduct[row.product_id] = row.product_photo_url;
+            }
+        });
+
+        return data.map(row => ({
             productId: row.product_id,
             name: row.products?.name || 'Produit inconnu',
             quantity: row.quantity,
-            photo: null, // product photos live in prices table; Package icon shown as fallback
+            photo: photoByProduct[row.product_id] || null,
         }));
     };
 
