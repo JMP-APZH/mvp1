@@ -65,16 +65,16 @@ const Leaderboard = ({ city }) => {
 
   const getLevelTitle = (level) => {
     const titles = {
-      1: 'Debutant',
+      1: 'Débutant',
       2: 'Contributeur',
       3: 'Chasseur',
       4: 'Expert',
       5: 'Champion',
-      6: 'Legende',
-      7: 'Maitre',
-      8: 'Grand Maitre',
-      9: 'Elite',
-      10: 'Heros'
+      6: 'Légende',
+      7: 'Maître',
+      8: 'Grand Maître',
+      9: 'Élite',
+      10: 'Héros'
     };
     return titles[level] || `Niv.${level}`;
   };
@@ -99,7 +99,7 @@ const Leaderboard = ({ city }) => {
         <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
         <p className="text-gray-600 font-medium">Pas encore de classement</p>
         <p className="text-sm text-gray-500 mt-1">
-          Soyez le premier a vous inscrire et contribuer!
+          Soyez le premier à vous inscrire et contribuer !
         </p>
       </div>
     );

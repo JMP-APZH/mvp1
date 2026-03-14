@@ -224,7 +224,7 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
       stopScanning();
       onDetected(trimmedCode);
     } else {
-      alert('Le code-barres doit contenir entre 8 et 13 chiffres');
+      setError('Le code-barres doit contenir entre 8 et 13 chiffres');
     }
   };
 
@@ -428,6 +428,7 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
       {/* Close button */}
       <button
         onClick={handleClose}
+        aria-label="Fermer le scanner"
         className="absolute top-6 right-6 bg-white bg-opacity-20 backdrop-blur-sm text-white p-3 rounded-full pointer-events-auto z-10 hover:bg-opacity-30 transition-all"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

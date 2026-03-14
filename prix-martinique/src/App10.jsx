@@ -17,6 +17,8 @@ import Community from './components/Community';
 import PersoStats from './components/PersoStats';
 import AdminDashboard from './components/AdminDashboard';
 import PriceDuel from './components/PriceDuel';
+import { ToastContainer } from './components/Toast';
+import { useToast } from './hooks/useToast';
 
 const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     const [loaded, setLoaded] = useState(false);
@@ -129,9 +131,13 @@ const App10 = () => {
     const [categories, setCategories] = useState([]);
     const [selectedImage, setSelectedImage] = useState(null);
     const [categoryFilter, setCategoryFilter] = useState(null);
+    const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('welcome_v1_shown'));
 
     const productPhotoInputRef = useRef(null);
     const priceTagPhotoInputRef = useRef(null);
+
+    // Toast notifications
+    const { toasts, toast } = useToast();
 
     // Auth context
     const { user, userProfile, awardPoints, refreshProfile, userFavorites, toggleFavorite, passwordRecoveryMode } = useAuth();
@@ -236,7 +242,7 @@ const App10 = () => {
             setStores(data || []);
         } catch (err) {
             console.error('Error loading stores:', err);
-            setError('Erreur lors du chargement des magasins');
+            toast.error('Impossible de charger les magasins. Vérifiez votre connexion.');
         }
     };
 
@@ -295,7 +301,7 @@ const App10 = () => {
             setLoading(false);
         } catch (err) {
             console.error('Error loading prices:', err);
-            setError('Erreur lors du chargement des prix');
+            toast.error('Impossible de charger les prix. Vérifiez votre connexion.');
             setLoading(false);
         }
     };
@@ -390,8 +396,7 @@ const App10 = () => {
 
         } catch (err) {
             console.error('Error checking BQP status:', err);
-            // Fallback to manual entry
-            alert(`Code-barres détecté: ${code}`);
+            toast.error('Erreur de lecture. Veuillez saisir le produit manuellement.');
         }
     };
 
@@ -410,7 +415,7 @@ const App10 = () => {
 
             if (error) throw error;
 
-            alert(`Produit associé à la catégorie BQP: ${category.code}`);
+            toast.success(`Produit lié à la catégorie BQP : ${category.code}`);
             setShowBqpSelector(false);
             setBqpCheckResult({
                 status: 'found',
@@ -420,76 +425,35 @@ const App10 = () => {
 
         } catch (err) {
             console.error('Error linking BQP:', err);
-            alert('Erreur lors de l\'association BQP');
+            toast.error('Erreur lors de l\'association BQP');
         } finally {
             setLoading(false);
         }
     };
 
+    // Single RPC replaces 6 sequential queries (3 for accuracy votes + 3 for quality votes)
     const fetchBqpVotes = async (associationId) => {
         try {
-            // Get vote counts
-            const { count: upvotes } = await supabase
-                .from('bqp_votes')
-                .select('*', { count: 'exact', head: true })
-                .eq('association_id', associationId)
-                .eq('vote_type', 1);
+            const { data, error } = await supabase
+                .rpc('get_bqp_vote_stats', {
+                    p_association_id: associationId,
+                    p_user_id: user?.id ?? null,
+                });
 
-            const { count: downvotes } = await supabase
-                .from('bqp_votes')
-                .select('*', { count: 'exact', head: true })
-                .eq('association_id', associationId)
-                .eq('vote_type', -1);
+            if (error) throw error;
 
-            // Get user's vote if logged in
-            let userVote = 0;
-            if (user) {
-                const { data } = await supabase
-                    .from('bqp_votes')
-                    .select('vote_type')
-                    .eq('association_id', associationId)
-                    .eq('user_id', user.id)
-                    .single();
-
-                if (data) userVote = data.vote_type;
-            }
-
-            setBqpVoteStats({ upvotes: upvotes || 0, downvotes: downvotes || 0, userVote });
-
-            // Also fetch quality votes
-            fetchBqpQualityVotes(bqpCheckResult.product.id);
+            setBqpVoteStats({
+                upvotes:  data.upvotes  || 0,
+                downvotes: data.downvotes || 0,
+                userVote: data.user_vote || 0,
+            });
+            setBqpQualityStats({
+                upvotes:  data.quality_upvotes  || 0,
+                downvotes: data.quality_downvotes || 0,
+                userVote: data.quality_user_vote || 0,
+            });
         } catch (err) {
             console.error('Error fetching votes:', err);
-        }
-    };
-
-    const fetchBqpQualityVotes = async (productId) => {
-        try {
-            const { count: upvotes } = await supabase
-                .from('bqp_quality_votes')
-                .select('*', { count: 'exact', head: true })
-                .eq('product_id', productId)
-                .eq('vote', 1);
-
-            const { count: downvotes } = await supabase
-                .from('bqp_quality_votes')
-                .select('*', { count: 'exact', head: true })
-                .eq('product_id', productId)
-                .eq('vote', -1);
-
-            let userVote = 0;
-            if (user) {
-                const { data } = await supabase
-                    .from('bqp_quality_votes')
-                    .select('vote')
-                    .eq('product_id', productId)
-                    .eq('user_id', user.id)
-                    .single();
-                if (data) userVote = data.vote;
-            }
-            setBqpQualityStats({ upvotes: upvotes || 0, downvotes: downvotes || 0, userVote });
-        } catch (err) {
-            console.error('Error fetching quality votes:', err);
         }
     };
 
@@ -555,7 +519,7 @@ const App10 = () => {
 
     const handleVote = async (voteType) => {
         if (!user) {
-            alert("Vous devez être connecté pour voter !");
+            toast.info('Connectez-vous pour voter');
             setShowAuthModal(true);
             return;
         }
@@ -600,8 +564,7 @@ const App10 = () => {
 
         } catch (err) {
             console.error('Error voting:', err);
-            alert('Erreur lors du vote');
-            // Revert state (could implement proper rollback here)
+            toast.error('Erreur lors du vote');
         }
     };
 
@@ -685,7 +648,7 @@ const App10 = () => {
 
     const submitPrice = async () => {
         if (!manualEntry.productName || !manualEntry.price || !manualEntry.storeId) {
-            alert('Veuillez remplir tous les champs obligatoires (produit, prix, magasin)');
+            toast.error('Veuillez remplir tous les champs obligatoires (produit, prix, magasin)');
             return;
         }
 
@@ -868,7 +831,7 @@ const App10 = () => {
                 }
             }
 
-            alert(successMessage);
+            toast.success(successMessage);
 
             // Reset form but conditionally set BQP prompt
             setManualEntry(prev => ({
@@ -1315,14 +1278,16 @@ const App10 = () => {
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => handleVote(1)}
-                                                        className={`p-2 rounded-full border ${bqpVoteStats.userVote === 1 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-white border-gray-200 text-gray-400'}`}
+                                                        aria-label="Voter pour"
+                                                        className={`p-3 rounded-full border min-w-[44px] min-h-[44px] flex flex-col items-center justify-center ${bqpVoteStats.userVote === 1 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-white border-gray-200 text-gray-400'}`}
                                                     >
                                                         <ThumbsUp className="w-4 h-4" />
                                                         <span className="text-[10px] font-bold block text-center">{bqpVoteStats.upvotes}</span>
                                                     </button>
                                                     <button
                                                         onClick={() => handleVote(-1)}
-                                                        className={`p-2 rounded-full border ${bqpVoteStats.userVote === -1 ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-200 text-gray-400'}`}
+                                                        aria-label="Voter contre"
+                                                        className={`p-3 rounded-full border min-w-[44px] min-h-[44px] flex flex-col items-center justify-center ${bqpVoteStats.userVote === -1 ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-200 text-gray-400'}`}
                                                     >
                                                         <ThumbsDown className="w-4 h-4" />
                                                         <span className="text-[10px] font-bold block text-center">{bqpVoteStats.downvotes}</span>
@@ -1374,7 +1339,7 @@ const App10 = () => {
                                                             }]);
                                                             if (error) throw error;
                                                             if (user) await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
-                                                            alert("Prix confirmé !");
+                                                            toast.success('Prix confirmé ! +5 points');
                                                             setBqpCheckResult(null);
                                                             loadRecentPrices();
                                                         } catch (err) { console.error(err); }
@@ -1925,6 +1890,56 @@ const App10 = () => {
                     </p>
                 </div>
             </div >
+
+            {/* Welcome overlay — shown once to first-time visitors */}
+            {showWelcome && (
+                <div className="fixed inset-0 z-[500] bg-black/60 flex items-end sm:items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in slide-in-from-bottom-8 duration-400">
+                        <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 p-6 text-white">
+                            <div className="text-4xl mb-2">🛒</div>
+                            <h2 className="text-2xl font-bold">Vie chère en Martinique</h2>
+                            <p className="text-orange-100 text-sm mt-1">Ensemble, rendons les prix transparents</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-gray-700 font-medium">Comment ça marche ?</p>
+                            <ul className="space-y-3">
+                                {[
+                                    { icon: '📷', text: 'Scannez un code-barres en magasin' },
+                                    { icon: '💶', text: 'Saisissez le prix affiché sur l\'étiquette' },
+                                    { icon: '📊', text: 'Comparez les prix entre supermarchés' },
+                                    { icon: '🏆', text: 'Gagnez des points et montez dans le classement' },
+                                ].map(({ icon, text }) => (
+                                    <li key={text} className="flex items-center gap-3 text-sm text-gray-600">
+                                        <span className="text-xl flex-shrink-0">{icon}</span>
+                                        {text}
+                                    </li>
+                                ))}
+                            </ul>
+                            <button
+                                onClick={() => {
+                                    localStorage.setItem('welcome_v1_shown', '1');
+                                    setShowWelcome(false);
+                                }}
+                                className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-bold text-lg hover:from-orange-600 hover:to-red-600 transition-colors mt-2"
+                            >
+                                Commencer !
+                            </button>
+                            <button
+                                onClick={() => {
+                                    localStorage.setItem('welcome_v1_shown', '1');
+                                    setShowWelcome(false);
+                                }}
+                                className="w-full text-sm text-gray-400 hover:text-gray-600 py-1"
+                            >
+                                Je connais déjà l'application
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Toast notifications */}
+            <ToastContainer toasts={toasts} />
 
             {/* Image Zoom Modal */}
             {

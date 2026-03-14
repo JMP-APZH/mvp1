@@ -56,6 +56,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
         const { error } = await signUp(email, password, displayName, regionCode, city);
         if (error) throw error;
         setSuccessMessage('Compte créé ! Vérifiez votre email pour confirmer votre inscription.');
+        setTimeout(() => handleClose(), 3000);
       } else if (mode === 'signin') {
         const { error } = await signIn(email, password);
         if (error) throw error;
@@ -64,6 +65,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
         const { error } = await resetPasswordForEmail(email);
         if (error) throw error;
         setSuccessMessage(`Un lien de réinitialisation a été envoyé à ${email}. Vérifiez votre boîte de réception.`);
+        setTimeout(() => handleClose(), 4000);
       } else if (mode === 'set_password') {
         if (password.length < 6) throw new Error('Le mot de passe doit contenir au moins 6 caracteres');
         if (password !== confirmPassword) throw new Error('Les mots de passe ne correspondent pas');
@@ -114,7 +116,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
         <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 p-6 text-white relative">
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 text-white/80 hover:text-white"
+            aria-label="Fermer"
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <X className="w-6 h-6" />
           </button>
@@ -297,7 +300,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
                     <button
                       type="button"
                       onClick={() => { setMode('forgot_password'); setError(null); setSuccessMessage(null); }}
-                      className="text-sm text-orange-600 hover:underline"
+                      className="text-sm text-orange-600 hover:underline py-2 px-1 min-h-[44px] inline-flex items-center"
                     >
                       Mot de passe oublié ?
                     </button>
