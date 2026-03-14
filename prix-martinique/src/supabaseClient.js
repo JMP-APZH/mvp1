@@ -1,34 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
-// PASSWORD_RECOVERY detection — must run BEFORE createClient() which starts _initialize()
-// and will consume (delete) the code verifier from localStorage during the PKCE exchange.
-
-// --- Diagnostic (temporary) ---
-// Store URL details in sessionStorage so the UI can surface them if recovery fails.
-sessionStorage.setItem('_dbg_url_search', window.location.search);
-sessionStorage.setItem('_dbg_url_hash', window.location.hash.slice(0, 60));
-const _dbgVerifiers = [];
-for (let i = 0; i < localStorage.length; i++) {
-  const k = localStorage.key(i);
-  if (k?.endsWith('-code-verifier')) _dbgVerifiers.push(`${k}=${localStorage.getItem(k)?.slice(-20)}`);
-}
-sessionStorage.setItem('_dbg_verifiers', JSON.stringify(_dbgVerifiers));
-// --- End diagnostic ---
-
-// PKCE flow (project-enforced): when the user clicks the reset link (?code=XXX),
-// the verifier stored by resetPasswordForEmail has the format "<verifier>/PASSWORD_RECOVERY".
-// We read it here before _initialize() removes it, then bridge via sessionStorage.
-if (new URLSearchParams(window.location.search).has('code')) {
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.endsWith('-code-verifier') &&
-        localStorage.getItem(key)?.includes('/PASSWORD_RECOVERY')) {
-      sessionStorage.setItem('supabase_recovery_pending', '1');
-      break;
-    }
-  }
-}
-// Implicit flow fallback: hash-based tokens include type=recovery directly.
+// PASSWORD_RECOVERY detection — must run BEFORE createClient() which starts _initialize().
+// The SDK fires PASSWORD_RECOVERY via setTimeout(fn, 0), before React mounts and registers
+// its onAuthStateChange listener. We bridge this by setting a sessionStorage flag here,
+// which AuthContext reads synchronously on mount.
+//
+// Password reset emails are sent using implicit flow (see AuthContext.resetPasswordForEmail),
+// so the reset link carries #access_token=...&type=recovery in the hash — no PKCE verifier
+// required. This makes the link work regardless of which browser the user opens it in.
 if (new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery') {
   sessionStorage.setItem('supabase_recovery_pending', '1');
 }

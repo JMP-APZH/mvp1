@@ -144,21 +144,6 @@ const App10 = () => {
         }
     }, [passwordRecoveryMode]);
 
-    // --- Temporary diagnostic: show URL/storage info when ?debug=1 is in the URL ---
-    const [debugInfo, setDebugInfo] = useState(null);
-    useEffect(() => {
-        if (new URLSearchParams(window.location.search).has('debug')) {
-            setDebugInfo({
-                search: sessionStorage.getItem('_dbg_url_search') || '(empty)',
-                hash: sessionStorage.getItem('_dbg_url_hash') || '(empty)',
-                verifiers: sessionStorage.getItem('_dbg_verifiers') || '[]',
-                recoveryPending: sessionStorage.getItem('supabase_recovery_pending') || 'not set',
-                passwordRecoveryMode: String(passwordRecoveryMode),
-            });
-        }
-    }, [passwordRecoveryMode]);
-    // --- End diagnostic ---
-
     // Shopping list — Supabase-backed for authenticated users, localStorage for anonymous
     const { shoppingList, addToShoppingList, removeFromShoppingList, updateQuantity, clearShoppingList } = useShoppingList(supabase, user);
 
@@ -993,18 +978,6 @@ const App10 = () => {
 
     return (
         <div className="max-w-2xl mx-auto bg-white min-h-screen">
-            {/* Temporary debug panel — visible only when ?debug is in the URL */}
-            {debugInfo && (
-                <div style={{background:'#1e1e1e',color:'#0f0',fontFamily:'monospace',fontSize:'11px',padding:'12px',wordBreak:'break-all',whiteSpace:'pre-wrap',zIndex:9999,position:'relative'}}>
-                    <strong>DEBUG — URL &amp; Storage at load time</strong>{'\n'}
-                    search: {debugInfo.search}{'\n'}
-                    hash:   {debugInfo.hash}{'\n'}
-                    verifiers: {debugInfo.verifiers}{'\n'}
-                    recoveryPending: {debugInfo.recoveryPending}{'\n'}
-                    passwordRecoveryMode: {debugInfo.passwordRecoveryMode}
-                </div>
-            )}
-
             {/* ZXingBarcodeScanner - Full screen overlay when active */}
             {showScanner && (
                 <ZXingBarcodeScanner
