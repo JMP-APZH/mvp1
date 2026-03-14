@@ -15,9 +15,11 @@ if (new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// flowType: 'pkce' must match the Supabase project's server-side auth setting.
-// Without this, resetPasswordForEmail() does not store a code verifier, so the
-// server's PKCE-format reset link (?code=XXX) cannot be exchanged and is silently ignored.
+// flowType: 'implicit' — the client receives auth tokens in the URL hash.
+// This is required for password reset to work cross-browser (email link may open
+// in a different browser context than where the reset was requested). A PKCE client
+// would throw "Not a valid PKCE flow url" when processing the implicit hash token.
+// Google OAuth is unaffected: Supabase returns the OAuth session in the hash either way.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: { flowType: 'pkce' },
+  auth: { flowType: 'implicit' },
 })

@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext({});
@@ -323,17 +322,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Send password reset email.
-  // Uses implicit flow (not PKCE) so the email link works regardless of which browser
-  // the user opens it in. The link carries #access_token=...&type=recovery in the hash;
-  // the main PKCE client processes it fine since flowType only affects what is sent, not received.
   const resetPasswordForEmail = async (email) => {
     try {
-      const implicitClient = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-        { auth: { flowType: 'implicit', persistSession: false } }
-      );
-      const { error } = await implicitClient.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
       });
       if (error) throw error;
