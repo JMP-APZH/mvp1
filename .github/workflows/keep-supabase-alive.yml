@@ -1,0 +1,27 @@
+name: Keep Supabase alive
+
+on:
+  schedule:
+    # Runs every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch: # allow manual trigger from GitHub UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://euqqxictzvyszjzeejsz.supabase.co/rest/v1/stores?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1cXF4aWN0enZ5c3pqemVlanN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxMjg2OTksImV4cCI6MjA4MzcwNDY5OX0.DkMrDxlFiESrmxloc-wd-W_6Sz3AVHeicsyBb9_SLZQ" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1cXF4aWN0enZ5c3pqemVlanN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgxMjg2OTksImV4cCI6MjA4MzcwNDY5OX0.DkMrDxlFiESrmxloc-wd-W_6Sz3AVHeicsyBb9_SLZQ")
+
+          echo "Supabase responded with HTTP $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Project is active and healthy."
+          else
+            echo "Unexpected status — project may be paused or unreachable."
+            exit 1
+          fi
