@@ -195,6 +195,14 @@ export const AuthProvider = ({ children }) => {
 
     // Main initialization function
     const initializeAuth = async () => {
+      // Failsafe: never block the UI for more than 8 seconds
+      const failsafeTimer = setTimeout(() => {
+        if (isMounted && !isInitialized) {
+          isInitialized = true;
+          setLoading(false);
+        }
+      }, 8000);
+
       try {
         // Get current session
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -227,6 +235,8 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         if (isMounted) setLoading(false);
         isInitialized = true;
+      } finally {
+        clearTimeout(failsafeTimer);
       }
     };
 
@@ -501,9 +511,30 @@ export const AuthProvider = ({ children }) => {
     toggleFavoriteStore
   };
 
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        backgroundColor: 'white',
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: '4px solid #fed7aa',
+          borderTopColor: '#f97316',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
