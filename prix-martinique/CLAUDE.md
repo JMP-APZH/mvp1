@@ -45,7 +45,7 @@ This file provides guidance to Claude Code (claude.ai/code) for the Prix Martini
 - **Shopping List (Cloud Sync)**: `src/hooks/useShoppingList.js`. Supabase-backed for authenticated users, localStorage fallback for anonymous users. Auto-migrates localStorage items on login. Product photos pulled from `prices` table.
 - **Toast Notifications**: `src/components/Toast.jsx` + `src/hooks/useToast.js`.
 - **Auth Loading Spinner**: Prevents mobile white screen during auth init (`AuthContext.jsx`, `index.css`).
-- **Supabase Keep-Alive**: Weekly GitHub Actions cron (`.github/workflows/keep-supabase-alive.yml`) to prevent project pausing.
+- **Supabase Keep-Alive**: GitHub Actions cron (`.github/workflows/keep-supabase-alive.yml`) pings Supabase **twice a week** (Monday + Thursday at 08:00 UTC) to prevent free-tier auto-pause (threshold: 7 days inactivity). If the project gets paused despite this, restore it at supabase.com/dashboard — you have 90 days before data is lost. Long-term fix: upgrade to Supabase Pro ($25/month) for guaranteed uptime.
 
 ### Feb 28, 2026 — Security Audit & Shopping List Milestone
 Four Supabase database migrations applied:
@@ -116,6 +116,6 @@ Required in `.env.local`:
 2. **Next Milestone** — TBD.
 
 ---
-**Last Updated**: 2026-05-29
+**Last Updated**: 2026-07-06
 **Current Version**: MVP v1.5 (App10)
 **Status**: Launched — Production
