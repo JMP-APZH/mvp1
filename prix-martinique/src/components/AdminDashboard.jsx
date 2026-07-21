@@ -10,11 +10,14 @@ import {
     ArrowDownRight,
     ShieldCheck,
     MapPin,
-    X
+    X,
+    ScanLine
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import BarcodeAudit from './BarcodeAudit';
 
 const AdminDashboard = ({ onClose }) => {
+    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'barcodes'
     const [stats, setStats] = useState({
         totalScans: 0,
         uniqueUsers: 0,
@@ -117,8 +120,31 @@ const AdminDashboard = ({ onClose }) => {
                         <X className="w-6 h-6" />
                     </button>
                 </div>
+
+                {/* Sub-tabs */}
+                <div className="flex gap-2 mt-4">
+                    <button
+                        onClick={() => setSubTab('overview')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'overview' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <BarChart3 className="w-3.5 h-3.5" /> Vue d'ensemble
+                    </button>
+                    <button
+                        onClick={() => setSubTab('barcodes')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'barcodes' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <ScanLine className="w-3.5 h-3.5" /> Intégrité Codes-barres
+                    </button>
+                </div>
             </div>
 
+            {subTab === 'barcodes' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                    <BarcodeAudit />
+                </div>
+            ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {/* Main KPIs */}
                 <div className="grid grid-cols-2 gap-4">
@@ -218,6 +244,7 @@ const AdminDashboard = ({ onClose }) => {
                     </div>
                 </section>
             </div>
+            )}
         </div>
     );
 };

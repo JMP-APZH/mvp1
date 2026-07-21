@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import BQPVerifier from './components/BQPVerifier';
+import PriceHistoryChart from './components/PriceHistoryChart';
+import ProductDetailModal from './components/ProductDetailModal';
 
-import { Camera, Search, TrendingDown, BarChart3, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store } from 'lucide-react';
+import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
@@ -34,62 +35,6 @@ const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
                 onLoad={() => setLoaded(true)}
                 {...props}
             />
-        </div>
-    );
-};
-
-const PriceHistoryChart = ({ data }) => {
-    if (!data || data.length < 2) return null;
-
-    return (
-        <div className="bg-white border border-gray-100 rounded-lg p-3 mt-4">
-            <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-orange-500" />
-                Évolution du prix (TTC)
-            </p>
-            <div className="h-40 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis
-                            dataKey="date"
-                            fontSize={10}
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fill: '#94a3b8' }}
-                        />
-                        <YAxis
-                            fontSize={10}
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fill: '#94a3b8' }}
-                            tickFormatter={(val) => `${val}€`}
-                        />
-                        <Tooltip
-                            content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                    return (
-                                        <div className="bg-white border shadow-sm p-2 rounded-lg text-xs">
-                                            <p className="font-bold text-gray-900">{payload[0].value.toFixed(2)}€</p>
-                                            <p className="text-gray-500">{payload[0].payload.fullDate}</p>
-                                            <p className="text-orange-600 font-medium">{payload[0].payload.store}</p>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            }}
-                        />
-                        <Line
-                            type="monotone"
-                            dataKey="price"
-                            stroke="#f97316"
-                            strokeWidth={2}
-                            dot={{ r: 4, fill: '#f97316', strokeWidth: 0 }}
-                            activeDot={{ r: 6, strokeWidth: 0 }}
-                        />
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
         </div>
     );
 };
@@ -129,7 +74,9 @@ const App10 = () => {
         isMdd: false
     });
     const [categories, setCategories] = useState([]);
-    const [selectedImage, setSelectedImage] = useState(null);
+    const [imageViewer, setImageViewer] = useState(null); // { images: string[], index: number, labels: string[] } | null
+    const [selectedProductId, setSelectedProductId] = useState(null);
+    const touchStartXRef = useRef(0);
     const [categoryFilter, setCategoryFilter] = useState(null);
     const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('welcome_v1_shown'));
 
@@ -1722,7 +1669,11 @@ const App10 = () => {
                                             const isCurrentUser = user && price.userId === user.id;
 
                                             return (
-                                                <div key={price.id} className={`bg-white border rounded-lg p-4 shadow-sm ${isCurrentUser ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
+                                                <div
+                                                    key={price.id}
+                                                    onClick={() => setSelectedProductId(price.productId)}
+                                                    className={`bg-white border rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${isCurrentUser ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}
+                                                >
                                                     <div className="flex justify-between items-start mb-2">
                                                         <div className="flex-1">
                                                             <h3 className="font-semibold text-gray-900 flex items-center gap-1">
@@ -1778,45 +1729,45 @@ const App10 = () => {
                                                     </div>
 
                                                     {/* Photos display */}
-                                                    {(price.productPhotoUrl || price.priceTagPhotoUrl) && (
-                                                        <div className="flex gap-2 mt-3 mb-2 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar touch-pan-y overscroll-x-contain">
-                                                            {price.productPhotoUrl && (
-                                                                <div
-                                                                    onClick={() => setSelectedImage(price.productPhotoUrl)}
-                                                                    className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
-                                                                >
-                                                                    <ImageWithSkeleton
-                                                                        src={price.productPhotoUrl}
-                                                                        alt="Produit"
-                                                                        className="rounded border border-gray-200 group-hover:opacity-90"
-                                                                    />
-                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
-                                                                        <Search className="w-5 h-5 text-white" />
+                                                    {(price.productPhotoUrl || price.priceTagPhotoUrl) && (() => {
+                                                        const photoEntries = [
+                                                            price.productPhotoUrl && { url: price.productPhotoUrl, label: 'Produit' },
+                                                            price.priceTagPhotoUrl && { url: price.priceTagPhotoUrl, label: 'Étiquette' },
+                                                        ].filter(Boolean);
+
+                                                        return (
+                                                            <div className="flex gap-2 mt-3 mb-2 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar touch-pan-y overscroll-x-contain">
+                                                                {photoEntries.map((entry, i) => (
+                                                                    <div
+                                                                        key={entry.label}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setImageViewer({
+                                                                                images: photoEntries.map(e => e.url),
+                                                                                labels: photoEntries.map(e => e.label),
+                                                                                index: i,
+                                                                            });
+                                                                        }}
+                                                                        className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
+                                                                    >
+                                                                        <ImageWithSkeleton
+                                                                            src={entry.url}
+                                                                            alt={entry.label}
+                                                                            className="rounded border border-gray-200 group-hover:opacity-90"
+                                                                        />
+                                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
+                                                                            <Search className="w-5 h-5 text-white" />
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
-                                                            {price.priceTagPhotoUrl && (
-                                                                <div
-                                                                    onClick={() => setSelectedImage(price.priceTagPhotoUrl)}
-                                                                    className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
-                                                                >
-                                                                    <ImageWithSkeleton
-                                                                        src={price.priceTagPhotoUrl}
-                                                                        alt="Etiquette"
-                                                                        className="rounded border border-gray-200 group-hover:opacity-90"
-                                                                    />
-                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
-                                                                        <Search className="w-5 h-5 text-white" />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                                ))}
+                                                            </div>
+                                                        );
+                                                    })()}
 
                                                     <div className="flex justify-between items-center text-xs text-gray-500 mt-2 pt-2 border-t">
                                                         <div className="flex items-center gap-4">
                                                             <button
-                                                                onClick={() => handleToggleLike(price.id, price.isLikedByUser)}
+                                                                onClick={(e) => { e.stopPropagation(); handleToggleLike(price.id, price.isLikedByUser); }}
                                                                 className={`flex items-center gap-1.5 transition-colors ${price.isLikedByUser ? 'text-red-500' : 'hover:text-red-500'}`}
                                                             >
                                                                 <Heart className={`w-4 h-4 ${price.isLikedByUser ? 'fill-red-500' : ''}`} />
@@ -1941,30 +1892,88 @@ const App10 = () => {
             {/* Toast notifications */}
             <ToastContainer toasts={toasts} />
 
+            {/* Product Detail Modal ("wow" card) */}
+            {selectedProductId && (
+                <ProductDetailModal
+                    productId={selectedProductId}
+                    onClose={() => setSelectedProductId(null)}
+                />
+            )}
+
             {/* Image Zoom Modal */}
             {
-                selectedImage && (
-                    <div
-                        className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200"
-                        onClick={() => setSelectedImage(null)}
-                    >
-                        <button
-                            className="absolute top-4 right-4 text-white p-2 hover:bg-white/10 rounded-full transition-colors"
-                            onClick={() => setSelectedImage(null)}
-                        >
-                            <X className="w-8 h-8" />
-                        </button>
+                imageViewer && (() => {
+                    const { images, labels, index } = imageViewer;
+                    const hasMultiple = images.length > 1;
+                    const goTo = (newIndex) => {
+                        if (newIndex < 0 || newIndex >= images.length) return;
+                        setImageViewer(prev => prev && { ...prev, index: newIndex });
+                    };
 
-                        <div className="relative w-full h-full flex items-center justify-center p-4">
-                            <img
-                                src={selectedImage}
-                                alt="Zoom"
-                                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
-                                onClick={(e) => e.stopPropagation()}
-                            />
+                    return (
+                        <div
+                            className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200"
+                            onClick={() => setImageViewer(null)}
+                            onTouchStart={(e) => { touchStartXRef.current = e.touches[0].clientX; }}
+                            onTouchEnd={(e) => {
+                                const delta = e.changedTouches[0].clientX - touchStartXRef.current;
+                                if (Math.abs(delta) < 50) return;
+                                goTo(delta < 0 ? index + 1 : index - 1);
+                            }}
+                        >
+                            <button
+                                className="absolute top-4 right-4 text-white p-2 hover:bg-white/10 rounded-full transition-colors z-10"
+                                onClick={() => setImageViewer(null)}
+                            >
+                                <X className="w-8 h-8" />
+                            </button>
+
+                            {hasMultiple && labels?.[index] && (
+                                <div className="absolute top-4 left-4 text-white/80 text-xs font-bold uppercase tracking-wider bg-white/10 px-3 py-1.5 rounded-full">
+                                    {labels[index]}
+                                </div>
+                            )}
+
+                            {hasMultiple && index > 0 && (
+                                <button
+                                    className="absolute left-2 sm:left-4 text-white p-2 hover:bg-white/10 rounded-full transition-colors z-10"
+                                    onClick={(e) => { e.stopPropagation(); goTo(index - 1); }}
+                                >
+                                    <ChevronLeft className="w-8 h-8" />
+                                </button>
+                            )}
+                            {hasMultiple && index < images.length - 1 && (
+                                <button
+                                    className="absolute right-2 sm:right-4 text-white p-2 hover:bg-white/10 rounded-full transition-colors z-10"
+                                    onClick={(e) => { e.stopPropagation(); goTo(index + 1); }}
+                                >
+                                    <ChevronRight className="w-8 h-8" />
+                                </button>
+                            )}
+
+                            <div className="relative w-full h-full flex items-center justify-center p-4">
+                                <img
+                                    src={images[index]}
+                                    alt={labels?.[index] || 'Zoom'}
+                                    className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </div>
+
+                            {hasMultiple && (
+                                <div className="absolute bottom-6 flex gap-2">
+                                    {images.map((_, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={(e) => { e.stopPropagation(); goTo(i); }}
+                                            className={`w-2 h-2 rounded-full transition-all ${i === index ? 'bg-white w-6' : 'bg-white/40'}`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                )
+                    );
+                })()
             }
         </div>
     );

@@ -91,8 +91,17 @@ Went looking for more of the same failure class (wrong table/column names, RPC s
 - **`PersoStats.jsx` "Mes Économies"**: computed as `points * 0.15` (explicitly commented `// Mock logic`), but the adjacent "Comment c'est calculé ?" explainer describes a completely different methodology (savings vs. highest observed price for the same product). The number itself isn't wrong per se, but the stated methodology doesn't match the code — worth rewording the explainer or implementing the described logic before anyone asks how it's calculated.
 - **Badges system** (`user_badges`, `badges` tables): both empty in production; no code path was found that ever inserts into them. The "Mes Badges" UI in `PersoStats.jsx` is fully wired but has nothing to display — appears to be a stubbed-out feature rather than a bug.
 
+### Jul 21, 2026 — Product Detail Card, Swipeable Photos, Admin Barcode Audit
+Three features requested ahead of the RPPRAC presentation, built against real production data:
+
+- **`ProductDetailModal.jsx`** (new): tapping a card in the recent-prices feed opens a "wow" detail view — total scan count, distinct-shop count, best price, a price-trend chart (reusing the extracted `PriceHistoryChart.jsx`), and an intra-Martinique store-by-store price comparison sorted cheapest-first. Excludes legacy `prices` rows with a null `store_id` (pre-dates mandatory store selection) from the shop count and comparison table — confirmed live that at least one such row exists (`881db4d5-...`, submitted before store selection was enforced) and would otherwise show as a misleading "Magasin inconnu — cheapest!" entry.
+- **`PriceHistoryChart.jsx`** (extracted from `App10.jsx`, where it was previously inline and only used by the BQP-scan flow): now shared between that flow and `ProductDetailModal`. Same props/behavior, just relocated.
+- **Swipeable photo viewer**: the image zoom modal (`App10.jsx`) previously showed one image at a time — closing and reopening was required to compare the product photo against the price-tag photo. Now a single modal with left/right arrows, dot indicators, and touch-swipe (50px threshold) cycles between all photos for that scan.
+- **`BarcodeAudit.jsx`** (new, admin-only, Console Admin → "Intégrité Codes-barres" sub-tab): lists recent scans with a product photo next to the currently-stored `products.barcode`, so an admin can visually compare the captured value against the barcode printed on the packaging. Two actions per entry: **"J'ai corrigé"** (admin enters the correct barcode, updates `products.barcode` directly, logged with `resolution_type = 'admin_modification'`) or **"Demander re-capture"** (flags the item for the original user to rescan, `resolution_type = 'user_recapture'`, no value changed). Every action is an insert into `barcode_flags` — append-only, publicly readable (RLS `for select using (true)`) so the audit trail survives corrections and is inspectable by RPPRAC or any other external party, not just admins. Migration: `barcode_audit_migration.sql` — **not yet applied**, needs the same manual Supabase SQL Editor run as the other pending migration. Admin write access (insert/update on `barcode_flags`) is gated by the same `user_roles` admin check noted as unconfirmed above — if the admin tab's flag/correct actions fail with an RLS error after applying the migration, that's the thing to check.
+
 ## Known Issues & Limitations
 - `get_bqp_vote_stats` RPC fix (`bqp_vote_stats_fix_migration.sql`) has been committed but not yet run against the live DB — BQP community vote counts will keep failing until it's applied via Supabase SQL Editor.
+- `barcode_audit_migration.sql` has been committed but not yet run against the live DB — the new Console Admin → "Intégrité Codes-barres" tab will show `PGRST205` errors on the `barcode_flags` queries until it's applied.
 - See "Jul 21, 2026 — Component-Wide Bug Sweep" above for items flagged but intentionally not changed.
 
 ## Accepted Risks & Frozen Dependencies
@@ -128,6 +137,9 @@ Went looking for more of the same failure class (wrong table/column names, RPC s
 - `src/components/BQPVerifier.jsx` — BQP product verification engine.
 - `src/components/ZXingBarcodeScanner.jsx` — iOS/fallback barcode scanner.
 - `src/components/Toast.jsx` — Toast notification UI.
+- `src/components/ProductDetailModal.jsx` — Per-product "wow" card (scans, trend, cross-store comparison).
+- `src/components/PriceHistoryChart.jsx` — Shared recharts line chart (BQP scan flow + ProductDetailModal).
+- `src/components/BarcodeAudit.jsx` — Admin-only barcode integrity review (Console Admin sub-tab).
 
 ### Database Schema (Critical Tables)
 - `products`: Includes `is_local_production`, `is_mdd` (distributor brand), `barcode`.
