@@ -3,7 +3,7 @@ import BQPVerifier from './components/BQPVerifier';
 import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 
-import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import AuthModal from './components/AuthModal';
@@ -78,6 +78,9 @@ const App10 = () => {
     const [selectedProductId, setSelectedProductId] = useState(null);
     const touchStartXRef = useRef(0);
     const [categoryFilter, setCategoryFilter] = useState(null);
+    const [storeFilter, setStoreFilter] = useState(null);
+    const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+    const [showStorePicker, setShowStorePicker] = useState(false);
     const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('welcome_v1_shown'));
 
     const productPhotoInputRef = useRef(null);
@@ -217,7 +220,7 @@ const App10 = () => {
                   product_photo_url,
                   price_tag_photo_url,
                   products (id, name, barcode, category_id, is_local_production),
-                  stores (name, full_address),
+                  stores (id, name, full_address),
                   price_likes (user_id)
                 `)
                 .order('created_at', { ascending: false })
@@ -233,6 +236,7 @@ const App10 = () => {
                 isLocal: item.products?.is_local_production,
                 barcode: item.products?.barcode,
                 price: item.price,
+                storeId: item.stores?.id,
                 store: item.stores?.name || 'Magasin inconnu',
                 location: item.stores?.full_address,
                 userName: item.user_name || 'Anonyme',
@@ -819,8 +823,24 @@ const App10 = () => {
         const matchesQuery = p.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
             p.store.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCategory = categoryFilter ? p.categoryId === categoryFilter : true;
-        return matchesQuery && matchesCategory;
+        const matchesStore = storeFilter ? p.storeId === storeFilter : true;
+        return matchesQuery && matchesCategory && matchesStore;
     });
+
+    // Stores that have at least one scanned product, for the store filter picker
+    const scannedStores = Array.from(
+        recentPrices.reduce((map, p) => {
+            if (p.storeId && !map.has(p.storeId)) map.set(p.storeId, p.store);
+            return map;
+        }, new Map())
+    ).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+
+    // Categories that actually have a scanned product at the selected store
+    // (falls back to all categories with any scanned product when no store is selected)
+    const availableCategoryIds = new Set(
+        recentPrices.filter(p => !storeFilter || p.storeId === storeFilter).map(p => p.categoryId).filter(Boolean)
+    );
+    const pickerCategories = categories.filter(c => availableCategoryIds.has(c.id));
 
     const getProductStats = (productName) => {
         const productPrices = recentPrices.filter(p => p.product === productName);
@@ -1632,21 +1652,104 @@ const App10 = () => {
                                 />
                             </div>
 
-                            {categoryFilter && (
-                                <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xl">{categories.find(c => c.id === categoryFilter)?.icon}</span>
-                                        <span className="text-sm font-medium text-orange-800">
-                                            Filtré par: <span className="font-bold">{categories.find(c => c.id === categoryFilter)?.name}</span>
-                                        </span>
-                                    </div>
-                                    <button
-                                        onClick={() => setCategoryFilter(null)}
-                                        className="p-1 hover:bg-orange-100 rounded-full text-orange-600 transition-colors"
-                                        title="Réinitialiser le filtre"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
+                            {/* Filter buttons */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => { setShowCategoryPicker(v => !v); setShowStorePicker(false); }}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium border transition-colors ${categoryFilter || showCategoryPicker
+                                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    <Tag className="w-4 h-4" /> Catégorie
+                                </button>
+                                <button
+                                    onClick={() => { setShowStorePicker(v => !v); setShowCategoryPicker(false); }}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium border transition-colors ${storeFilter || showStorePicker
+                                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    <Store className="w-4 h-4" /> Magasin
+                                </button>
+                            </div>
+
+                            {/* Category icon picker overlay */}
+                            {showCategoryPicker && (
+                                <div className="bg-white border border-gray-200 rounded-2xl shadow-lg p-4 animate-in fade-in slide-in-from-top-2">
+                                    {pickerCategories.length === 0 ? (
+                                        <p className="text-xs text-gray-400 text-center py-4">
+                                            Aucune catégorie avec un produit scanné{storeFilter ? ' pour ce magasin' : ''}.
+                                        </p>
+                                    ) : (
+                                        <div className="grid grid-cols-4 gap-3">
+                                            {pickerCategories.map(cat => (
+                                                <button
+                                                    key={cat.id}
+                                                    onClick={() => { setCategoryFilter(cat.id); setShowCategoryPicker(false); }}
+                                                    className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-orange-50 transition-colors"
+                                                >
+                                                    <span className="text-2xl">{cat.icon}</span>
+                                                    <span className="text-[10px] text-gray-600 font-medium text-center leading-tight">{cat.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Store picker overlay */}
+                            {showStorePicker && (
+                                <div className="bg-white border border-gray-200 rounded-2xl shadow-lg p-2 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-top-2">
+                                    {scannedStores.length === 0 ? (
+                                        <p className="text-xs text-gray-400 text-center py-4">Aucun magasin avec des prix enregistrés.</p>
+                                    ) : (
+                                        scannedStores.map(s => (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => { setStoreFilter(s.id); setShowStorePicker(false); }}
+                                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-orange-50 text-sm text-gray-700 transition-colors flex items-center gap-2"
+                                            >
+                                                <Store className="w-4 h-4 text-gray-400 flex-shrink-0" /> {s.name}
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Active filter chips */}
+                            {(categoryFilter || storeFilter) && (
+                                <div className="flex flex-wrap gap-2">
+                                    {categoryFilter && (
+                                        <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                                            <span className="text-base">{categories.find(c => c.id === categoryFilter)?.icon}</span>
+                                            <span className="text-xs font-medium text-orange-800">
+                                                {categories.find(c => c.id === categoryFilter)?.name}
+                                            </span>
+                                            <button
+                                                onClick={() => setCategoryFilter(null)}
+                                                className="p-0.5 hover:bg-orange-100 rounded-full text-orange-600 transition-colors"
+                                                title="Réinitialiser le filtre de catégorie"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
+                                    {storeFilter && (
+                                        <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                                            <Store className="w-4 h-4 text-orange-600" />
+                                            <span className="text-xs font-medium text-orange-800">
+                                                {scannedStores.find(s => s.id === storeFilter)?.name}
+                                            </span>
+                                            <button
+                                                onClick={() => setStoreFilter(null)}
+                                                className="p-0.5 hover:bg-orange-100 rounded-full text-orange-600 transition-colors"
+                                                title="Réinitialiser le filtre de magasin"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

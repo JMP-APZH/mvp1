@@ -11,13 +11,15 @@ import {
     ShieldCheck,
     MapPin,
     X,
-    ScanLine
+    ScanLine,
+    Tag
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import BarcodeAudit from './BarcodeAudit';
+import CategoryManager from './CategoryManager';
 
 const AdminDashboard = ({ onClose }) => {
-    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'barcodes'
+    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'barcodes' | 'categories'
     const [stats, setStats] = useState({
         totalScans: 0,
         uniqueUsers: 0,
@@ -150,12 +152,23 @@ const AdminDashboard = ({ onClose }) => {
                     >
                         <ScanLine className="w-3.5 h-3.5" /> Intégrité Codes-barres
                     </button>
+                    <button
+                        onClick={() => setSubTab('categories')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'categories' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <Tag className="w-3.5 h-3.5" /> Catégories
+                    </button>
                 </div>
             </div>
 
             {subTab === 'barcodes' ? (
                 <div className="flex-1 overflow-y-auto p-6">
                     <BarcodeAudit />
+                </div>
+            ) : subTab === 'categories' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                    <CategoryManager />
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">

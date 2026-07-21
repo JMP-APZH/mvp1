@@ -259,7 +259,7 @@ export const AuthProvider = ({ children }) => {
           data: {
             display_name: displayName,
             region_code: regionCode,
-            city: city
+            city: city?.trim()
           }
         }
       });
@@ -475,9 +475,13 @@ export const AuthProvider = ({ children }) => {
     try {
       if (!user) return { error: 'Not authenticated' };
 
+      const trimmedUpdates = Object.fromEntries(
+        Object.entries(updates).map(([key, val]) => [key, typeof val === 'string' ? val.trim() : val])
+      );
+
       const { error } = await supabase
         .from('user_profiles')
-        .update(updates)
+        .update(trimmedUpdates)
         .eq('id', user.id);
 
       if (error) throw error;
