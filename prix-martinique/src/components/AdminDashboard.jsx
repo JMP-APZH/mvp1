@@ -24,6 +24,8 @@ const AdminDashboard = ({ onClose }) => {
         uniqueProducts: 0,
         diasporaScans: 0,
         mddProducts: 0,
+        scansThisWeek: 0,
+        activeUsersThisWeek: 0,
         topStores: [],
         diasporaRegions: [],
         recentActivity: []
@@ -47,6 +49,15 @@ const AdminDashboard = ({ onClose }) => {
                 .from('prices')
                 .select('user_id');
             const uniqueUsers = new Set(userData?.map(u => u.user_id)).size;
+
+            // 2b. Real weekly activity (replaces hardcoded trend badges)
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            const { data: recentRows } = await supabase
+                .from('prices')
+                .select('user_id')
+                .gte('created_at', sevenDaysAgo);
+            const scansThisWeek = recentRows?.length || 0;
+            const activeUsersThisWeek = new Set((recentRows || []).map(r => r.user_id).filter(Boolean)).size;
 
             // 3. Unique Products
             const { count: uniqueProducts } = await supabase
@@ -91,6 +102,8 @@ const AdminDashboard = ({ onClose }) => {
                 uniqueProducts: uniqueProducts || 0,
                 diasporaScans: diasporaScans || 0,
                 mddProducts: mddProducts || 0,
+                scansThisWeek,
+                activeUsersThisWeek,
                 topStores: [],
                 diasporaRegions: Object.entries(regionCounts).map(([code, count]) => ({ code, count })),
                 recentActivity: activity || []
@@ -154,9 +167,11 @@ const AdminDashboard = ({ onClose }) => {
                         </div>
                         <div className="text-2xl font-black text-gray-900">{stats.totalScans}</div>
                         <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Scans</p>
-                        <div className="mt-2 flex items-center gap-1 text-green-600 text-[10px] font-bold">
-                            <ArrowUpRight className="w-3 h-3" /> +12%
-                        </div>
+                        {stats.scansThisWeek > 0 && (
+                            <div className="mt-2 flex items-center gap-1 text-green-600 text-[10px] font-bold">
+                                <ArrowUpRight className="w-3 h-3" /> +{stats.scansThisWeek} cette semaine
+                            </div>
+                        )}
                     </div>
                     <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
                         <div className="bg-purple-100 w-10 h-10 rounded-2xl flex items-center justify-center text-purple-600 mb-3">
@@ -164,9 +179,11 @@ const AdminDashboard = ({ onClose }) => {
                         </div>
                         <div className="text-2xl font-black text-gray-900">{stats.uniqueUsers}</div>
                         <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Utilisateurs Actifs</p>
-                        <div className="mt-2 flex items-center gap-1 text-green-600 text-[10px] font-bold">
-                            <ArrowUpRight className="w-3 h-3" /> +5%
-                        </div>
+                        {stats.activeUsersThisWeek > 0 && (
+                            <div className="mt-2 flex items-center gap-1 text-green-600 text-[10px] font-bold">
+                                <ArrowUpRight className="w-3 h-3" /> +{stats.activeUsersThisWeek} cette semaine
+                            </div>
+                        )}
                     </div>
                     <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
                         <div className="bg-green-100 w-10 h-10 rounded-2xl flex items-center justify-center text-green-600 mb-3">

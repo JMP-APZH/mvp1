@@ -72,8 +72,34 @@ const PersoStats = ({ onClose }) => {
                     }
                 }
 
-                // 4. Mock logic for "Mes économies"
-                const savings = (userProfile?.points || 0) * 0.15;
+                // 4. "Mes économies": for each product the user has priced, compare their
+                // price against the highest price observed for that same product across
+                // all stores/users, and sum the positive differences.
+                let savings = 0;
+                const { data: ownPrices } = await supabase
+                    .from('prices')
+                    .select('product_id, price')
+                    .eq('user_id', user.id);
+
+                const productIds = [...new Set((ownPrices || []).map(p => p.product_id))];
+                if (productIds.length > 0) {
+                    const { data: allPricesForProducts } = await supabase
+                        .from('prices')
+                        .select('product_id, price')
+                        .in('product_id', productIds);
+
+                    const maxByProduct = {};
+                    (allPricesForProducts || []).forEach(p => {
+                        if (!(p.product_id in maxByProduct) || p.price > maxByProduct[p.product_id]) {
+                            maxByProduct[p.product_id] = p.price;
+                        }
+                    });
+
+                    savings = (ownPrices || []).reduce((total, p) => {
+                        const highest = maxByProduct[p.product_id] ?? p.price;
+                        return total + Math.max(0, highest - p.price);
+                    }, 0);
+                }
 
                 setStats({
                     firstScan: firstScan?.created_at,
@@ -180,7 +206,7 @@ const PersoStats = ({ onClose }) => {
                             <div>
                                 <h4 className="font-bold text-blue-900 mb-1">Comment c'est calculé ?</h4>
                                 <p className="text-sm text-blue-800/80 leading-relaxed">
-                                    "Mes économies" correspond à la différence estimée entre les prix que vous scannez et la moyenne des prix les plus élevés observés pour les mêmes produits. Plus vous trouvez de bons plans, plus votre score grimpe !
+                                    Pour chaque produit que vous avez scanné, on compare votre prix au prix le plus élevé observé pour ce même produit (tous magasins confondus), et on additionne les écarts positifs. Plus vous trouvez de bons plans, plus votre score grimpe !
                                 </p>
                             </div>
                         </div>

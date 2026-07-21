@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScanLine, Flag, RefreshCw, CheckCircle2, Loader2, AlertTriangle, UserCheck, ShieldCheck } from 'lucide-react';
+import { ScanLine, Flag, RefreshCw, CheckCircle2, Loader2, AlertTriangle, UserCheck, ShieldCheck, X, ZoomIn } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -20,6 +20,7 @@ const BarcodeAudit = () => {
     const [note, setNote] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState(null);
+    const [zoomedEntry, setZoomedEntry] = useState(null);
 
     const load = async () => {
         setLoading(true);
@@ -131,11 +132,20 @@ const BarcodeAudit = () => {
                         return (
                             <div key={entry.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
                                 <div className="flex gap-3 p-3">
-                                    <img
-                                        src={entry.product_photo_url}
-                                        alt={entry.products.name}
-                                        className="w-20 h-20 rounded-lg object-cover border border-gray-100 flex-shrink-0"
-                                    />
+                                    <button
+                                        onClick={() => setZoomedEntry(entry)}
+                                        className="relative flex-shrink-0 w-20 h-20 group"
+                                        title="Zoomer sur la photo"
+                                    >
+                                        <img
+                                            src={entry.product_photo_url}
+                                            alt={entry.products.name}
+                                            className="w-20 h-20 rounded-lg object-cover border border-gray-100 group-hover:opacity-90 transition-opacity"
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded-lg">
+                                            <ZoomIn className="w-5 h-5 text-white drop-shadow" />
+                                        </div>
+                                    </button>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-bold text-gray-900 truncate">{entry.products.name}</p>
                                         <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
@@ -210,6 +220,35 @@ const BarcodeAudit = () => {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Photo zoom with barcode overlay for side-by-side comparison */}
+            {zoomedEntry && (
+                <div
+                    className="fixed inset-0 z-[400] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={() => setZoomedEntry(null)}
+                >
+                    <button
+                        className="absolute top-4 right-4 text-white p-2 hover:bg-white/10 rounded-full transition-colors"
+                        onClick={() => setZoomedEntry(null)}
+                    >
+                        <X className="w-8 h-8" />
+                    </button>
+
+                    <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+                        <img
+                            src={zoomedEntry.product_photo_url}
+                            alt={zoomedEntry.products.name}
+                            className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                        />
+                        <div className="absolute bottom-3 left-3 bg-black/75 backdrop-blur-sm rounded-xl px-3 py-2 flex items-center gap-2 border border-white/10">
+                            <ScanLine className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                            <span className="font-mono text-white text-base sm:text-lg font-bold tracking-wide">
+                                {zoomedEntry.products.barcode || 'Aucun code-barres'}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             )}
 
