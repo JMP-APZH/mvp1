@@ -67,11 +67,18 @@ Discovered while auditing a 10-item test scan session ahead of the RPPRAC presen
 - **Root cause**: `awardPoints` in `AuthContext.jsx` was refactored on 2026-02-05 (`73f6c22`) from `(activityType, points, description)` down to `(points, description)`, dropping the `p_activity_type` arg sent to the `award_points` Postgres RPC (which requires it, no default). Call sites in `App10.jsx` (price submission `+10`, BQP verification `+5`) were never updated and kept calling it with 3 positional args, so `points`/`description` were silently misassigned and the RPC call failed every time. The error was caught and only `console.error`'d — the price/photo submission itself always succeeded, so the bug was invisible in normal use.
 - **Impact**: Every point-earning action for every user since 2026-02-05 (~5.5 months) silently failed. Verified via direct Supabase query: all user_profiles created after that date sit at 0 points regardless of activity; only the one profile predating the regression has nonzero points.
 - **Fix**: Restored the 3-arg signature and `p_activity_type` passthrough in `awardPoints` (`AuthContext.jsx`). No call-site changes needed — they were already correct.
-- **Not done**: Historical points were **not backfilled** — past activity (e.g. the Jul 20 test session) still shows 0 points earned, by explicit decision. Only submissions from this fix onward award correctly.
+- **Backfill**: The Jul 20 test session (10 price submissions by user "Tony") was manually backfilled via 10 direct `award_points` RPC calls → 100 pts, Level 2. All other historical activity since 2026-02-05 was **not** backfilled by design — only submissions from this fix onward award correctly.
 - **Also observed, not fixed**: `user_profiles.city` is not trimmed before insert, producing duplicate-looking entries (e.g. `"Zurich"` vs `"Zurich "`) in city-based stats/leaderboards. Low priority, cosmetic.
 
+### Jul 21, 2026 — Community Leaderboard Querying Nonexistent Table
+Found while investigating why the Communauté → Classement tab showed no ranking at all for any user, not just Tony.
+
+- **Root cause**: `Leaderboard.jsx` has queried `.from('profiles')` since 2026-02-10 (`68fda8f`) — a table that **does not exist** in the schema (confirmed: `PGRST205`). The correct table, used everywhere else in the app, is `user_profiles`. The failed query was caught silently, leaving the component permanently stuck on its "Pas encore de classement" empty state for ~5.5 months, independent of the `award_points` bug above.
+- **Fix**: `Leaderboard.jsx` now queries `user_profiles`, matching `AuthContext.jsx` / `AdminDashboard.jsx` / the schema.
+- **Also observed, not fixed**: `user_profiles.total_contributions` is never written to by `award_points` or any known migration — it appears permanently 0 for all users, so the leaderboard's "X prix" sub-label will read 0 even for active contributors. Separate from points/level, which are correct. Worth a dedicated fix in a future sprint (likely: increment it inside `award_points`, or derive it via a count on `prices` instead of a stored column).
+
 ## Known Issues & Limitations
-None blocking. The app is in production.
+- `user_profiles.total_contributions` is not populated (see Jul 21, 2026 entry above) — leaderboard "prix" count always shows 0.
 
 ## Accepted Risks & Frozen Dependencies
 

@@ -17,7 +17,7 @@ const Leaderboard = ({ city }) => {
     setLoading(true);
     try {
       let query = supabase
-        .from('profiles')
+        .from('user_profiles')
         .select('id, display_name, points, level, total_contributions, city')
         .order('points', { ascending: false })
         .limit(10);
