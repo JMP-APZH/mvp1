@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, ScanLine, Store, TrendingDown, TrendingUp, Leaf, MapPin, Loader2, MessageSquare, Heart, Share2, Link2, Trophy, Check } from 'lucide-react';
+import { X, ScanLine, Store, TrendingDown, TrendingUp, Leaf, MapPin, Loader2, MessageSquare, Heart, Share2, Link2, Trophy, Check, Globe2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import PriceHistoryChart from './PriceHistoryChart';
+import PriceDuel from './PriceDuel';
 
 const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
     const { user } = useAuth();
@@ -12,11 +13,39 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
     const [stats, setStats] = useState(null);
     const [priceHistory, setPriceHistory] = useState([]);
     const [storeComparison, setStoreComparison] = useState([]);
+    const [mainlandPrices, setMainlandPrices] = useState([]);
     const [comments, setComments] = useState([]);
     const [topHunterIds, setTopHunterIds] = useState(new Set());
     const [newComment, setNewComment] = useState('');
     const [submittingComment, setSubmittingComment] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
+
+    // Isolated from the core prices query above: mainland_chain/source_type/source_url
+    // are new columns (mainland_price_migration.sql) that may not exist yet on a given
+    // environment, so a failure here must not break the rest of the card.
+    const loadMainlandPrices = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('prices')
+                .select('price, mainland_chain, source_type, source_url, created_at')
+                .eq('product_id', productId)
+                .eq('origin_region_code', 'Hexagone')
+                .order('price', { ascending: true });
+
+            if (error) throw error;
+
+            setMainlandPrices((data || []).map(r => ({
+                chain: r.mainland_chain || 'Chaîne inconnue',
+                price: r.price,
+                sourceType: r.source_type,
+                sourceUrl: r.source_url,
+                date: new Date(r.created_at).toLocaleDateString('fr-FR'),
+            })));
+        } catch (err) {
+            console.error('Error loading mainland prices:', err);
+            setMainlandPrices([]);
+        }
+    };
 
     const loadComments = async () => {
         const { data: commentRows, error } = await supabase
@@ -123,29 +152,34 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                     .single();
                 setProduct(productData);
 
-                const { data: rows, error } = await supabase
+                const { data: allRows, error } = await supabase
                     .from('prices')
-                    .select('price, created_at, store_id, product_photo_url, stores(id, name, city)')
+                    .select('price, created_at, store_id, product_photo_url, origin_region_code, stores(id, name, city)')
                     .eq('product_id', productId)
                     .order('created_at', { ascending: true });
 
                 if (error) throw error;
 
-                const photoRow = [...(rows || [])].reverse().find(r => r.product_photo_url);
+                // France Hexagonale reference prices are a different market entirely --
+                // keep them out of the Martinique stats/trend/store-comparison below,
+                // and surface them separately as the diaspora price-gap comparison.
+                const rows = (allRows || []).filter(r => r.origin_region_code !== 'Hexagone');
+
+                const photoRow = [...rows].reverse().find(r => r.product_photo_url);
                 setPhotoUrl(photoRow?.product_photo_url || null);
 
-                const prices = (rows || []).map(r => r.price);
-                const distinctShops = new Set((rows || []).filter(r => r.store_id != null).map(r => r.store_id)).size;
+                const prices = rows.map(r => r.price);
+                const distinctShops = new Set(rows.filter(r => r.store_id != null).map(r => r.store_id)).size;
 
                 setStats({
-                    totalScans: rows?.length || 0,
+                    totalScans: rows.length,
                     distinctShops,
                     min: prices.length ? Math.min(...prices) : null,
                     max: prices.length ? Math.max(...prices) : null,
                     avg: prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null,
                 });
 
-                setPriceHistory((rows || []).map(r => ({
+                setPriceHistory(rows.map(r => ({
                     date: new Date(r.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
                     fullDate: new Date(r.created_at).toLocaleDateString('fr-FR'),
                     price: r.price,
@@ -154,7 +188,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
 
                 // Most recent price per store, sorted cheapest first (unknown-store legacy rows excluded)
                 const latestByStore = {};
-                (rows || []).filter(r => r.store_id != null).forEach(r => {
+                rows.filter(r => r.store_id != null).forEach(r => {
                     latestByStore[r.store_id] = r; // rows are ascending by date, so last write wins = most recent
                 });
                 const comparison = Object.values(latestByStore)
@@ -167,6 +201,8 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                     }))
                     .sort((a, b) => a.price - b.price);
                 setStoreComparison(comparison);
+
+                await loadMainlandPrices();
 
                 const { data: topHunters } = await supabase
                     .from('user_profiles')
@@ -272,6 +308,44 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                     <p className="text-[9px] uppercase tracking-wider font-bold text-green-500 mt-1">Meilleur prix</p>
                                 </div>
                             </div>
+
+                            {/* Diaspora price comparison */}
+                            {stats?.min != null && mainlandPrices.length > 0 && (
+                                <PriceDuel
+                                    localPrice={stats.min}
+                                    mainlandPrice={mainlandPrices[0].price}
+                                    productName={product?.name}
+                                    mainlandOrigin={mainlandPrices[0].chain}
+                                    localStore="Meilleur prix Martinique"
+                                />
+                            )}
+
+                            {mainlandPrices.length > 0 && (
+                                <div>
+                                    <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                        <Globe2 className="w-4 h-4 text-blue-500" /> Prix en France Hexagonale
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {mainlandPrices.map((m, i) => (
+                                            <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-blue-100 bg-blue-50">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-gray-900 truncate">{m.chain}</p>
+                                                    <p className="text-[10px] text-gray-500 flex items-center gap-2">
+                                                        {m.sourceType === 'admin_reference' ? 'Source en ligne' : 'Scan communautaire'}
+                                                        {m.sourceUrl && (
+                                                            <a href={m.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">lien</a>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right flex-shrink-0 pl-2">
+                                                    <div className="text-base font-black text-blue-700">{m.price.toFixed(2)}€</div>
+                                                    <p className="text-[10px] text-gray-400">{m.date}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Price trend */}
                             {priceHistory.length >= 2 ? (

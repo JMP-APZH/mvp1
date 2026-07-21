@@ -11,13 +11,15 @@ import {
     ShieldCheck,
     MapPin,
     X,
-    Wrench
+    Wrench,
+    Globe2
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import ProductCompletion from './ProductCompletion';
+import MainlandPriceAdmin from './MainlandPriceAdmin';
 
 const AdminDashboard = ({ onClose }) => {
-    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete'
+    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland'
     const [stats, setStats] = useState({
         totalScans: 0,
         uniqueUsers: 0,
@@ -150,12 +152,23 @@ const AdminDashboard = ({ onClose }) => {
                     >
                         <Wrench className="w-3.5 h-3.5" /> Compléter produit
                     </button>
+                    <button
+                        onClick={() => setSubTab('mainland')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'mainland' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <Globe2 className="w-3.5 h-3.5" /> Prix France Hexagonale
+                    </button>
                 </div>
             </div>
 
             {subTab === 'complete' ? (
                 <div className="flex-1 overflow-y-auto p-6">
                     <ProductCompletion />
+                </div>
+            ) : subTab === 'mainland' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                    <MainlandPriceAdmin />
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
