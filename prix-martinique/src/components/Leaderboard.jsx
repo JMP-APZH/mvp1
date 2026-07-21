@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Star, TrendingUp, Crown } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import HunterDetailModal from './HunterDetailModal';
 
 const Leaderboard = ({ city }) => {
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('all'); // 'all', 'month', 'week'
+  const [selectedHunterId, setSelectedHunterId] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -199,7 +201,8 @@ const Leaderboard = ({ city }) => {
           return (
             <div
               key={leader.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border ${getRankBackground(rank)} ${isCurrentUser ? 'ring-2 ring-orange-400' : ''
+              onClick={() => setSelectedHunterId(leader.id)}
+              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:shadow-md transition-shadow ${getRankBackground(rank)} ${isCurrentUser ? 'ring-2 ring-orange-400' : ''
                 }`}
             >
               {/* Rank */}
@@ -247,6 +250,10 @@ const Leaderboard = ({ city }) => {
             Continuez a soumettre des prix pour monter dans le classement!
           </p>
         </div>
+      )}
+
+      {selectedHunterId && (
+        <HunterDetailModal userId={selectedHunterId} onClose={() => setSelectedHunterId(null)} />
       )}
     </div>
   );

@@ -11,15 +11,13 @@ import {
     ShieldCheck,
     MapPin,
     X,
-    ScanLine,
-    Tag
+    Wrench
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import BarcodeAudit from './BarcodeAudit';
-import CategoryManager from './CategoryManager';
+import ProductCompletion from './ProductCompletion';
 
 const AdminDashboard = ({ onClose }) => {
-    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'barcodes' | 'categories'
+    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete'
     const [stats, setStats] = useState({
         totalScans: 0,
         uniqueUsers: 0,
@@ -146,29 +144,18 @@ const AdminDashboard = ({ onClose }) => {
                         <BarChart3 className="w-3.5 h-3.5" /> Vue d'ensemble
                     </button>
                     <button
-                        onClick={() => setSubTab('barcodes')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'barcodes' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                        onClick={() => setSubTab('complete')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'complete' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
                             }`}
                     >
-                        <ScanLine className="w-3.5 h-3.5" /> Intégrité Codes-barres
-                    </button>
-                    <button
-                        onClick={() => setSubTab('categories')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'categories' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
-                            }`}
-                    >
-                        <Tag className="w-3.5 h-3.5" /> Catégories
+                        <Wrench className="w-3.5 h-3.5" /> Compléter produit
                     </button>
                 </div>
             </div>
 
-            {subTab === 'barcodes' ? (
+            {subTab === 'complete' ? (
                 <div className="flex-1 overflow-y-auto p-6">
-                    <BarcodeAudit />
-                </div>
-            ) : subTab === 'categories' ? (
-                <div className="flex-1 overflow-y-auto p-6">
-                    <CategoryManager />
+                    <ProductCompletion />
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">

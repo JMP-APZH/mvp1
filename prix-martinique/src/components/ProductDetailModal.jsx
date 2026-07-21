@@ -1,15 +1,114 @@
 import React, { useState, useEffect } from 'react';
-import { X, ScanLine, Store, TrendingDown, TrendingUp, Leaf, MapPin, Loader2 } from 'lucide-react';
+import { X, ScanLine, Store, TrendingDown, TrendingUp, Leaf, MapPin, Loader2, MessageSquare, Heart, Share2, Link2, Trophy, Check } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import PriceHistoryChart from './PriceHistoryChart';
 
-const ProductDetailModal = ({ productId, onClose }) => {
+const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [product, setProduct] = useState(null);
     const [photoUrl, setPhotoUrl] = useState(null);
     const [stats, setStats] = useState(null);
     const [priceHistory, setPriceHistory] = useState([]);
     const [storeComparison, setStoreComparison] = useState([]);
+    const [comments, setComments] = useState([]);
+    const [topHunterIds, setTopHunterIds] = useState(new Set());
+    const [newComment, setNewComment] = useState('');
+    const [submittingComment, setSubmittingComment] = useState(false);
+    const [linkCopied, setLinkCopied] = useState(false);
+
+    const loadComments = async () => {
+        const { data: commentRows, error } = await supabase
+            .from('product_comments')
+            .select('id, content, created_at, user_id, product_comment_likes(user_id)')
+            .eq('product_id', productId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error loading comments:', error);
+            return;
+        }
+
+        const userIds = [...new Set((commentRows || []).map(c => c.user_id))];
+        let profileByUserId = {};
+        if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+                .from('user_profiles')
+                .select('id, display_name')
+                .in('id', userIds);
+            profileByUserId = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+        }
+
+        const enriched = (commentRows || []).map(c => ({
+            id: c.id,
+            content: c.content,
+            createdAt: c.created_at,
+            userId: c.user_id,
+            authorName: profileByUserId[c.user_id]?.display_name || 'Anonyme',
+            likeCount: c.product_comment_likes?.length || 0,
+            likedByMe: user ? c.product_comment_likes?.some(l => l.user_id === user.id) : false,
+        })).sort((a, b) => b.likeCount - a.likeCount || new Date(b.createdAt) - new Date(a.createdAt));
+
+        setComments(enriched);
+    };
+
+    const submitComment = async () => {
+        if (!user) {
+            onRequireAuth?.();
+            return;
+        }
+        if (!newComment.trim()) return;
+
+        setSubmittingComment(true);
+        try {
+            const { error } = await supabase
+                .from('product_comments')
+                .insert([{ product_id: productId, user_id: user.id, content: newComment.trim() }]);
+            if (error) throw error;
+            setNewComment('');
+            await loadComments();
+        } catch (err) {
+            console.error('Error posting comment:', err);
+        } finally {
+            setSubmittingComment(false);
+        }
+    };
+
+    const toggleLike = async (comment) => {
+        if (!user) {
+            onRequireAuth?.();
+            return;
+        }
+        try {
+            if (comment.likedByMe) {
+                await supabase.from('product_comment_likes').delete()
+                    .eq('comment_id', comment.id).eq('user_id', user.id);
+            } else {
+                await supabase.from('product_comment_likes').insert([{ comment_id: comment.id, user_id: user.id }]);
+            }
+            await loadComments();
+        } catch (err) {
+            console.error('Error toggling comment like:', err);
+        }
+    };
+
+    const shareUrl = `${window.location.origin}${window.location.pathname}?product=${productId}`;
+
+    const shareWhatsApp = () => {
+        const text = `Regarde le prix de "${product?.name || 'ce produit'}" sur Prix Martinique : ${shareUrl}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
+
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        } catch (err) {
+            console.error('Error copying link:', err);
+        }
+    };
 
     useEffect(() => {
         if (!productId) return;
@@ -68,6 +167,15 @@ const ProductDetailModal = ({ productId, onClose }) => {
                     }))
                     .sort((a, b) => a.price - b.price);
                 setStoreComparison(comparison);
+
+                const { data: topHunters } = await supabase
+                    .from('user_profiles')
+                    .select('id')
+                    .order('points', { ascending: false })
+                    .limit(3);
+                setTopHunterIds(new Set((topHunters || []).map(h => h.id)));
+
+                await loadComments();
             } catch (err) {
                 console.error('Error loading product detail:', err);
             } finally {
@@ -119,6 +227,23 @@ const ProductDetailModal = ({ productId, onClose }) => {
                                 )}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Share */}
+                    <div className="flex gap-2 mt-4">
+                        <button
+                            onClick={shareWhatsApp}
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold py-2 rounded-lg transition-colors"
+                        >
+                            <Share2 className="w-3.5 h-3.5" /> WhatsApp
+                        </button>
+                        <button
+                            onClick={copyLink}
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold py-2 rounded-lg transition-colors"
+                        >
+                            {linkCopied ? <Check className="w-3.5 h-3.5" /> : <Link2 className="w-3.5 h-3.5" />}
+                            {linkCopied ? 'Copié !' : 'Copier le lien'}
+                        </button>
                     </div>
                 </div>
 
@@ -196,6 +321,73 @@ const ProductDetailModal = ({ productId, onClose }) => {
                                     </div>
                                 ) : (
                                     <p className="text-xs text-gray-400">Aucune donnée de magasin disponible.</p>
+                                )}
+                            </div>
+
+                            {/* Comments */}
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4 text-orange-500" /> Commentaires ({comments.length})
+                                </h3>
+
+                                {user ? (
+                                    <div className="flex gap-2 mb-4">
+                                        <input
+                                            type="text"
+                                            value={newComment}
+                                            onChange={(e) => setNewComment(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') submitComment(); }}
+                                            placeholder="Ajouter un commentaire..."
+                                            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                                        />
+                                        <button
+                                            onClick={submitComment}
+                                            disabled={submittingComment || !newComment.trim()}
+                                            className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-bold px-4 rounded-lg transition-colors"
+                                        >
+                                            Publier
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => onRequireAuth?.()}
+                                        className="w-full bg-gray-50 border border-dashed border-gray-200 rounded-lg py-2.5 text-xs text-gray-500 mb-4 hover:bg-gray-100 transition-colors"
+                                    >
+                                        Connectez-vous pour laisser un commentaire
+                                    </button>
+                                )}
+
+                                {comments.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {comments.map(c => (
+                                            <div key={c.id} className="bg-white border border-gray-100 rounded-xl p-3">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <span className="text-sm font-bold text-gray-900 truncate">{c.authorName}</span>
+                                                        {topHunterIds.has(c.userId) && (
+                                                            <span className="flex-shrink-0 text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                                                <Trophy className="w-2.5 h-2.5" /> Top Chasseur
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-400 flex-shrink-0 pl-2">
+                                                        {new Date(c.createdAt).toLocaleDateString('fr-FR')}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-gray-700 leading-snug">{c.content}</p>
+                                                <button
+                                                    onClick={() => toggleLike(c)}
+                                                    className={`mt-2 flex items-center gap-1 text-xs font-bold transition-colors ${c.likedByMe ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
+                                                        }`}
+                                                >
+                                                    <Heart className={`w-3.5 h-3.5 ${c.likedByMe ? 'fill-red-500' : ''}`} />
+                                                    {c.likeCount || 0}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-gray-400">Aucun commentaire pour le moment.</p>
                                 )}
                             </div>
                         </>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScanLine, Flag, RefreshCw, CheckCircle2, Loader2, AlertTriangle, UserCheck, ShieldCheck, X, ZoomIn } from 'lucide-react';
+import { ScanLine, Flag, RefreshCw, CheckCircle2, Loader2, AlertTriangle, UserCheck, ShieldCheck, X, ZoomIn, Tag } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,9 +10,10 @@ const STATUS_BADGES = {
     resolved: { label: 'Résolu', className: 'bg-gray-100 text-gray-600' },
 };
 
-const BarcodeAudit = () => {
+const ProductCompletion = () => {
     const { user } = useAuth();
     const [entries, setEntries] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [flagsByProduct, setFlagsByProduct] = useState({});
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState(null);
@@ -27,12 +28,18 @@ const BarcodeAudit = () => {
         try {
             const { data: priceRows, error } = await supabase
                 .from('prices')
-                .select('id, created_at, product_photo_url, products(id, name, barcode)')
+                .select('id, created_at, product_photo_url, products(id, name, barcode, category_id)')
                 .not('product_photo_url', 'is', null)
                 .order('created_at', { ascending: false })
                 .limit(30);
             if (error) throw error;
             setEntries((priceRows || []).filter(r => r.products));
+
+            const { data: categoriesData } = await supabase
+                .from('categories')
+                .select('*')
+                .order('display_order', { ascending: true });
+            setCategories(categoriesData || []);
 
             const { data: flags } = await supabase
                 .from('barcode_flags')
@@ -45,7 +52,7 @@ const BarcodeAudit = () => {
             });
             setFlagsByProduct(map);
         } catch (err) {
-            console.error('Error loading barcode audit data:', err);
+            console.error('Error loading product completion data:', err);
         } finally {
             setLoading(false);
         }
@@ -100,6 +107,21 @@ const BarcodeAudit = () => {
         }
     };
 
+    const updateCategory = async (productId, categoryId) => {
+        // Optimistic update so the select feels instant
+        setEntries(prev => prev.map(e =>
+            e.products.id === productId ? { ...e, products: { ...e.products, category_id: categoryId } } : e
+        ));
+        const { error } = await supabase
+            .from('products')
+            .update({ category_id: categoryId })
+            .eq('id', productId);
+        if (error) {
+            console.error('Error updating category:', error);
+            await load(); // revert to server truth on failure
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-16">
@@ -114,9 +136,8 @@ const BarcodeAudit = () => {
             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-xs text-amber-800 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <p>
-                    Comparez le code-barres capturé (sous chaque photo) avec celui visible sur l'emballage.
-                    En cas d'écart, signalez-le : corrigez vous-même si l'image est lisible, ou demandez une
-                    re-capture à l'utilisateur si elle ne l'est pas.
+                    Complétez ou corrigez les informations d'un produit à partir de sa photo : comparez le
+                    code-barres capturé avec celui visible sur l'emballage, et assignez ou corrigez sa catégorie.
                 </p>
             </div>
 
@@ -152,7 +173,20 @@ const BarcodeAudit = () => {
                                             <ScanLine className="w-3.5 h-3.5" />
                                             <span className="font-mono">{entry.products.barcode || 'Aucun code-barres'}</span>
                                         </p>
-                                        <p className="text-[10px] text-gray-400 mt-1">
+                                        <div className="flex items-center gap-1.5 mt-1.5">
+                                            <Tag className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                            <select
+                                                value={entry.products.category_id || ''}
+                                                onChange={(e) => updateCategory(entry.products.id, e.target.value || null)}
+                                                className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-red-500 outline-none max-w-[180px]"
+                                            >
+                                                <option value="">Non catégorisé</option>
+                                                {categories.map(cat => (
+                                                    <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-1.5">
                                             {new Date(entry.created_at).toLocaleDateString('fr-FR')}
                                         </p>
                                         {badge && (
@@ -255,15 +289,15 @@ const BarcodeAudit = () => {
             <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-[11px] text-gray-500 flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5 text-gray-400" />
                 <p>
-                    Chaque signalement est conservé de façon permanente (table <code className="bg-white px-1 rounded border">barcode_flags</code>,
+                    Chaque signalement de code-barres est conservé de façon permanente (table <code className="bg-white px-1 rounded border">barcode_flags</code>,
                     lecture publique) pour permettre un audit externe de l'intégrité des données —
                     <UserCheck className="inline w-3 h-3 mx-1" />"re-capture demandée" identifie une correction
                     attendue de l'utilisateur, <ShieldCheck className="inline w-3 h-3 mx-1" />"corrigé par admin" une
-                    modification directe.
+                    modification directe. Les changements de catégorie sont appliqués directement.
                 </p>
             </div>
         </div>
     );
 };
 
-export default BarcodeAudit;
+export default ProductCompletion;

@@ -76,6 +76,13 @@ const App10 = () => {
     const [categories, setCategories] = useState([]);
     const [imageViewer, setImageViewer] = useState(null); // { images: string[], index: number, labels: string[] } | null
     const [selectedProductId, setSelectedProductId] = useState(null);
+
+    // Auto-open the product detail modal when arriving via a shared link (?product=<id>)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sharedProductId = params.get('product');
+        if (sharedProductId) setSelectedProductId(sharedProductId);
+    }, []);
     const touchStartXRef = useRef(0);
     const [categoryFilter, setCategoryFilter] = useState(null);
     const [storeFilter, setStoreFilter] = useState(null);
@@ -2000,6 +2007,7 @@ const App10 = () => {
                 <ProductDetailModal
                     productId={selectedProductId}
                     onClose={() => setSelectedProductId(null)}
+                    onRequireAuth={() => setShowAuthModal(true)}
                 />
             )}
 
