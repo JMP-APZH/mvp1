@@ -61,6 +61,15 @@ Four Supabase database migrations applied:
 - **UX polish**: Toast system, welcome screen, a11y improvements, BQP performance (`7528bae`).
 - **Mobile white screen**: Loading spinner added during auth initialization (`3c3e105`).
 
+### Jul 21, 2026 — Gamification (`award_points`) Regression Fixed
+Discovered while auditing a 10-item test scan session ahead of the RPPRAC presentation: the test user completed 10 price submissions but earned **0 points**.
+
+- **Root cause**: `awardPoints` in `AuthContext.jsx` was refactored on 2026-02-05 (`73f6c22`) from `(activityType, points, description)` down to `(points, description)`, dropping the `p_activity_type` arg sent to the `award_points` Postgres RPC (which requires it, no default). Call sites in `App10.jsx` (price submission `+10`, BQP verification `+5`) were never updated and kept calling it with 3 positional args, so `points`/`description` were silently misassigned and the RPC call failed every time. The error was caught and only `console.error`'d — the price/photo submission itself always succeeded, so the bug was invisible in normal use.
+- **Impact**: Every point-earning action for every user since 2026-02-05 (~5.5 months) silently failed. Verified via direct Supabase query: all user_profiles created after that date sit at 0 points regardless of activity; only the one profile predating the regression has nonzero points.
+- **Fix**: Restored the 3-arg signature and `p_activity_type` passthrough in `awardPoints` (`AuthContext.jsx`). No call-site changes needed — they were already correct.
+- **Not done**: Historical points were **not backfilled** — past activity (e.g. the Jul 20 test session) still shows 0 points earned, by explicit decision. Only submissions from this fix onward award correctly.
+- **Also observed, not fixed**: `user_profiles.city` is not trimmed before insert, producing duplicate-looking entries (e.g. `"Zurich"` vs `"Zurich "`) in city-based stats/leaderboards. Low priority, cosmetic.
+
 ## Known Issues & Limitations
 None blocking. The app is in production.
 
@@ -116,6 +125,6 @@ Required in `.env.local`:
 2. **Next Milestone** — TBD.
 
 ---
-**Last Updated**: 2026-07-06
+**Last Updated**: 2026-07-21
 **Current Version**: MVP v1.5 (App10)
 **Status**: Launched — Production

@@ -359,12 +359,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Award points
-  const awardPoints = async (points, description) => {
+  const awardPoints = async (activityType, points, description) => {
     try {
       if (!user) return { data: null, error: 'Not authenticated' };
 
       const { data, error } = await supabase.rpc('award_points', {
         p_user_id: user.id,
+        p_activity_type: activityType,
         p_points: points,
         p_description: description
       });
