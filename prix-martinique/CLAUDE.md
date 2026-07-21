@@ -75,10 +75,10 @@ Found while investigating why the Communauté → Classement tab showed no ranki
 
 - **Root cause**: `Leaderboard.jsx` has queried `.from('profiles')` since 2026-02-10 (`68fda8f`) — a table that **does not exist** in the schema (confirmed: `PGRST205`). The correct table, used everywhere else in the app, is `user_profiles`. The failed query was caught silently, leaving the component permanently stuck on its "Pas encore de classement" empty state for ~5.5 months, independent of the `award_points` bug above.
 - **Fix**: `Leaderboard.jsx` now queries `user_profiles`, matching `AuthContext.jsx` / `AdminDashboard.jsx` / the schema.
-- **Also observed, not fixed**: `user_profiles.total_contributions` is never written to by `award_points` or any known migration — it appears permanently 0 for all users, so the leaderboard's "X prix" sub-label will read 0 even for active contributors. Separate from points/level, which are correct. Worth a dedicated fix in a future sprint (likely: increment it inside `award_points`, or derive it via a count on `prices` instead of a stored column).
+- **`total_contributions` fixed too**: this column is never written to by `award_points` or any known migration (still permanently 0 in the DB for everyone). Rather than alter the RPC (no service-role/migration access in this session), `Leaderboard.jsx` now derives each leader's contribution count client-side from `COUNT(prices) WHERE user_id = leader.id`, so the "X prix" sub-label reflects real activity regardless of the stale column. **Future cleanup**: either have `award_points` increment `total_contributions` directly, or drop the column and always compute it from `prices` (current approach works but issues one extra query per leaderboard load).
 
 ## Known Issues & Limitations
-- `user_profiles.total_contributions` is not populated (see Jul 21, 2026 entry above) — leaderboard "prix" count always shows 0.
+- `user_profiles.total_contributions` column itself is still never populated at the DB level — `Leaderboard.jsx` works around it by deriving the count from `prices` client-side (see Jul 21, 2026 entry). Any other UI reading `total_contributions` directly (if added later) will still see 0.
 
 ## Accepted Risks & Frozen Dependencies
 

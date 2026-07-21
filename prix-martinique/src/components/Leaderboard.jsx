@@ -29,7 +29,29 @@ const Leaderboard = ({ city }) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setLeaders(data || []);
+      const leaderList = data || [];
+
+      // user_profiles.total_contributions is never incremented anywhere in the
+      // backend, so derive the real submission count from `prices` instead of
+      // trusting the stale column.
+      if (leaderList.length > 0) {
+        const { data: priceRows, error: priceError } = await supabase
+          .from('prices')
+          .select('user_id')
+          .in('user_id', leaderList.map((l) => l.id));
+
+        if (!priceError) {
+          const counts = {};
+          for (const row of priceRows || []) {
+            counts[row.user_id] = (counts[row.user_id] || 0) + 1;
+          }
+          leaderList.forEach((l) => {
+            l.total_contributions = counts[l.id] || 0;
+          });
+        }
+      }
+
+      setLeaders(leaderList);
     } catch (err) {
       console.error('Error loading leaderboard:', err);
     } finally {
