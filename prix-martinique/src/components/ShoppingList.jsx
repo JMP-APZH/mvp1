@@ -29,7 +29,7 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, supa
                         store_id,
                         product_id,
                         created_at,
-                        stores (id, name, type)
+                        stores (id, name)
                     `)
                     .in('product_id', productIds)
                     .order('created_at', { ascending: false });

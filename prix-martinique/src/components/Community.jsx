@@ -50,7 +50,7 @@ const Community = () => {
             const { count: bqpProducts } = await supabase
                 .from('products')
                 .select('*', { count: 'exact', head: true })
-                .eq('is_bqp', true);
+                .eq('is_declared_bqp', true);
 
             const { count: pricesCount } = await supabase
                 .from('prices')
