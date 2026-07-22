@@ -81,7 +81,7 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
             <div className="bg-blue-600 p-4 text-white">
                 <div className="flex items-center gap-2 mb-2">
                     <ShieldCheck className="w-6 h-6" />
-                    <h2 className="font-bold text-lg">BQP Watchdog 🛡️</h2>
+                    <h2 className="font-bold text-lg">Surveillance BQP 🛡️</h2>
                 </div>
 
                 <div className="flex gap-4 mb-3">
@@ -173,11 +173,6 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
                                         </div>
                                         <h3 className="font-medium text-gray-900">{item.label}</h3>
                                     </div>
-                                    {item.is_local && (
-                                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full border border-green-200 flex-shrink-0">
-                                            Local 🌴
-                                        </span>
-                                    )}
                                 </div>
 
                                 <div className="mt-2 flex items-center justify-between text-sm text-gray-600">

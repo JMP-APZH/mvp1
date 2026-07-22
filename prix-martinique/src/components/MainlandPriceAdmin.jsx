@@ -246,12 +246,12 @@ const MainlandPriceAdmin = () => {
                                                 value={price}
                                                 onChange={(e) => setPrice(e.target.value)}
                                                 placeholder="Prix (€)"
-                                                className="w-28 bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                className="w-28 bg-white text-gray-900 border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             />
                                             <select
                                                 value={chain}
                                                 onChange={(e) => setChain(e.target.value)}
-                                                className="flex-1 bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                className="flex-1 bg-white text-gray-900 border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             >
                                                 {CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
                                             </select>
@@ -296,7 +296,7 @@ const MainlandPriceAdmin = () => {
                                                 value={sourceUrl}
                                                 onChange={(e) => setSourceUrl(e.target.value)}
                                                 placeholder="Lien source (optionnel)"
-                                                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                className="w-full pl-9 pr-3 py-2 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             />
                                         </div>
 

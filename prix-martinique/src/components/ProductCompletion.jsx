@@ -178,7 +178,7 @@ const ProductCompletion = () => {
                                             <select
                                                 value={entry.products.category_id || ''}
                                                 onChange={(e) => updateCategory(entry.products.id, e.target.value || null)}
-                                                className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-red-500 outline-none max-w-[180px]"
+                                                className="text-xs text-gray-900 border border-gray-200 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-red-500 outline-none max-w-[180px]"
                                             >
                                                 <option value="">Non catégorisé</option>
                                                 {categories.map(cat => (
@@ -217,7 +217,7 @@ const ProductCompletion = () => {
                                                 type="text"
                                                 value={correctedBarcode}
                                                 onChange={(e) => setCorrectedBarcode(e.target.value)}
-                                                className="w-full mt-1 bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm font-mono focus:ring-2 focus:ring-red-500 outline-none"
+                                                className="w-full mt-1 bg-white text-gray-900 border border-gray-200 rounded-lg py-2 px-3 text-sm font-mono focus:ring-2 focus:ring-red-500 outline-none"
                                             />
                                         </div>
                                         <div>
@@ -228,7 +228,7 @@ const ProductCompletion = () => {
                                                 value={note}
                                                 onChange={(e) => setNote(e.target.value)}
                                                 rows={2}
-                                                className="w-full mt-1 bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-red-500 outline-none resize-none"
+                                                className="w-full mt-1 bg-white text-gray-900 border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-red-500 outline-none resize-none"
                                                 placeholder="Ex: chiffre 8 mal lu au scan, corrigé depuis la photo."
                                             />
                                         </div>
