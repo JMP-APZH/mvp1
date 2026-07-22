@@ -2047,6 +2047,7 @@ const App10 = () => {
                                 onUpdateQuantity={updateQuantity}
                                 onRemoveItem={removeFromShoppingList}
                                 onClearList={clearShoppingList}
+                                onAddItem={addToShoppingList}
                                 supabase={supabase}
                                 user={user}
                             />
