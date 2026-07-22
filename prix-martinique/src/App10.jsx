@@ -1891,6 +1891,42 @@ const App10 = () => {
                                                                 {price.isLocal && <Leaf className="w-4 h-4 text-green-600 fill-green-100" title="Produit Local" />}
                                                             </h3>
                                                             <p className="text-sm text-gray-600">{price.store}</p>
+
+                                                            {/* Photos display -- grouped with name/store so the gap between them is directly controllable, not an artifact of the taller price/badges column next to it */}
+                                                            {(price.productPhotoUrl || price.priceTagPhotoUrl) && (() => {
+                                                                const photoEntries = [
+                                                                    price.productPhotoUrl && { url: price.productPhotoUrl, label: 'Produit' },
+                                                                    price.priceTagPhotoUrl && { url: price.priceTagPhotoUrl, label: 'Étiquette' },
+                                                                ].filter(Boolean);
+
+                                                                return (
+                                                                    <div className="flex gap-2 mt-0.5 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar touch-pan-y overscroll-x-contain">
+                                                                        {photoEntries.map((entry, i) => (
+                                                                            <div
+                                                                                key={entry.label}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setImageViewer({
+                                                                                        images: photoEntries.map(e => e.url),
+                                                                                        labels: photoEntries.map(e => e.label),
+                                                                                        index: i,
+                                                                                    });
+                                                                                }}
+                                                                                className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
+                                                                            >
+                                                                                <ImageWithSkeleton
+                                                                                    src={entry.url}
+                                                                                    alt={entry.label}
+                                                                                    className="rounded border border-gray-200 group-hover:opacity-90"
+                                                                                />
+                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
+                                                                                    <Search className="w-5 h-5 text-white" />
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                         <div className="text-right flex flex-col items-end gap-1 pl-2">
                                                             <div className={`text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900'}`}>
@@ -1960,42 +1996,6 @@ const App10 = () => {
                                                             </div>
                                                         </div>
                                                     </div>
-
-                                                    {/* Photos display */}
-                                                    {(price.productPhotoUrl || price.priceTagPhotoUrl) && (() => {
-                                                        const photoEntries = [
-                                                            price.productPhotoUrl && { url: price.productPhotoUrl, label: 'Produit' },
-                                                            price.priceTagPhotoUrl && { url: price.priceTagPhotoUrl, label: 'Étiquette' },
-                                                        ].filter(Boolean);
-
-                                                        return (
-                                                            <div className="flex gap-2 mt-0.5 mb-2 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar touch-pan-y overscroll-x-contain">
-                                                                {photoEntries.map((entry, i) => (
-                                                                    <div
-                                                                        key={entry.label}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setImageViewer({
-                                                                                images: photoEntries.map(e => e.url),
-                                                                                labels: photoEntries.map(e => e.label),
-                                                                                index: i,
-                                                                            });
-                                                                        }}
-                                                                        className="relative flex-shrink-0 cursor-zoom-in group w-20 h-20"
-                                                                    >
-                                                                        <ImageWithSkeleton
-                                                                            src={entry.url}
-                                                                            alt={entry.label}
-                                                                            className="rounded border border-gray-200 group-hover:opacity-90"
-                                                                        />
-                                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded pointer-events-none">
-                                                                            <Search className="w-5 h-5 text-white" />
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        );
-                                                    })()}
 
                                                     <div className="flex justify-between items-center text-xs text-gray-500 mt-2 pt-2 border-t">
                                                         <div className="flex items-center gap-4">
