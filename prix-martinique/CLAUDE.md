@@ -172,6 +172,10 @@ Reported after adding the first two mainland reference prices: the "Comparer" fe
 - **Comparer feed diff badge now shows the absolute mainland price too**, not just the delta — e.g. `🇫🇷 2.85€ · +0.80€ (+28%)` — so the actual France Hexagonale price is visible without a click, per request.
 - **Feed card spacing tightened**: reduced the margin between the product/store-name header row and the photo thumbnails below it (`mb-2`→`mb-1` on the header, `mt-3`→`mt-1` on the photo row) to reclaim vertical space per card.
 
+### Jul 22, 2026 — Feed Card Spacing Tightened Further; "Pas encore dispo" Placeholder
+- Removed the remaining margins between the header row and the photo thumbnails entirely (`mb-1`→`mb-0` on the header row, `mt-1`→`mt-0.5` on the photo row; also dropped the now-redundant `mb-1` on the individual price badges, since the right column's own `gap-1` already spaces them) — per feedback, using the France Hexagonale badge's line as the visual reference point for how tight the layout should be.
+- **`App10.jsx` Comparer feed + `HunterDetailModal.jsx`**: the France Hexagonale badge now always renders, even with no data — shows `🇫🇷 Pas encore dispo` in a muted gray badge instead of just omitting the badge, consistent with the "information manquante" honesty pattern already used in `ProductDetailModal.jsx`'s 4-source comparison.
+
 ## Known Issues & Limitations
 None blocking. All migrations to date (`bqp_vote_stats_fix_migration.sql`, `barcode_audit_migration.sql`, `trim_city_cleanup_migration.sql`, `categories_admin_insert_migration.sql`, `product_comments_migration.sql`, `mainland_price_migration.sql`, `mainland_evidence_photo_migration.sql`) — check each file's header comment for apply status as of the date you're reading this; the newest one or two may not yet be applied.
 - See "Jul 21, 2026 — Component-Wide Bug Sweep" above for items flagged but intentionally not changed (admin-role RLS uncertainty, unused badges system).

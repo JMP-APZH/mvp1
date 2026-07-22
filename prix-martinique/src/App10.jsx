@@ -1884,7 +1884,7 @@ const App10 = () => {
                                                     onClick={() => setSelectedProductId(price.productId)}
                                                     className={`bg-white border rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${isCurrentUser ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}
                                                 >
-                                                    <div className="flex justify-between items-start mb-1">
+                                                    <div className="flex justify-between items-start">
                                                         <div className="flex-1">
                                                             <h3 className="font-semibold text-gray-900 flex items-center gap-1">
                                                                 {price.product}
@@ -1897,18 +1897,25 @@ const App10 = () => {
                                                                 {price.price.toFixed(2)}€
                                                             </div>
                                                             {isLowest && (
-                                                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap mb-1">
+                                                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full whitespace-nowrap">
                                                                     <TrendingDown className="inline w-3 h-3" /> Meilleur prix
                                                                 </span>
                                                             )}
-                                                            {mainlandByProduct[price.productId] && (() => {
+                                                            {(() => {
                                                                 const mainland = mainlandByProduct[price.productId];
+                                                                if (!mainland) {
+                                                                    return (
+                                                                        <span className="text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap flex items-center gap-1 bg-gray-100 text-gray-400">
+                                                                            <span>🇫🇷</span> Pas encore dispo
+                                                                        </span>
+                                                                    );
+                                                                }
                                                                 const diff = price.price - mainland.price;
                                                                 const pct = (diff / mainland.price) * 100;
                                                                 const isCheaper = diff < 0;
                                                                 return (
                                                                     <span
-                                                                        className={`text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap mb-1 flex items-center gap-1 ${isCheaper ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                                        className={`text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap flex items-center gap-1 ${isCheaper ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                                                             }`}
                                                                         title={`vs ${mainland.chain || 'France Hexagonale'} : ${mainland.price.toFixed(2)}€`}
                                                                     >
@@ -1962,7 +1969,7 @@ const App10 = () => {
                                                         ].filter(Boolean);
 
                                                         return (
-                                                            <div className="flex gap-2 mt-1 mb-2 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar touch-pan-y overscroll-x-contain">
+                                                            <div className="flex gap-2 mt-0.5 mb-2 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar touch-pan-y overscroll-x-contain">
                                                                 {photoEntries.map((entry, i) => (
                                                                     <div
                                                                         key={entry.label}
