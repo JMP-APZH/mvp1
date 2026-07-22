@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Globe2, Plus, Loader2, Link2, Trash2, ZoomIn, X, Camera } from 'lucide-react';
+import { Plus, Loader2, Link2, Trash2, ZoomIn, X, Camera } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { MAINLAND_CHAINS as CHAINS } from '../constants/mainlandChains';
@@ -177,7 +177,7 @@ const MainlandPriceAdmin = () => {
     return (
         <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs text-blue-800 flex items-start gap-2">
-                <Globe2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span className="flex-shrink-0">🇫🇷</span>
                 <p>
                     Ajoutez un prix de référence trouvé en ligne pour l'équivalent d'un produit en France
                     Hexagonale, avec une capture d'écran du site du magasin comme preuve. Il apparaîtra

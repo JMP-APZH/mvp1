@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import HunterDetailModal from './HunterDetailModal';
 
-const Leaderboard = ({ city }) => {
+const Leaderboard = ({ city, onRequireAuth }) => {
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState('all'); // 'all', 'month', 'week'
@@ -253,7 +253,7 @@ const Leaderboard = ({ city }) => {
       )}
 
       {selectedHunterId && (
-        <HunterDetailModal userId={selectedHunterId} onClose={() => setSelectedHunterId(null)} />
+        <HunterDetailModal userId={selectedHunterId} onClose={() => setSelectedHunterId(null)} onRequireAuth={onRequireAuth} />
       )}
     </div>
   );

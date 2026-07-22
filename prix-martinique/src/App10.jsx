@@ -3,7 +3,7 @@ import BQPVerifier from './components/BQPVerifier';
 import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 
-import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag, Globe2 } from 'lucide-react';
+import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import { MAINLAND_CHAINS } from './constants/mainlandChains';
@@ -1231,7 +1231,7 @@ const App10 = () => {
                                                 : 'bg-white border-gray-200 text-gray-500'
                                                 }`}
                                         >
-                                            <Globe2 className="w-4 h-4" /> France Hexagonale
+                                            <span>🇫🇷</span> France Hexagonale
                                         </button>
                                     </div>
 
@@ -1243,7 +1243,7 @@ const App10 = () => {
                                             <select
                                                 value={manualEntry.mainlandChain}
                                                 onChange={(e) => setManualEntry({ ...manualEntry, mainlandChain: e.target.value })}
-                                                className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                className="w-full bg-white text-gray-900 border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                             >
                                                 <option value="">Choisir une chaîne...</option>
                                                 {MAINLAND_CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1266,7 +1266,7 @@ const App10 = () => {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-lg ${manualEntry.isMainland ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
-                                            {manualEntry.isMainland ? <Globe2 className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
+                                            {manualEntry.isMainland ? <span className="text-lg leading-none">🇫🇷</span> : <MapPin className="w-5 h-5" />}
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">
@@ -1884,7 +1884,7 @@ const App10 = () => {
                                                     onClick={() => setSelectedProductId(price.productId)}
                                                     className={`bg-white border rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${isCurrentUser ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}
                                                 >
-                                                    <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex justify-between items-start mb-1">
                                                         <div className="flex-1">
                                                             <h3 className="font-semibold text-gray-900 flex items-center gap-1">
                                                                 {price.product}
@@ -1912,8 +1912,8 @@ const App10 = () => {
                                                                             }`}
                                                                         title={`vs ${mainland.chain || 'France Hexagonale'} : ${mainland.price.toFixed(2)}€`}
                                                                     >
-                                                                        <Globe2 className="w-3 h-3" />
-                                                                        {diff > 0 ? '+' : ''}{diff.toFixed(2)}€ ({pct > 0 ? '+' : ''}{pct.toFixed(0)}%)
+                                                                        <span>🇫🇷</span>
+                                                                        {mainland.price.toFixed(2)}€ · {diff > 0 ? '+' : ''}{diff.toFixed(2)}€ ({pct > 0 ? '+' : ''}{pct.toFixed(0)}%)
                                                                     </span>
                                                                 );
                                                             })()}
@@ -1962,7 +1962,7 @@ const App10 = () => {
                                                         ].filter(Boolean);
 
                                                         return (
-                                                            <div className="flex gap-2 mt-3 mb-2 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar touch-pan-y overscroll-x-contain">
+                                                            <div className="flex gap-2 mt-1 mb-2 overflow-x-auto overflow-y-hidden pb-1 no-scrollbar touch-pan-y overscroll-x-contain">
                                                                 {photoEntries.map((entry, i) => (
                                                                     <div
                                                                         key={entry.label}
@@ -2028,7 +2028,7 @@ const App10 = () => {
                 {/* Community Tab */}
                 {
                     activeTab === 'community' && (
-                        <Community />
+                        <Community onRequireAuth={() => setShowAuthModal(true)} />
                     )
                 }
                 {/* List Tab */}

@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, Store, Package, Loader2, MapPin } from 'lucide-react';
+import { X, Star, Store, Package, Loader2, MapPin, Tag } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import ProductDetailModal from './ProductDetailModal';
 
-const HunterDetailModal = ({ userId, onClose }) => {
+const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState(null);
     const [items, setItems] = useState([]);
-    const [distinctShops, setDistinctShops] = useState(0);
+    const [categories, setCategories] = useState([]);
+    const [mainlandByProduct, setMainlandByProduct] = useState({});
+    const [categoryFilter, setCategoryFilter] = useState(null);
+    const [storeFilter, setStoreFilter] = useState(null);
+    const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+    const [showStorePicker, setShowStorePicker] = useState(false);
+    const [selectedProductId, setSelectedProductId] = useState(null);
 
     useEffect(() => {
         if (!userId) return;
@@ -23,14 +30,46 @@ const HunterDetailModal = ({ userId, onClose }) => {
 
                 const { data: rows, error } = await supabase
                     .from('prices')
-                    .select('id, price, created_at, store_id, products(name), stores(name, city)')
+                    .select('id, price, created_at, store_id, products(id, name, category_id), stores(id, name, city)')
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
 
                 setItems(rows || []);
-                setDistinctShops(new Set((rows || []).filter(r => r.store_id != null).map(r => r.store_id)).size);
+
+                const { data: categoriesData } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .order('display_order', { ascending: true });
+                setCategories(categoriesData || []);
+
+                // At-a-glance France Hexagonale comparison per item, isolated so a
+                // failure here can't break the rest of the card.
+                try {
+                    const productIds = [...new Set((rows || []).map(r => r.products?.id).filter(Boolean))];
+                    if (productIds.length > 0) {
+                        const { data: mainlandRows, error: mainlandError } = await supabase
+                            .from('prices')
+                            .select('product_id, price, mainland_chain')
+                            .in('product_id', productIds)
+                            .eq('origin_region_code', 'Hexagone');
+                        if (mainlandError) throw mainlandError;
+
+                        const byProduct = {};
+                        (mainlandRows || []).forEach(r => {
+                            if (!byProduct[r.product_id] || r.price < byProduct[r.product_id].price) {
+                                byProduct[r.product_id] = { price: r.price, chain: r.mainland_chain };
+                            }
+                        });
+                        setMainlandByProduct(byProduct);
+                    } else {
+                        setMainlandByProduct({});
+                    }
+                } catch (mainlandErr) {
+                    console.error('Error loading mainland comparison for hunter items:', mainlandErr);
+                    setMainlandByProduct({});
+                }
             } catch (err) {
                 console.error('Error loading hunter detail:', err);
             } finally {
@@ -42,6 +81,24 @@ const HunterDetailModal = ({ userId, onClose }) => {
     }, [userId]);
 
     if (!userId) return null;
+
+    const distinctShops = Array.from(
+        items.reduce((map, item) => {
+            if (item.store_id != null && !map.has(item.store_id)) {
+                map.set(item.store_id, item.stores?.name || 'Magasin inconnu');
+            }
+            return map;
+        }, new Map())
+    ).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+
+    const availableCategoryIds = new Set(items.map(i => i.products?.category_id).filter(Boolean));
+    const pickerCategories = categories.filter(c => availableCategoryIds.has(c.id));
+
+    const filteredItems = items.filter(item => {
+        const matchesCategory = categoryFilter ? item.products?.category_id === categoryFilter : true;
+        const matchesStore = storeFilter ? item.store_id === storeFilter : true;
+        return matchesCategory && matchesStore;
+    });
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -88,41 +145,140 @@ const HunterDetailModal = ({ userId, onClose }) => {
                         </div>
                     ) : (
                         <>
-                            {/* Headline stats, at the top as requested */}
+                            {/* Headline stats, at the top as requested -- both clickable filters */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-orange-50 border border-orange-100 rounded-2xl p-3 text-center">
+                                <button
+                                    onClick={() => { setShowCategoryPicker(v => !v); setShowStorePicker(false); }}
+                                    className={`rounded-2xl p-3 text-center border transition-colors ${categoryFilter || showCategoryPicker
+                                        ? 'bg-orange-100 border-orange-300'
+                                        : 'bg-orange-50 border-orange-100 hover:bg-orange-100'
+                                        }`}
+                                >
                                     <div className="text-xl font-black text-orange-600">{items.length}</div>
                                     <p className="text-[9px] uppercase tracking-wider font-bold text-orange-400 mt-1">Prix collectés</p>
-                                </div>
-                                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 text-center">
-                                    <div className="text-xl font-black text-blue-600">{distinctShops}</div>
+                                </button>
+                                <button
+                                    onClick={() => { setShowStorePicker(v => !v); setShowCategoryPicker(false); }}
+                                    className={`rounded-2xl p-3 text-center border transition-colors ${storeFilter || showStorePicker
+                                        ? 'bg-blue-100 border-blue-300'
+                                        : 'bg-blue-50 border-blue-100 hover:bg-blue-100'
+                                        }`}
+                                >
+                                    <div className="text-xl font-black text-blue-600">{distinctShops.length}</div>
                                     <p className="text-[9px] uppercase tracking-wider font-bold text-blue-400 mt-1">Magasins visités</p>
-                                </div>
+                                </button>
                             </div>
+
+                            {/* Category picker overlay */}
+                            {showCategoryPicker && (
+                                <div className="bg-white border border-gray-200 rounded-2xl shadow-lg p-4 animate-in fade-in slide-in-from-top-2">
+                                    {pickerCategories.length === 0 ? (
+                                        <p className="text-xs text-gray-400 text-center py-2">Aucune catégorie disponible.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-4 gap-3">
+                                            {pickerCategories.map(cat => (
+                                                <button
+                                                    key={cat.id}
+                                                    onClick={() => { setCategoryFilter(cat.id); setShowCategoryPicker(false); }}
+                                                    className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-orange-50 transition-colors"
+                                                >
+                                                    <span className="text-2xl">{cat.icon}</span>
+                                                    <span className="text-[10px] text-gray-600 font-medium text-center leading-tight">{cat.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Store picker overlay */}
+                            {showStorePicker && (
+                                <div className="bg-white border border-gray-200 rounded-2xl shadow-lg p-2 max-h-64 overflow-y-auto animate-in fade-in slide-in-from-top-2">
+                                    {distinctShops.length === 0 ? (
+                                        <p className="text-xs text-gray-400 text-center py-2">Aucun magasin disponible.</p>
+                                    ) : (
+                                        distinctShops.map(s => (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => { setStoreFilter(s.id); setShowStorePicker(false); }}
+                                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 transition-colors flex items-center gap-2"
+                                            >
+                                                <Store className="w-4 h-4 text-gray-400 flex-shrink-0" /> {s.name}
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Active filter chips */}
+                            {(categoryFilter || storeFilter) && (
+                                <div className="flex flex-wrap gap-2">
+                                    {categoryFilter && (
+                                        <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                                            <Tag className="w-3.5 h-3.5 text-orange-600" />
+                                            <span className="text-xs font-medium text-orange-800">
+                                                {categories.find(c => c.id === categoryFilter)?.name}
+                                            </span>
+                                            <button onClick={() => setCategoryFilter(null)} className="p-0.5 hover:bg-orange-100 rounded-full text-orange-600">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
+                                    {storeFilter && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                                            <Store className="w-3.5 h-3.5 text-blue-600" />
+                                            <span className="text-xs font-medium text-blue-800">
+                                                {distinctShops.find(s => s.id === storeFilter)?.name}
+                                            </span>
+                                            <button onClick={() => setStoreFilter(null)} className="p-0.5 hover:bg-blue-100 rounded-full text-blue-600">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Collected products list */}
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                                     <Package className="w-4 h-4 text-orange-500" /> Produits collectés
                                 </h3>
-                                {items.length > 0 ? (
+                                {filteredItems.length > 0 ? (
                                     <div className="space-y-2">
-                                        {items.map(item => (
-                                            <div key={item.id} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white">
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-gray-900 truncate">{item.products?.name || 'Produit inconnu'}</p>
-                                                    <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                                        <Store className="w-2.5 h-2.5" /> {item.stores?.name || 'Magasin inconnu'}
-                                                    </p>
+                                        {filteredItems.map(item => {
+                                            const mainland = mainlandByProduct[item.products?.id];
+                                            const diff = mainland ? item.price - mainland.price : null;
+                                            const pct = mainland ? (diff / mainland.price) * 100 : null;
+                                            const isCheaper = diff != null && diff < 0;
+
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => setSelectedProductId(item.products?.id)}
+                                                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white cursor-pointer hover:shadow-md hover:border-orange-200 transition-all"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-gray-900 truncate">{item.products?.name || 'Produit inconnu'}</p>
+                                                        <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                                            <Store className="w-2.5 h-2.5" /> {item.stores?.name || 'Magasin inconnu'}
+                                                        </p>
+                                                        {mainland && (
+                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full mt-1 ${isCheaper ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                                }`}>
+                                                                <span>🇫🇷</span>
+                                                                {mainland.price.toFixed(2)}€ · {diff > 0 ? '+' : ''}{diff.toFixed(2)}€ ({pct > 0 ? '+' : ''}{pct.toFixed(0)}%)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right flex-shrink-0 pl-2">
+                                                        <div className="text-base font-black text-gray-900">{item.price.toFixed(2)}€</div>
+                                                        <p className="text-[10px] text-gray-400">
+                                                            {new Date(item.created_at).toLocaleDateString('fr-FR')}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div className="text-right flex-shrink-0 pl-2">
-                                                    <div className="text-base font-black text-gray-900">{item.price.toFixed(2)}€</div>
-                                                    <p className="text-[10px] text-gray-400">
-                                                        {new Date(item.created_at).toLocaleDateString('fr-FR')}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <p className="text-xs text-gray-400">Aucun prix collecté pour le moment.</p>
@@ -132,6 +288,14 @@ const HunterDetailModal = ({ userId, onClose }) => {
                     )}
                 </div>
             </div>
+
+            {selectedProductId && (
+                <ProductDetailModal
+                    productId={selectedProductId}
+                    onClose={() => setSelectedProductId(null)}
+                    onRequireAuth={onRequireAuth}
+                />
+            )}
         </div>
     );
 };

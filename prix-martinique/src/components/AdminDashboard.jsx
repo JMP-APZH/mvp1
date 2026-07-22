@@ -11,8 +11,7 @@ import {
     ShieldCheck,
     MapPin,
     X,
-    Wrench,
-    Globe2
+    Wrench
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import ProductCompletion from './ProductCompletion';
@@ -157,7 +156,7 @@ const AdminDashboard = ({ onClose }) => {
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'mainland' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
                             }`}
                     >
-                        <Globe2 className="w-3.5 h-3.5" /> Prix France Hexagonale
+                        <span>🇫🇷</span> Prix France Hexagonale
                     </button>
                 </div>
             </div>

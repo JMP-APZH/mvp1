@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import Leaderboard from './Leaderboard';
 
-const Community = () => {
+const Community = ({ onRequireAuth }) => {
     const [subTab, setSubTab] = useState('ranking'); // 'ranking', 'voting', 'stats'
     const [featureRequests, setFeatureRequests] = useState([]);
     const [loadingFeatures, setLoadingFeatures] = useState(false);
@@ -237,7 +237,7 @@ const Community = () => {
                                 ))}
                             </select>
                         </div>
-                        <Leaderboard city={selectedCity} />
+                        <Leaderboard city={selectedCity} onRequireAuth={onRequireAuth} />
                     </div>
                 )}
 
