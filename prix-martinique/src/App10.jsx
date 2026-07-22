@@ -3,9 +3,10 @@ import BQPVerifier from './components/BQPVerifier';
 import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 
-import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
+import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag, Globe2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
+import { MAINLAND_CHAINS } from './constants/mainlandChains';
 import AuthModal from './components/AuthModal';
 import UserMenu from './components/UserMenu';
 import Leaderboard from './components/Leaderboard';
@@ -65,6 +66,8 @@ const App10 = () => {
         barcode: '',
         price: '',
         storeId: '',
+        isMainland: false,
+        mainlandChain: '',
         userName: '',
         productPhoto: null,
         priceTagPhoto: null,
@@ -293,14 +296,17 @@ const App10 = () => {
             if (product) {
                 setScannedProduct(product);
 
-                // Fetch the most recent price for this product
-                const { data: latestPriceData } = await supabase
+                // Fetch the most recent *local* price for this product. Filtered
+                // client-side, not via .neq('origin_region_code', 'Hexagone') --
+                // that drops NULL rows entirely (SQL three-valued logic), and most
+                // existing prices have a null origin_region_code.
+                const { data: recentPriceRows } = await supabase
                     .from('prices')
                     .select('*, stores(name)')
                     .eq('product_id', product.id)
                     .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                    .limit(5);
+                const latestPriceData = (recentPriceRows || []).find(r => r.origin_region_code !== 'Hexagone') || null;
 
                 // 2. Fetch Mainland Counterpart (Live Diaspora Scan)
                 const { data: mainlandPriceData } = await supabase
@@ -605,7 +611,8 @@ const App10 = () => {
     };
 
     const submitPrice = async () => {
-        if (!manualEntry.productName || !manualEntry.price || !manualEntry.storeId) {
+        const hasLocation = manualEntry.isMainland ? manualEntry.mainlandChain : manualEntry.storeId;
+        if (!manualEntry.productName || !manualEntry.price || !hasLocation) {
             toast.error('Veuillez remplir tous les champs obligatoires (produit, prix, magasin)');
             return;
         }
@@ -721,18 +728,26 @@ const App10 = () => {
             // Step 3: Insert price with photo URLs and user_id if authenticated
             const priceData = {
                 product_id: productId,
-                store_id: manualEntry.storeId,
+                store_id: manualEntry.isMainland ? null : manualEntry.storeId,
                 price: parseFloat(manualEntry.price),
                 user_name: manualEntry.userName || 'Anonyme',
                 product_photo_url: productPhotoUrl,
                 price_tag_photo_url: priceTagPhotoUrl
             };
 
+            if (manualEntry.isMainland) {
+                // Community scan from France Hexagonale -- same shape ProductDetailModal's
+                // "communauté" comparison slot and the scan-flow "Duel des Prix" already expect.
+                priceData.origin_region_code = 'Hexagone';
+                priceData.mainland_chain = manualEntry.mainlandChain;
+                priceData.source_type = 'scan';
+            }
+
             // Add user_id if authenticated and tag origin
             if (user) {
                 priceData.user_id = user.id;
-                // Add geographical origin for backend analysis
-                if (userProfile) {
+                // Add geographical origin for backend analysis (skip if already set above for a mainland scan)
+                if (userProfile && !manualEntry.isMainland) {
                     priceData.origin_region_code = userProfile.region_code;
                     priceData.origin_city = userProfile.city;
                 }
@@ -797,6 +812,8 @@ const App10 = () => {
                 barcode: '',
                 price: '',
                 storeId: prev.storeId, // Keep shop selection persistent!
+                isMainland: prev.isMainland, // Keep region/chain selection persistent!
+                mainlandChain: prev.mainlandChain,
                 userName: userProfile?.display_name || prev.userName, // Keep username
                 productPhoto: null,
                 priceTagPhoto: null,
@@ -1151,36 +1168,81 @@ const App10 = () => {
 
                         {/* Shop Selection - NOW FIRST */}
                         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm mb-4">
-                            {!manualEntry.storeId ? (
+                            {!manualEntry.storeId && !manualEntry.mainlandChain ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2 text-orange-600 mb-2">
                                         <MapPin className="w-5 h-5" />
                                         <h3 className="font-bold">Où êtes-vous ?</h3>
                                     </div>
-                                    <p className="text-sm text-gray-600 italic">
-                                        Sélectionnez votre magasin pour commencer à scanner
-                                    </p>
-                                    <StoreSelectionWizard
-                                        supabase={supabase}
-                                        selectedStoreId={manualEntry.storeId}
-                                        onStoreSelect={(storeId) => setManualEntry({ ...manualEntry, storeId })}
-                                    />
+
+                                    {/* Region toggle */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            onClick={() => setManualEntry({ ...manualEntry, isMainland: false, mainlandChain: '' })}
+                                            className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-bold border transition-colors ${!manualEntry.isMainland
+                                                ? 'bg-orange-50 border-orange-300 text-orange-700'
+                                                : 'bg-white border-gray-200 text-gray-500'
+                                                }`}
+                                        >
+                                            🇲🇶 Martinique
+                                        </button>
+                                        <button
+                                            onClick={() => setManualEntry({ ...manualEntry, isMainland: true, storeId: '' })}
+                                            className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-bold border transition-colors ${manualEntry.isMainland
+                                                ? 'bg-blue-50 border-blue-300 text-blue-700'
+                                                : 'bg-white border-gray-200 text-gray-500'
+                                                }`}
+                                        >
+                                            <Globe2 className="w-4 h-4" /> France Hexagonale
+                                        </button>
+                                    </div>
+
+                                    {manualEntry.isMainland ? (
+                                        <>
+                                            <p className="text-sm text-gray-600 italic">
+                                                Sélectionnez la chaîne du magasin où vous avez trouvé ce prix
+                                            </p>
+                                            <select
+                                                value={manualEntry.mainlandChain}
+                                                onChange={(e) => setManualEntry({ ...manualEntry, mainlandChain: e.target.value })}
+                                                className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                            >
+                                                <option value="">Choisir une chaîne...</option>
+                                                {MAINLAND_CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm text-gray-600 italic">
+                                                Sélectionnez votre magasin pour commencer à scanner
+                                            </p>
+                                            <StoreSelectionWizard
+                                                supabase={supabase}
+                                                selectedStoreId={manualEntry.storeId}
+                                                onStoreSelect={(storeId) => setManualEntry({ ...manualEntry, storeId })}
+                                            />
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="bg-green-100 p-2 rounded-lg text-green-600">
-                                            <MapPin className="w-5 h-5" />
+                                        <div className={`p-2 rounded-lg ${manualEntry.isMainland ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                                            {manualEntry.isMainland ? <Globe2 className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
                                         </div>
                                         <div>
-                                            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Magasin Actuel</p>
+                                            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">
+                                                {manualEntry.isMainland ? 'Chaîne actuelle (France Hexagonale)' : 'Magasin Actuel'}
+                                            </p>
                                             <h3 className="font-bold text-gray-900">
-                                                {stores.find(s => String(s.id) === String(manualEntry.storeId))?.name || "Magasin sélectionné"}
+                                                {manualEntry.isMainland
+                                                    ? manualEntry.mainlandChain
+                                                    : (stores.find(s => String(s.id) === String(manualEntry.storeId))?.name || "Magasin sélectionné")}
                                             </h3>
                                         </div>
                                     </div>
                                     <button
-                                        onClick={() => setManualEntry({ ...manualEntry, storeId: '' })}
+                                        onClick={() => setManualEntry({ ...manualEntry, storeId: '', mainlandChain: '' })}
                                         className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100 transition-colors"
                                     >
                                         Changer
@@ -1189,7 +1251,7 @@ const App10 = () => {
                             )}
                         </div>
 
-                        {manualEntry.storeId && (
+                        {(manualEntry.storeId || manualEntry.mainlandChain) && (
                             <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
                                 {/* Scanner UI */}
                                 <div className="space-y-4">
@@ -1349,7 +1411,7 @@ const App10 = () => {
                                                     localPrice={bqpCheckResult.latestPrice?.price || parseFloat(manualEntry.price) || 0}
                                                     mainlandPrice={bqpCheckResult.mainlandPrice.price}
                                                     productName={bqpCheckResult.product?.name || manualEntry.productName}
-                                                    mainlandOrigin="France Continentale"
+                                                    mainlandOrigin={bqpCheckResult.mainlandPrice.mainland_chain || "France Continentale"}
                                                 />
                                             )}
                                             <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">

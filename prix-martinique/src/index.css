@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  /* This app is light-themed only. Without this, browsers style native
+     form controls (input, select) using the OS/browser dark-mode
+     preference regardless of the page's own light background -- typed
+     text can render white-on-white and appear invisible while typing. */
+  color-scheme: light;
+}
+
 html, body {
   background-color: white;
   margin: 0;

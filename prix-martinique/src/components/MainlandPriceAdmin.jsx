@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Globe2, Plus, Loader2, Link2, Trash2, ZoomIn, X, Camera } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-
-const CHAINS = ['Carrefour', 'E.Leclerc', 'Système U', 'Auchan', 'Autre'];
+import { MAINLAND_CHAINS as CHAINS } from '../constants/mainlandChains';
 
 const MainlandPriceAdmin = () => {
     const { user } = useAuth();
