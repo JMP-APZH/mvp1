@@ -46,6 +46,7 @@ const App10 = () => {
     const [showScanner, setShowScanner] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [recentPrices, setRecentPrices] = useState([]);
+    const [mainlandByProduct, setMainlandByProduct] = useState({});
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -229,6 +230,7 @@ const App10 = () => {
                   created_at,
                   product_photo_url,
                   price_tag_photo_url,
+                  origin_region_code,
                   products (id, name, barcode, category_id, is_local_production),
                   stores (id, name, full_address),
                   price_likes (user_id)
@@ -238,7 +240,14 @@ const App10 = () => {
 
             if (error) throw error;
 
-            const transformedPrices = data.map(item => ({
+            // France Hexagonale reference/community prices are a different market --
+            // they belong in the product detail card's comparison section, not as
+            // regular Martinique scan cards in this feed (they have no store_id and
+            // typically no product photo, since they're often admin-entered from an
+            // evidence screenshot rather than a real in-store scan).
+            const localData = data.filter(item => item.origin_region_code !== 'Hexagone');
+
+            const transformedPrices = localData.map(item => ({
                 id: item.id,
                 productId: item.products?.id,
                 categoryId: item.products?.category_id,
@@ -259,6 +268,35 @@ const App10 = () => {
             }));
 
             setRecentPrices(transformedPrices);
+
+            // At-a-glance France Hexagonale diff badge on each card: cheapest
+            // mainland reference/community price per product. Isolated in its
+            // own try/catch -- a failure here must not break the feed above.
+            try {
+                const productIds = [...new Set(transformedPrices.map(p => p.productId).filter(Boolean))];
+                if (productIds.length > 0) {
+                    const { data: mainlandRows, error: mainlandError } = await supabase
+                        .from('prices')
+                        .select('product_id, price, mainland_chain')
+                        .in('product_id', productIds)
+                        .eq('origin_region_code', 'Hexagone');
+                    if (mainlandError) throw mainlandError;
+
+                    const byProduct = {};
+                    (mainlandRows || []).forEach(r => {
+                        if (!byProduct[r.product_id] || r.price < byProduct[r.product_id].price) {
+                            byProduct[r.product_id] = { price: r.price, chain: r.mainland_chain };
+                        }
+                    });
+                    setMainlandByProduct(byProduct);
+                } else {
+                    setMainlandByProduct({});
+                }
+            } catch (mainlandErr) {
+                console.error('Error loading mainland comparison data:', mainlandErr);
+                setMainlandByProduct({});
+            }
+
             setLoading(false);
         } catch (err) {
             console.error('Error loading prices:', err);
@@ -1863,6 +1901,22 @@ const App10 = () => {
                                                                     <TrendingDown className="inline w-3 h-3" /> Meilleur prix
                                                                 </span>
                                                             )}
+                                                            {mainlandByProduct[price.productId] && (() => {
+                                                                const mainland = mainlandByProduct[price.productId];
+                                                                const diff = price.price - mainland.price;
+                                                                const pct = (diff / mainland.price) * 100;
+                                                                const isCheaper = diff < 0;
+                                                                return (
+                                                                    <span
+                                                                        className={`text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap mb-1 flex items-center gap-1 ${isCheaper ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                                            }`}
+                                                                        title={`vs ${mainland.chain || 'France Hexagonale'} : ${mainland.price.toFixed(2)}€`}
+                                                                    >
+                                                                        <Globe2 className="w-3 h-3" />
+                                                                        {diff > 0 ? '+' : ''}{diff.toFixed(2)}€ ({pct > 0 ? '+' : ''}{pct.toFixed(0)}%)
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                             <div className="flex gap-2">
                                                                 <button
                                                                     onClick={(e) => {
