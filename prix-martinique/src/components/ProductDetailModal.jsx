@@ -1,9 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { X, ScanLine, Store, TrendingDown, TrendingUp, Leaf, MapPin, Loader2, MessageSquare, Heart, Share2, Link2, Trophy, Check, Globe2 } from 'lucide-react';
+import { X, ScanLine, Store, Leaf, MapPin, Loader2, MessageSquare, Heart, Share2, Link2, Trophy, Check, Globe2, Users, Camera, HelpCircle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import PriceHistoryChart from './PriceHistoryChart';
-import PriceDuel from './PriceDuel';
+
+// One row of the 4-source price comparison. Renders a price + source-diff
+// badge when data exists, or an honest "information manquante" placeholder
+// when it doesn't -- never just hides the row, so it's clear what's missing.
+const ComparisonSource = ({ icon: Icon, label, iconColor, children, empty, emptyText }) => (
+    <div className="border border-gray-100 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+            <Icon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
+            <span className="text-xs font-bold text-gray-700">{label}</span>
+        </div>
+        {empty ? (
+            <p className="text-xs text-gray-400 italic px-3 py-3">{emptyText || 'Information manquante'}</p>
+        ) : (
+            <div className="p-3">{children}</div>
+        )}
+    </div>
+);
+
+const DiffBadge = ({ diff }) => {
+    if (!diff) return null;
+    const isCheaper = diff.abs < 0;
+    const isSame = Math.abs(diff.abs) < 0.005;
+    return (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${isSame ? 'bg-gray-100 text-gray-500' : isCheaper ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
+            {isSame ? 'Identique' : `${diff.abs > 0 ? '+' : ''}${diff.abs.toFixed(2)}€ (${diff.pct > 0 ? '+' : ''}${diff.pct.toFixed(0)}%)`}
+        </span>
+    );
+};
 
 const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
     const { user } = useAuth();
@@ -13,6 +41,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
     const [stats, setStats] = useState(null);
     const [priceHistory, setPriceHistory] = useState([]);
     const [storeComparison, setStoreComparison] = useState([]);
+    const [latestLocal, setLatestLocal] = useState(null);
     const [mainlandPrices, setMainlandPrices] = useState([]);
     const [zoomedEvidence, setZoomedEvidence] = useState(null);
     const [comments, setComments] = useState([]);
@@ -31,7 +60,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                 .select('price, mainland_chain, source_type, source_url, evidence_photo_url, created_at')
                 .eq('product_id', productId)
                 .eq('origin_region_code', 'Hexagone')
-                .order('price', { ascending: true });
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
 
@@ -41,6 +70,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                 sourceType: r.source_type,
                 sourceUrl: r.source_url,
                 evidencePhotoUrl: r.evidence_photo_url,
+                createdAt: r.created_at,
                 date: new Date(r.created_at).toLocaleDateString('fr-FR'),
             })));
         } catch (err) {
@@ -169,6 +199,16 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
 
                 const photoRow = [...rows].reverse().find(r => r.product_photo_url);
                 setPhotoUrl(photoRow?.product_photo_url || null);
+
+                // Most recent Martinique scan -- the reference price every other
+                // source in the comparison section is measured against.
+                const lastLocalRow = rows[rows.length - 1];
+                setLatestLocal(lastLocalRow ? {
+                    price: lastLocalRow.price,
+                    storeId: lastLocalRow.store_id,
+                    storeName: lastLocalRow.stores?.name || 'Magasin inconnu',
+                    date: new Date(lastLocalRow.created_at).toLocaleDateString('fr-FR'),
+                } : null);
 
                 const prices = rows.map(r => r.price);
                 const distinctShops = new Set(rows.filter(r => r.store_id != null).map(r => r.store_id)).size;
@@ -311,54 +351,141 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                 </div>
                             </div>
 
-                            {/* Diaspora price comparison */}
-                            {stats?.min != null && mainlandPrices.length > 0 && (
-                                <PriceDuel
-                                    localPrice={stats.min}
-                                    mainlandPrice={mainlandPrices[0].price}
-                                    productName={product?.name}
-                                    mainlandOrigin={mainlandPrices[0].chain}
-                                    localStore="Meilleur prix Martinique"
-                                />
-                            )}
+                            {/* 4-source price comparison */}
+                            {(() => {
+                                const communityEntry = mainlandPrices.find(m => m.sourceType === 'scan');
+                                const onlineEntry = mainlandPrices.find(m => m.sourceType === 'admin_reference');
+                                const otherStores = storeComparison.filter(s => s.storeId !== latestLocal?.storeId);
+                                const diffOf = (price) => (price != null && latestLocal?.price != null)
+                                    ? { abs: price - latestLocal.price, pct: ((price - latestLocal.price) / latestLocal.price) * 100 }
+                                    : null;
 
-                            {mainlandPrices.length > 0 && (
-                                <div>
-                                    <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                        <Globe2 className="w-4 h-4 text-blue-500" /> Prix en France Hexagonale
-                                    </h3>
-                                    <div className="space-y-2">
-                                        {mainlandPrices.map((m, i) => (
-                                            <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-blue-100 bg-blue-50">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    {m.evidencePhotoUrl && (
-                                                        <button
-                                                            onClick={() => setZoomedEvidence(m.evidencePhotoUrl)}
-                                                            className="flex-shrink-0"
-                                                            title="Voir la preuve"
-                                                        >
-                                                            <img src={m.evidencePhotoUrl} alt="Preuve" className="w-10 h-10 rounded object-cover border border-blue-200" />
-                                                        </button>
-                                                    )}
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-bold text-gray-900 truncate">{m.chain}</p>
-                                                        <p className="text-[10px] text-gray-500 flex items-center gap-2">
-                                                            {m.sourceType === 'admin_reference' ? 'Source en ligne' : 'Scan communautaire'}
-                                                            {m.sourceUrl && (
-                                                                <a href={m.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">lien</a>
-                                                            )}
-                                                        </p>
+                                return (
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                            <Globe2 className="w-4 h-4 text-orange-500" /> Comparaison des prix
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {/* Source 1: Martinique */}
+                                            <ComparisonSource
+                                                icon={ScanLine}
+                                                iconColor="text-orange-500"
+                                                label="Martinique (dernier scan)"
+                                                empty={!latestLocal}
+                                            >
+                                                {latestLocal && (
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-bold text-gray-900 truncate">{latestLocal.storeName}</p>
+                                                            <p className="text-[10px] text-gray-400">{latestLocal.date}</p>
+                                                        </div>
+                                                        <div className="text-lg font-black text-gray-900 flex-shrink-0 pl-2">
+                                                            {latestLocal.price.toFixed(2)}€
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div className="text-right flex-shrink-0 pl-2">
-                                                    <div className="text-base font-black text-blue-700">{m.price.toFixed(2)}€</div>
-                                                    <p className="text-[10px] text-gray-400">{m.date}</p>
-                                                </div>
-                                            </div>
-                                        ))}
+                                                )}
+                                            </ComparisonSource>
+
+                                            {/* Source 2: France Hexagonale, community scan */}
+                                            <ComparisonSource
+                                                icon={Users}
+                                                iconColor="text-purple-500"
+                                                label="France Hexagonale — communauté"
+                                                empty={!communityEntry}
+                                                emptyText="Information manquante — aucun chasseur de prix basé en France Hexagonale n'a encore scanné ce produit."
+                                            >
+                                                {communityEntry && (
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-bold text-gray-900 truncate">{communityEntry.chain}</p>
+                                                            <p className="text-[10px] text-gray-400">{communityEntry.date}</p>
+                                                        </div>
+                                                        <div className="text-right flex-shrink-0 pl-2">
+                                                            <div className="text-lg font-black text-gray-900">{communityEntry.price.toFixed(2)}€</div>
+                                                            <DiffBadge diff={diffOf(communityEntry.price)} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </ComparisonSource>
+
+                                            {/* Source 3: France Hexagonale, admin online capture */}
+                                            <ComparisonSource
+                                                icon={Camera}
+                                                iconColor="text-blue-500"
+                                                label="France Hexagonale — capture en ligne"
+                                                empty={!onlineEntry}
+                                                emptyText="Information manquante — aucune capture en ligne n'a encore été ajoutée pour ce produit."
+                                            >
+                                                {onlineEntry && (
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            {onlineEntry.evidencePhotoUrl && (
+                                                                <button
+                                                                    onClick={() => setZoomedEvidence(onlineEntry.evidencePhotoUrl)}
+                                                                    className="flex-shrink-0"
+                                                                    title="Voir la preuve"
+                                                                >
+                                                                    <img src={onlineEntry.evidencePhotoUrl} alt="Preuve" className="w-10 h-10 rounded object-cover border border-gray-200" />
+                                                                </button>
+                                                            )}
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-bold text-gray-900 truncate">{onlineEntry.chain}</p>
+                                                                <p className="text-[10px] text-gray-400 flex items-center gap-2">
+                                                                    {onlineEntry.date}
+                                                                    {onlineEntry.sourceUrl && (
+                                                                        <a href={onlineEntry.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">lien</a>
+                                                                    )}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right flex-shrink-0 pl-2">
+                                                            <div className="text-lg font-black text-gray-900">{onlineEntry.price.toFixed(2)}€</div>
+                                                            <DiffBadge diff={diffOf(onlineEntry.price)} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </ComparisonSource>
+
+                                            {/* Source 4: other Martinique shops, same barcode */}
+                                            <ComparisonSource
+                                                icon={Store}
+                                                iconColor="text-green-600"
+                                                label="Autres magasins en Martinique"
+                                                empty={otherStores.length === 0}
+                                                emptyText="Information manquante — aucun autre magasin n'a encore scanné ce code-barres."
+                                            >
+                                                {otherStores.length > 0 && (
+                                                    <div className="space-y-2">
+                                                        {otherStores.map(s => {
+                                                            const d = diffOf(s.price);
+                                                            return (
+                                                                <div key={s.storeId} className="flex items-center justify-between gap-2">
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-sm font-bold text-gray-900 truncate">{s.storeName}</p>
+                                                                        {s.city && (
+                                                                            <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                                                                                <MapPin className="w-2.5 h-2.5" /> {s.city}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-right flex-shrink-0 pl-2">
+                                                                        <div className="text-base font-black text-gray-900">{s.price.toFixed(2)}€</div>
+                                                                        <DiffBadge diff={d} />
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </ComparisonSource>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-2 flex items-start gap-1">
+                                            <HelpCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                                            Écarts calculés par rapport au dernier prix scanné en Martinique. Vert = moins cher, rouge = plus cher.
+                                        </p>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {/* Price trend */}
                             {priceHistory.length >= 2 ? (
@@ -368,48 +495,6 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                     Pas encore assez de scans pour afficher une tendance.
                                 </div>
                             )}
-
-                            {/* Cross-store comparison */}
-                            <div>
-                                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                    <Store className="w-4 h-4 text-orange-500" /> Comparaison en Martinique
-                                </h3>
-                                {storeComparison.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {storeComparison.map((s, i) => {
-                                            const isCheapest = i === 0 && storeComparison.length > 1;
-                                            const isMostExpensive = i === storeComparison.length - 1 && storeComparison.length > 1;
-                                            return (
-                                                <div
-                                                    key={s.storeId}
-                                                    className={`flex items-center justify-between p-3 rounded-xl border ${isCheapest ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'
-                                                        }`}
-                                                >
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-bold text-gray-900 truncate">{s.storeName}</p>
-                                                        {s.city && (
-                                                            <p className="text-[10px] text-gray-400 flex items-center gap-1">
-                                                                <MapPin className="w-2.5 h-2.5" /> {s.city}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-right flex-shrink-0 pl-2">
-                                                        <div className={`text-base font-black flex items-center gap-1 justify-end ${isCheapest ? 'text-green-600' : isMostExpensive ? 'text-red-500' : 'text-gray-900'
-                                                            }`}>
-                                                            {isCheapest && <TrendingDown className="w-3.5 h-3.5" />}
-                                                            {isMostExpensive && <TrendingUp className="w-3.5 h-3.5" />}
-                                                            {s.price.toFixed(2)}€
-                                                        </div>
-                                                        <p className="text-[10px] text-gray-400">{s.date}</p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <p className="text-xs text-gray-400">Aucune donnée de magasin disponible.</p>
-                                )}
-                            </div>
 
                             {/* Comments */}
                             <div>

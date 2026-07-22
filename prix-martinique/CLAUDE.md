@@ -134,6 +134,16 @@ Feedback after first hands-on test: requiring a manual search before seeing anyt
 - **`ProductDetailModal.jsx`** updated to match: each mainland price entry now shows its evidence photo as a clickable thumbnail (own lightweight zoom overlay, `zoomedEvidence` state) alongside the existing source-link.
 - Mainland-column loading in the new list is isolated in its own try/catch (same reasoning as `loadMainlandPrices` in `ProductDetailModal.jsx`) — the browsable product list itself doesn't depend on `mainland_price_migration.sql`/`mainland_evidence_photo_migration.sql` having run; only the "existing entries" chips do, and they degrade to empty rather than breaking the list.
 
+### Jul 22, 2026 — Product Card: Explicit 4-Source Price Comparison
+Replaced the ad-hoc `PriceDuel` + generic "Prix en France Hexagonale" list in `ProductDetailModal.jsx` with a structured comparison always showing exactly 4 labeled sources, each either a real price + diff badge or an honest "Information manquante" placeholder (never silently hidden):
+
+1. **Martinique (dernier scan)** — the reference every other source is compared against. Computed as the most recent non-Hexagone `prices` row for the product (`latestLocal`), not the cheapest — "dernier scan" (last scan), matching what a shopper would have most recently seen, as opposed to the pre-existing "Meilleur prix" headline stat (which stays, unchanged, as a separate vanity stat).
+2. **France Hexagonale — communauté**: most recent entry with `source_type = 'scan'`. Always empty today (Option 1 — French community contributors — still isn't buildable, see the Jul 21 entry above).
+3. **France Hexagonale — capture en ligne**: most recent entry with `source_type = 'admin_reference'`, including its evidence photo as a clickable thumbnail if one was attached.
+4. **Autres magasins en Martinique**: every other Martinique store price for this product (`storeComparison`, minus whichever store is source 1), each with its own diff badge.
+
+Diff badges (`abs €` and `%`) are always computed against source 1, colored green when the source is cheaper and red when it's more expensive — verified live against a real 2-store product (Pli Bel Price François 2.10€ as reference vs. Leclerc 1.75€ → correctly shows `-0.35€ (-17%)` in green).
+
 ## Known Issues & Limitations
 None blocking. All migrations to date (`bqp_vote_stats_fix_migration.sql`, `barcode_audit_migration.sql`, `trim_city_cleanup_migration.sql`, `categories_admin_insert_migration.sql`, `product_comments_migration.sql`, `mainland_price_migration.sql`, `mainland_evidence_photo_migration.sql`) — check each file's header comment for apply status as of the date you're reading this; the newest one or two may not yet be applied.
 - See "Jul 21, 2026 — Component-Wide Bug Sweep" above for items flagged but intentionally not changed (admin-role RLS uncertainty, unused badges system).
