@@ -14,6 +14,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
     const [priceHistory, setPriceHistory] = useState([]);
     const [storeComparison, setStoreComparison] = useState([]);
     const [mainlandPrices, setMainlandPrices] = useState([]);
+    const [zoomedEvidence, setZoomedEvidence] = useState(null);
     const [comments, setComments] = useState([]);
     const [topHunterIds, setTopHunterIds] = useState(new Set());
     const [newComment, setNewComment] = useState('');
@@ -27,7 +28,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
         try {
             const { data, error } = await supabase
                 .from('prices')
-                .select('price, mainland_chain, source_type, source_url, created_at')
+                .select('price, mainland_chain, source_type, source_url, evidence_photo_url, created_at')
                 .eq('product_id', productId)
                 .eq('origin_region_code', 'Hexagone')
                 .order('price', { ascending: true });
@@ -39,6 +40,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                 price: r.price,
                 sourceType: r.source_type,
                 sourceUrl: r.source_url,
+                evidencePhotoUrl: r.evidence_photo_url,
                 date: new Date(r.created_at).toLocaleDateString('fr-FR'),
             })));
         } catch (err) {
@@ -328,14 +330,25 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                     <div className="space-y-2">
                                         {mainlandPrices.map((m, i) => (
                                             <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-blue-100 bg-blue-50">
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-gray-900 truncate">{m.chain}</p>
-                                                    <p className="text-[10px] text-gray-500 flex items-center gap-2">
-                                                        {m.sourceType === 'admin_reference' ? 'Source en ligne' : 'Scan communautaire'}
-                                                        {m.sourceUrl && (
-                                                            <a href={m.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">lien</a>
-                                                        )}
-                                                    </p>
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    {m.evidencePhotoUrl && (
+                                                        <button
+                                                            onClick={() => setZoomedEvidence(m.evidencePhotoUrl)}
+                                                            className="flex-shrink-0"
+                                                            title="Voir la preuve"
+                                                        >
+                                                            <img src={m.evidencePhotoUrl} alt="Preuve" className="w-10 h-10 rounded object-cover border border-blue-200" />
+                                                        </button>
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-gray-900 truncate">{m.chain}</p>
+                                                        <p className="text-[10px] text-gray-500 flex items-center gap-2">
+                                                            {m.sourceType === 'admin_reference' ? 'Source en ligne' : 'Scan communautaire'}
+                                                            {m.sourceUrl && (
+                                                                <a href={m.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">lien</a>
+                                                            )}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                                 <div className="text-right flex-shrink-0 pl-2">
                                                     <div className="text-base font-black text-blue-700">{m.price.toFixed(2)}€</div>
@@ -468,6 +481,26 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                     )}
                 </div>
             </div>
+
+            {zoomedEvidence && (
+                <div
+                    className="fixed inset-0 z-[400] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={() => setZoomedEvidence(null)}
+                >
+                    <button
+                        className="absolute top-4 right-4 text-white p-2 hover:bg-white/10 rounded-full transition-colors"
+                        onClick={() => setZoomedEvidence(null)}
+                    >
+                        <X className="w-8 h-8" />
+                    </button>
+                    <img
+                        src={zoomedEvidence}
+                        alt="Preuve"
+                        className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
         </div>
     );
 };
