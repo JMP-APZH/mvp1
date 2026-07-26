@@ -344,7 +344,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                     <p className="text-[9px] uppercase tracking-wider font-bold text-blue-400 mt-1">Magasins</p>
                                 </div>
                                 <div className="bg-green-50 border border-green-100 rounded-2xl p-3 text-center">
-                                    <div className="text-xl font-black text-green-600">
+                                    <div className="text-xl font-black text-green-600 tabular-nums">
                                         {stats?.min != null ? `${stats.min.toFixed(2)}€` : '—'}
                                     </div>
                                     <p className="text-[9px] uppercase tracking-wider font-bold text-green-500 mt-1">Meilleur prix</p>
@@ -379,7 +379,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                                             <p className="text-sm font-bold text-gray-900 truncate">{latestLocal.storeName}</p>
                                                             <p className="text-[10px] text-gray-400">{latestLocal.date}</p>
                                                         </div>
-                                                        <div className="text-lg font-black text-gray-900 flex-shrink-0 pl-2">
+                                                        <div className="text-lg font-black tabular-nums text-gray-900 flex-shrink-0 pl-2">
                                                             {latestLocal.price.toFixed(2)}€
                                                         </div>
                                                     </div>
@@ -401,7 +401,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                                             <p className="text-[10px] text-gray-400">{communityEntry.date}</p>
                                                         </div>
                                                         <div className="text-right flex-shrink-0 pl-2">
-                                                            <div className="text-lg font-black text-gray-900">{communityEntry.price.toFixed(2)}€</div>
+                                                            <div className="text-lg font-black tabular-nums text-gray-900">{communityEntry.price.toFixed(2)}€</div>
                                                             <DiffBadge diff={diffOf(communityEntry.price)} />
                                                         </div>
                                                     </div>
@@ -439,7 +439,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                                             </div>
                                                         </div>
                                                         <div className="text-right flex-shrink-0 pl-2">
-                                                            <div className="text-lg font-black text-gray-900">{onlineEntry.price.toFixed(2)}€</div>
+                                                            <div className="text-lg font-black tabular-nums text-gray-900">{onlineEntry.price.toFixed(2)}€</div>
                                                             <DiffBadge diff={diffOf(onlineEntry.price)} />
                                                         </div>
                                                     </div>
@@ -469,7 +469,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                                                                         )}
                                                                     </div>
                                                                     <div className="text-right flex-shrink-0 pl-2">
-                                                                        <div className="text-base font-black text-gray-900">{s.price.toFixed(2)}€</div>
+                                                                        <div className="text-base font-black tabular-nums text-gray-900">{s.price.toFixed(2)}€</div>
                                                                         <DiffBadge diff={d} />
                                                                     </div>
                                                                 </div>

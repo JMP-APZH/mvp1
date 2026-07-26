@@ -275,7 +275,7 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                                                         )}
                                                     </div>
                                                     <div className="text-right flex-shrink-0 pl-2">
-                                                        <div className="text-base font-black text-gray-900">{item.price.toFixed(2)}€</div>
+                                                        <div className="text-base font-black tabular-nums text-gray-900">{item.price.toFixed(2)}€</div>
                                                         <p className="text-[10px] text-gray-400">
                                                             {new Date(item.created_at).toLocaleDateString('fr-FR')}
                                                         </p>

@@ -3,7 +3,7 @@ import BQPVerifier from './components/BQPVerifier';
 import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 
-import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
+import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { useAuth } from './contexts/AuthContext';
 import { MAINLAND_CHAINS } from './constants/mainlandChains';
@@ -1939,7 +1939,7 @@ const App10 = () => {
                                                             })()}
                                                         </div>
                                                         <div className="text-right flex flex-col items-end gap-1 pl-2">
-                                                            <div className={`text-2xl font-bold ${isLowest ? 'text-green-600' : 'text-gray-900'}`}>
+                                                            <div className={`text-3xl font-black tabular-nums ${isLowest ? 'text-green-600' : 'text-gray-900'}`}>
                                                                 {price.price.toFixed(2)}€
                                                             </div>
                                                             {isLowest && (
@@ -2099,13 +2099,15 @@ const App10 = () => {
                             <p className="text-gray-700 font-medium">Comment ça marche ?</p>
                             <ul className="space-y-3">
                                 {[
-                                    { icon: '📷', text: 'Scannez un code-barres en magasin' },
-                                    { icon: '💶', text: 'Saisissez le prix affiché sur l\'étiquette' },
-                                    { icon: '📊', text: 'Comparez les prix entre supermarchés' },
-                                    { icon: '🏆', text: 'Gagnez des points et montez dans le classement' },
-                                ].map(({ icon, text }) => (
+                                    { Icon: Camera, text: 'Scannez un code-barres en magasin' },
+                                    { Icon: Euro, text: 'Saisissez le prix affiché sur l\'étiquette' },
+                                    { Icon: BarChart3, text: 'Comparez les prix entre supermarchés' },
+                                    { Icon: Trophy, text: 'Gagnez des points et montez dans le classement' },
+                                ].map(({ Icon, text }) => (
                                     <li key={text} className="flex items-center gap-3 text-sm text-gray-600">
-                                        <span className="text-xl flex-shrink-0">{icon}</span>
+                                        <span className="w-9 h-9 flex-shrink-0 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
+                                            <Icon className="w-4 h-4" />
+                                        </span>
                                         {text}
                                     </li>
                                 ))}

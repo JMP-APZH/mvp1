@@ -203,6 +203,13 @@ Read back the `bcd999eb` design-review artifact (2026-07-17) in full and cross-r
 - **Install banner now persists its dismissal**, matching the pattern the welcome overlay already used (`localStorage`). Previously: on iOS, `showInstallPrompt` was set unconditionally on every load (`isIOS() && !isInstalledPWA()`) with no dismissal memory at all — reappeared on every reload regardless of "J'ai compris"/"Plus tard". Added a `dismissInstallPrompt()` helper (writes `install_prompt_dismissed` to `localStorage`) wired to all three dismiss paths (iOS "J'ai compris", Android "Plus tard", and a successful Android install) and checked before auto-showing on mount.
 - **Verified Comparer/BQP demo data is in good shape** (the review's other P0 item) — no code changes needed. 20/26 of the most recent real Martinique entries have a product photo, 3 spot-checked photo URLs all return HTTP 200 (not broken links, unlike what the review found in its test environment). `bqp_categories` has 16 real rows driving the visible BQP list. One minor, non-blocking caveat noted above (`product_bqp_associations` header stat).
 
+### Jul 26, 2026 — Design Review Follow-Up: P1 Items
+- **Motion was completely dead app-wide — root cause, not a missing polish pass.** `tailwindcss-animate` was never installed (`plugins: []` in `tailwind.config.js`), so every `animate-in`/`fade-in`/`zoom-in-*`/`slide-in-from-*` class used throughout the entire codebase — in every modal, picker, and card built across this whole project, not just today's work — generated zero CSS and did nothing. Confirmed before and after in the built output: no `@keyframes enter`/`.animate-in{...}` rule existed pre-fix; both exist post-fix. Installed `tailwindcss-animate` as a dev dependency and registered it in `plugins`. This retroactively activates motion on every existing surface at once (all modals' entrance animations, the welcome overlay, every zoom/picker overlay) — far higher leverage than adding more of the same previously-inert classes would have been.
+- **Store-selection wizard step labels ("Ville"/"Enseigne"/"Magasin") were already coded but permanently invisible** — same root-cause class as the motion bug: `hidden xs:block`, and Tailwind has no `xs` breakpoint configured (`theme.extend.screens` was never set). Confirmed no `.xs\:block` rule existed in the built CSS. Considered adding an `xs` breakpoint instead, but the review's own test viewport (390px) is narrower than any sensible `xs` threshold (e.g. 475px) would be — that fix wouldn't have shown the labels on the exact device the review used. Removed the guard entirely instead; the labels are short single words at `text-xs` and don't need hiding on any realistic phone width.
+- **Price typography**: added `tabular-nums` (and bumped the Comparer feed's headline price to `text-3xl font-black`, from `text-2xl font-bold`) across every prominent € display — Comparer cards, `ProductDetailModal`'s stats/comparison rows, `HunterDetailModal`'s item prices, `ShoppingList`'s budget bar and France Hexagonale comparison totals.
+- **Welcome overlay**: replaced the four emoji (📷💶📊🏆) with the same Lucide icon set used everywhere else in the app (`Camera`, `Euro`, `BarChart3`, `Trophy`, each in a small orange circle), so the app's best screen doesn't visually break from its own icon language depending on the OS's emoji font.
+- **Not built this pass**: formalizing a second/third brand color (Martinique orange / France blue / BQP institutional blue) — this was my own addition when synthesizing the plan, not one of the review's own P1 punch-list items, and doing it properly risks a half-applied, inconsistent re-theme if rushed in alongside these bounded fixes. Worth a dedicated pass if wanted, not bundled here.
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
@@ -219,7 +226,7 @@ Read back the `bcd999eb` design-review artifact (2026-07-17) in full and cross-r
 
 ### Tech Stack & Dependencies
 - **React 19** / **Vite 7**
-- **UI**: Tailwind CSS v3 (Utility classes only).
+- **UI**: Tailwind CSS v3 (Utility classes only) + `tailwindcss-animate` (registered 2026-07-26 — see that date's entry; `animate-in`/`fade-in`/`zoom-in-*`/`slide-in-from-*` classes are used throughout the app and require this plugin to generate any CSS at all).
 - **Icons**: `lucide-react`.
 - **Charts**: `recharts` for price history trends.
 - **Scanner**: `zxing/library` + `quagga`.

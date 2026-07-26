@@ -266,7 +266,7 @@ export default function StoreSelectionWizard({
                         }`}>
                         {step > 1 ? '✓' : '1'}
                     </div>
-                    <div className="text-xs text-gray-600 hidden xs:block">Ville</div>
+                    <div className="text-xs text-gray-600">Ville</div>
 
                     <div className="w-4 sm:w-8 h-0.5 bg-gray-300"></div>
 
@@ -274,7 +274,7 @@ export default function StoreSelectionWizard({
                         }`}>
                         {step > 2 ? '✓' : '2'}
                     </div>
-                    <div className="text-xs text-gray-600 hidden xs:block">Enseigne</div>
+                    <div className="text-xs text-gray-600">Enseigne</div>
 
                     <div className="w-4 sm:w-8 h-0.5 bg-gray-300"></div>
 
@@ -282,7 +282,7 @@ export default function StoreSelectionWizard({
                         }`}>
                         3
                     </div>
-                    <div className="text-xs text-gray-600 hidden xs:block">Magasin</div>
+                    <div className="text-xs text-gray-600">Magasin</div>
                 </div>
 
                 {step > 1 && (

@@ -551,11 +551,11 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
                                     <div className="flex justify-between items-baseline mb-1">
                                         <span className="text-sm text-blue-800">Ce panier en Martinique</span>
-                                        <span className="text-base font-black text-gray-900">{mainlandComparison.martiniqueTotal.toFixed(2)}€</span>
+                                        <span className="text-base font-black tabular-nums text-gray-900">{mainlandComparison.martiniqueTotal.toFixed(2)}€</span>
                                     </div>
                                     <div className="flex justify-between items-baseline mb-2">
                                         <span className="text-sm text-blue-800">Équivalent en France Hexagonale</span>
-                                        <span className="text-base font-black text-blue-700">{mainlandComparison.mainlandTotal.toFixed(2)}€</span>
+                                        <span className="text-base font-black tabular-nums text-blue-700">{mainlandComparison.mainlandTotal.toFixed(2)}€</span>
                                     </div>
                                     <div className="pt-2 border-t border-blue-200">
                                         <p className="text-sm font-black text-red-600">
