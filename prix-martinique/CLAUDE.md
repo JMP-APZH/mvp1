@@ -195,6 +195,13 @@ Brainstormed and then built the connection between three pieces of data that wer
 None blocking. All migrations to date (`bqp_vote_stats_fix_migration.sql`, `barcode_audit_migration.sql`, `trim_city_cleanup_migration.sql`, `categories_admin_insert_migration.sql`, `product_comments_migration.sql`, `mainland_price_migration.sql`, `mainland_evidence_photo_migration.sql`) — check each file's header comment for apply status as of the date you're reading this; the newest one or two may not yet be applied.
 - See "Jul 21, 2026 — Component-Wide Bug Sweep" above for items flagged but intentionally not changed (admin-role RLS uncertainty, unused badges system).
 - Category coverage is currently low (5/23 products) since assigning a category during capture is optional — the category/store filters and the "Compléter produit" tool will look sparse until more products are categorized.
+- `product_bqp_associations` has only 1 row — `BQPVerifier.jsx`'s "Produits suivis" header stat will read "1" even though the actual BQP list renders 16 real categories fine (that list comes from `bqp_categories`, not from the association count).
+
+### Jul 26, 2026 — Design Review Follow-Up: P0 Fixes
+Read back the `bcd999eb` design-review artifact (2026-07-17) in full and cross-referenced it against everything shipped since — its "highest priority" finding (Leaderboard querying `profiles`) was already fixed on Jul 21, before this follow-up even started. Of its four remaining P0 items, two were code fixes, two are manual demo-day actions (rehearsing on a real phone, choosing what to lead with):
+
+- **Install banner now persists its dismissal**, matching the pattern the welcome overlay already used (`localStorage`). Previously: on iOS, `showInstallPrompt` was set unconditionally on every load (`isIOS() && !isInstalledPWA()`) with no dismissal memory at all — reappeared on every reload regardless of "J'ai compris"/"Plus tard". Added a `dismissInstallPrompt()` helper (writes `install_prompt_dismissed` to `localStorage`) wired to all three dismiss paths (iOS "J'ai compris", Android "Plus tard", and a successful Android install) and checked before auto-showing on mount.
+- **Verified Comparer/BQP demo data is in good shape** (the review's other P0 item) — no code changes needed. 20/26 of the most recent real Martinique entries have a product photo, 3 spot-checked photo URLs all return HTTP 200 (not broken links, unlike what the review found in its test environment). `bqp_categories` has 16 real rows driving the visible BQP list. One minor, non-blocking caveat noted above (`product_bqp_associations` header stat).
 
 ## Accepted Risks & Frozen Dependencies
 

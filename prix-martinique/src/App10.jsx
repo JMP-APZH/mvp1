@@ -128,22 +128,32 @@ const App10 = () => {
 
     // PWA Install Prompt (Android) or iOS instructions
     useEffect(() => {
+        const alreadyDismissed = localStorage.getItem('install_prompt_dismissed') === '1';
+
         // Android install prompt
         const handler = (e) => {
             e.preventDefault();
             setDeferredPrompt(e);
-            setShowInstallPrompt(true);
+            if (!alreadyDismissed) setShowInstallPrompt(true);
         };
 
         window.addEventListener('beforeinstallprompt', handler);
 
-        // iOS: Show install prompt if not installed and on iOS
-        if (isIOS() && !isInstalledPWA()) {
+        // iOS: Show install prompt if not installed, on iOS, and not previously dismissed.
+        // Was previously shown on every load with no persistence (>40% of the mobile
+        // fold on first render) -- now behaves like the welcome overlay's own
+        // localStorage dismissal instead of nagging on every reload.
+        if (isIOS() && !isInstalledPWA() && !alreadyDismissed) {
             setShowInstallPrompt(true);
         }
 
         return () => window.removeEventListener('beforeinstallprompt', handler);
     }, []);
+
+    const dismissInstallPrompt = () => {
+        localStorage.setItem('install_prompt_dismissed', '1');
+        setShowInstallPrompt(false);
+    };
 
     const handleInstallClick = async () => {
         if (deferredPrompt) {
@@ -152,7 +162,7 @@ const App10 = () => {
             const { outcome } = await deferredPrompt.userChoice;
 
             if (outcome === 'accepted') {
-                setShowInstallPrompt(false);
+                dismissInstallPrompt();
             }
 
             setDeferredPrompt(null);
@@ -1058,7 +1068,7 @@ const App10 = () => {
                                 </p>
                             </div>
                             <button
-                                onClick={() => setShowInstallPrompt(false)}
+                                onClick={dismissInstallPrompt}
                                 className="mt-3 text-xs text-amber-600 underline"
                             >
                                 J'ai compris
@@ -1081,7 +1091,7 @@ const App10 = () => {
                                     Installer
                                 </button>
                                 <button
-                                    onClick={() => setShowInstallPrompt(false)}
+                                    onClick={dismissInstallPrompt}
                                     className="text-xs text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-100"
                                 >
                                     Plus tard
