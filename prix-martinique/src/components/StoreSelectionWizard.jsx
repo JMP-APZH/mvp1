@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { detectUserLocation, getCityList, getStoresSortedByDistance } from '../utils/geocoding';
+import { posthog } from '../posthogClient';
+
+const STEP_NAMES = { 1: 'city', 2: 'chain', 3: 'store' };
 
 // Chain icons for visual recognition
 const CHAIN_ICONS = {
@@ -66,6 +69,18 @@ export default function StoreSelectionWizard({
         loadUserFavorites();
     }, []);
 
+    useEffect(() => {
+        posthog.capture('store_wizard_step_viewed', { step_number: step, step_name: STEP_NAMES[step] });
+    }, [step]);
+
+    // Fires once per mount, on the transition into "a store is selected" --
+    // covers every path (city→chain→store, favorites shortcut, nearest-store shortcut).
+    useEffect(() => {
+        if (selectedStoreId) {
+            posthog.capture('store_wizard_completed', { store_id: selectedStoreId });
+        }
+    }, [selectedStoreId]);
+
     async function loadUserFavorites() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -121,6 +136,7 @@ export default function StoreSelectionWizard({
                 setGpsCity(location.city);
                 setSelectedCity(location.city);
                 setStep(2); // Skip to chain selection
+                posthog.capture('store_wizard_gps_detected', { city: location.city });
             }
         }
 

@@ -1,6 +1,7 @@
 import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import './posthogClient'
 import App10 from './App10.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 class ErrorBoundary extends React.Component {

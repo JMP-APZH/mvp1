@@ -5,6 +5,7 @@ import ProductDetailModal from './components/ProductDetailModal';
 
 import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy } from 'lucide-react';
 import { supabase } from './supabaseClient';
+import { posthog } from './posthogClient';
 import { useAuth } from './contexts/AuthContext';
 import { MAINLAND_CHAINS } from './constants/mainlandChains';
 import AuthModal from './components/AuthModal';
@@ -320,6 +321,7 @@ const App10 = () => {
     const handleBarcodeDetected = async (code) => {
         console.log('Barcode detected:', code);
         setShowScanner(false);
+        posthog.capture('barcode_detected', { barcode: code });
 
         // Vibrate if supported
         if (navigator.vibrate) {
@@ -343,6 +345,7 @@ const App10 = () => {
 
             if (product) {
                 setScannedProduct(product);
+                posthog.capture('product_matched', { product_id: product.id, barcode: code });
 
                 // Fetch the most recent *local* price for this product. Filtered
                 // client-side, not via .neq('origin_region_code', 'Hexagone') --
@@ -806,6 +809,22 @@ const App10 = () => {
                 .insert([priceData]);
 
             if (priceError) throw priceError;
+
+            posthog.capture('price_submitted', {
+                submission_method: 'manual_entry',
+                product_id: productId,
+                price: priceData.price,
+                store_id: priceData.store_id,
+                is_mainland: !!manualEntry.isMainland,
+                has_product_photo: !!productPhotoUrl,
+                has_price_tag_photo: !!priceTagPhotoUrl,
+                authenticated: !!user,
+            });
+
+            if (!localStorage.getItem('ph_first_contribution_done')) {
+                localStorage.setItem('ph_first_contribution_done', '1');
+                posthog.capture('first_contribution_completed');
+            }
 
             // Step 4: Award points if user is authenticated
             let pointsAwarded = 0;
@@ -1306,7 +1325,7 @@ const App10 = () => {
                                     {showScanner ? (
                                         <div className="relative rounded-xl overflow-hidden shadow-2xl bg-black aspect-square max-w-sm mx-auto">
                                             <ZXingBarcodeScanner
-                                                onBarcodeDetected={handleBarcodeDetected}
+                                                onDetected={handleBarcodeDetected}
                                                 onClose={() => setShowScanner(false)}
                                             />
                                             <button
@@ -1318,7 +1337,10 @@ const App10 = () => {
                                         </div>
                                     ) : (
                                         <button
-                                            onClick={() => setShowScanner(true)}
+                                            onClick={() => {
+                                                posthog.capture('scan_session_started');
+                                                setShowScanner(true);
+                                            }}
                                             className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl p-4 shadow-md flex items-center justify-center gap-3 hover:shadow-lg transition-all"
                                         >
                                             <ScanLine className="w-6 h-6" />
@@ -1422,6 +1444,17 @@ const App10 = () => {
                                                                 is_verified: true
                                                             }]);
                                                             if (error) throw error;
+                                                            posthog.capture('price_submitted', {
+                                                                submission_method: 'quick_confirm',
+                                                                product_id: bqpCheckResult.latestPrice.product_id,
+                                                                price: bqpCheckResult.latestPrice.price,
+                                                                store_id: bqpCheckResult.latestPrice.store_id,
+                                                                authenticated: !!user,
+                                                            });
+                                                            if (!localStorage.getItem('ph_first_contribution_done')) {
+                                                                localStorage.setItem('ph_first_contribution_done', '1');
+                                                                posthog.capture('first_contribution_completed');
+                                                            }
                                                             if (user) await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
                                                             toast.success('Prix confirmé ! +5 points');
                                                             setBqpCheckResult(null);

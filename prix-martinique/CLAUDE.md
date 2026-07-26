@@ -219,6 +219,17 @@ The review's own P2 list was three items (second brand color, dark mode, micro-i
 - **Micro-interactions**: added `active:scale-*` press feedback (plus `transition-colors` → `transition-all` where needed so the scale transform actually animates) to the highest-traffic interactive surfaces — all 6 main nav tabs, the primary "Enregistrer le prix" and welcome-overlay "Commencer !" CTAs, and the clickable rows in the Comparer feed, `Leaderboard`, and `HunterDetailModal`. Not an exhaustive app-wide pass (the review itself scoped this as "not for this call — next milestone"); scoped to the paths most likely to be seen live.
 - **Dark mode — explicitly not built, recommend staying rejected rather than revisiting.** This app was deliberately locked to `color-scheme: light` on Jul 22 after it caused a real, reported bug (invisible input text on a device with OS dark mode enabled). Building real dark mode later means carefully reintroducing `color-scheme: light dark` plus a full second color pass across every component *without* reopening that exact bug — a project of its own, not a P2 line item to fit in alongside these fixes.
 
+### Jul 26, 2026 — PostHog Product Analytics Instrumented
+Added `posthog-js` and a minimal `src/posthogClient.js` (inits from `VITE_POSTHOG_KEY`/`VITE_POSTHOG_HOST`, `person_profiles: 'always'` so an anonymous user's profile exists before `identify()` merges it on signup). Events wired in so far:
+
+- **`App10.jsx`**: `barcode_detected`, `product_matched`, `scan_session_started`, `price_submitted` (both the manual-entry and quick-confirm paths, with `submission_method` distinguishing them), `first_contribution_completed` (fires once, gated on a `localStorage` flag).
+- **`AuthContext.jsx`**: `posthog.identify()` on session restore and OAuth sign-in; `anon_to_signup_converted` for both email signup and Google OAuth (Google needs a heuristic — `isLikelyNewOAuthSignup` — since Supabase doesn't flag "this sign-in was a brand-new account" directly; approximated as `created_at`/`last_sign_in_at` within 15s of each other); `posthog.reset()` on sign-out.
+- **`StoreSelectionWizard.jsx`**: `store_wizard_step_viewed` (per step), `store_wizard_completed`, `store_wizard_gps_detected`.
+
+**Verified live before shipping** (this class of silent-failure bug — instrumentation that looks right but never actually sends — is exactly what's bitten this project before, see the Jul 21 bug-sweep entries above): ran the app against the real dev server, drove the store-selection wizard in a real browser, then confirmed via a direct PostHog SQL query against the raw `events` table (not just the client-side network log) that `$pageview` and `store_wizard_step_viewed` (steps "city" and "chain") landed within seconds, tied to a real `distinct_id`.
+
+**`vercel.json` created** (didn't exist before): besides the PostHog vars, formalizes `framework`/`buildCommand`/`outputDirectory`, COEP/COOP headers, and separate production/preview env blocks for the Supabase vars (referenced via Vercel secret refs, `@vite_supabase_..._production` / `..._staging`). `VITE_POSTHOG_KEY`/`VITE_POSTHOG_HOST` are set directly as literal values instead of secret refs, deliberately — PostHog's project key is a public, write-only client token meant to ship in the browser bundle (unlike treating it as a secret, which would just add a manual Vercel-dashboard step for no security benefit).
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
@@ -239,6 +250,7 @@ The review's own P2 list was three items (second brand color, dark mode, micro-i
 - **Icons**: `lucide-react`.
 - **Charts**: `recharts` for price history trends.
 - **Scanner**: `zxing/library` + `quagga`.
+- **Analytics**: PostHog (`posthog-js`, `src/posthogClient.js`) — env vars `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST`. See "Jul 26, 2026 — PostHog Product Analytics Instrumented" above for what's tracked.
 - **Backend**: Supabase.
   - `supabaseClient.js` uses standard VITE_ env vars.
 
@@ -258,6 +270,7 @@ The review's own P2 list was three items (second brand color, dark mode, micro-i
 - `src/components/HunterDetailModal.jsx` — Per-contributor card from the Leaderboard (prices collected, shops visited, product list).
 - `src/components/PriceDuel.jsx` — Martinique vs. France Hexagonale price comparison visual (`localPrice`/`mainlandPrice` props); used in both the barcode-scan flow (`App10.jsx`) and `ProductDetailModal.jsx`.
 - `src/components/MainlandPriceAdmin.jsx` — Admin-only France Hexagonale reference price entry (Console Admin sub-tab).
+- `src/posthogClient.js` — PostHog init (product analytics).
 
 ### Database Schema (Critical Tables)
 - `products`: Includes `is_local_production`, `is_mdd` (distributor brand), `barcode`.
@@ -271,12 +284,14 @@ The review's own P2 list was three items (second brand color, dark mode, micro-i
 Required in `.env.local`:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_POSTHOG_KEY`
+- `VITE_POSTHOG_HOST` (e.g. `https://eu.i.posthog.com`)
 
 ## Open Items
 1. **Quagga → @ericblade/quagga2** — CVE mitigation / potential scanner rework. Requires physical iOS testing. Keep open; direction TBD.
 2. **Next Milestone** — TBD.
 
 ---
-**Last Updated**: 2026-07-21
+**Last Updated**: 2026-07-26
 **Current Version**: MVP v1.5 (App10)
 **Status**: Launched — Production

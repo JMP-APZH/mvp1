@@ -1,7 +1,16 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { posthog } from '../posthogClient';
 
 const AuthContext = createContext({});
+
+// Supabase doesn't flag "this OAuth sign-in was a brand-new signup" directly --
+// approximate it by checking whether the account was created just before this
+// sign-in (email/password signups go through signUp() below and don't need this).
+const isLikelyNewOAuthSignup = (authUser) => {
+  if (!authUser?.created_at || !authUser?.last_sign_in_at) return false;
+  return Math.abs(new Date(authUser.last_sign_in_at) - new Date(authUser.created_at)) < 15000;
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -174,6 +183,11 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           setLoading(true);
 
+          posthog.identify(session.user.id, { email: session.user.email });
+          if (isLikelyNewOAuthSignup(session.user)) {
+            posthog.capture('anon_to_signup_converted', { signup_method: 'google' });
+          }
+
           const { profile, badges, roles, favorites, favoriteStores } = await loadUserData(session.user.id);
           if (isMounted) {
             currentLoadedUserId = session.user.id;
@@ -215,6 +229,12 @@ export const AuthProvider = ({ children }) => {
 
         if (session?.user && isMounted) {
           setUser(session.user);
+
+          posthog.identify(session.user.id, { email: session.user.email });
+          if (isLikelyNewOAuthSignup(session.user)) {
+            posthog.capture('anon_to_signup_converted', { signup_method: 'google' });
+          }
+
           const { profile, badges, roles, favorites, favoriteStores } = await loadUserData(session.user.id);
           if (isMounted) {
             currentLoadedUserId = session.user.id;
@@ -265,6 +285,12 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (error) throw error;
+
+      if (data?.user) {
+        posthog.identify(data.user.id, { email: data.user.email });
+        posthog.capture('anon_to_signup_converted', { signup_method: 'email' });
+      }
+
       return { data, error: null };
     } catch (error) {
       console.error('Sign up error:', error);
@@ -318,6 +344,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      posthog.reset();
       setUser(null);
       setUserProfile(null);
       setUserBadges([]);
