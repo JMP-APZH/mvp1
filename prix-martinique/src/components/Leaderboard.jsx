@@ -202,7 +202,7 @@ const Leaderboard = ({ city, onRequireAuth }) => {
             <div
               key={leader.id}
               onClick={() => setSelectedHunterId(leader.id)}
-              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:shadow-md transition-shadow ${getRankBackground(rank)} ${isCurrentUser ? 'ring-2 ring-orange-400' : ''
+              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:shadow-md active:scale-[0.99] transition-all ${getRankBackground(rank)} ${isCurrentUser ? 'ring-2 ring-orange-400' : ''
                 }`}
             >
               {/* Rank */}

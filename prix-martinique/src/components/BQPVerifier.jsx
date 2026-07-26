@@ -78,7 +78,7 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-blue-600 p-4 text-white">
+            <div className="bg-indigo-700 p-4 text-white">
                 <div className="flex items-center gap-2 mb-2">
                     <ShieldCheck className="w-6 h-6" />
                     <h2 className="font-bold text-lg">Surveillance BQP 🛡️</h2>
@@ -95,7 +95,7 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
                     </div>
                 </div>
 
-                <p className="text-blue-100 text-xs leading-tight mb-2">
+                <p className="text-indigo-100 text-xs leading-tight mb-2">
                     Le Bouclier Qualité Prix est une liste officielle de produits à prix plafonnés.
                     <strong> Votre mission :</strong> signalez tout écart ou absence en rayon.
                 </p>
@@ -111,7 +111,7 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
                             placeholder="Ex: Lait, Riz, Poulet..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
                         />
                     </div>
 
@@ -121,7 +121,7 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
                                 key={type.id}
                                 onClick={() => setSelectedList(type.id)}
                                 className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors ${selectedList === type.id
-                                    ? 'bg-blue-100 text-blue-800 font-medium'
+                                    ? 'bg-indigo-100 text-indigo-800 font-medium'
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
@@ -155,14 +155,14 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
                                 key={item.id}
                                 onClick={() => onSelect && onSelect(item)}
                                 className={`border rounded-lg p-3 transition-colors ${onSelect
-                                    ? 'cursor-pointer hover:bg-blue-50 border-blue-200 hover:border-blue-400'
+                                    ? 'cursor-pointer hover:bg-indigo-50 border-indigo-200 hover:border-indigo-400'
                                     : 'hover:bg-gray-50'
                                     }`}
                             >
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                            <span className="text-xs font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
                                                 {item.code}
                                             </span>
                                             {item.section && (
@@ -187,7 +187,7 @@ export default function BQPVerifier({ initialSearchTerm = '', onSelect = null })
 
                                 {onSelect && (
                                     <div className="mt-2 text-center">
-                                        <span className="text-blue-600 text-xs font-semibold uppercase tracking-wider">
+                                        <span className="text-indigo-700 text-xs font-semibold uppercase tracking-wider">
                                             Sélectionner
                                         </span>
                                     </div>

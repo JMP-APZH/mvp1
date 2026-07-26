@@ -1106,7 +1106,7 @@ const App10 = () => {
             <div className="flex border-b bg-white sticky top-0 shadow-sm z-[100]">
                 <button
                     onClick={() => setActiveTab('scan')}
-                    className={`flex-1 py-3 px-2 font-medium transition-colors ${activeTab === 'scan'
+                    className={`flex-1 py-3 px-2 font-medium transition-all active:scale-95 active:bg-gray-50 ${activeTab === 'scan'
                         ? 'border-b-2 border-orange-500 text-orange-600'
                         : 'text-gray-500 hover:text-gray-700'
                         }`}
@@ -1118,7 +1118,7 @@ const App10 = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('search')}
-                    className={`flex-1 py-3 px-2 font-medium transition-colors ${activeTab === 'search'
+                    className={`flex-1 py-3 px-2 font-medium transition-all active:scale-95 active:bg-gray-50 ${activeTab === 'search'
                         ? 'border-b-2 border-orange-500 text-orange-600'
                         : 'text-gray-500 hover:text-gray-700'
                         }`}
@@ -1130,7 +1130,7 @@ const App10 = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('community')}
-                    className={`flex-1 py-3 px-2 font-medium transition-colors ${activeTab === 'community'
+                    className={`flex-1 py-3 px-2 font-medium transition-all active:scale-95 active:bg-gray-50 ${activeTab === 'community'
                         ? 'border-b-2 border-orange-500 text-orange-600'
                         : 'text-gray-500 hover:text-gray-700'
                         }`}
@@ -1142,7 +1142,7 @@ const App10 = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('list')}
-                    className={`flex-1 py-3 px-2 font-medium transition-colors ${activeTab === 'list'
+                    className={`flex-1 py-3 px-2 font-medium transition-all active:scale-95 active:bg-gray-50 ${activeTab === 'list'
                         ? 'border-b-2 border-orange-500 text-orange-600'
                         : 'text-gray-500 hover:text-gray-700'
                         }`}
@@ -1161,7 +1161,7 @@ const App10 = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('bqp')}
-                    className={`flex-1 py-3 px-2 font-medium transition-colors ${activeTab === 'bqp'
+                    className={`flex-1 py-3 px-2 font-medium transition-all active:scale-95 active:bg-gray-50 ${activeTab === 'bqp'
                         ? 'border-b-2 border-orange-500 text-orange-600'
                         : 'text-gray-500 hover:text-gray-700'
                         }`}
@@ -1173,7 +1173,7 @@ const App10 = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('about')}
-                    className={`flex-1 py-3 px-2 font-medium transition-colors ${activeTab === 'about'
+                    className={`flex-1 py-3 px-2 font-medium transition-all active:scale-95 active:bg-gray-50 ${activeTab === 'about'
                         ? 'border-b-2 border-orange-500 text-orange-600'
                         : 'text-gray-500 hover:text-gray-700'
                         }`}
@@ -1742,9 +1742,9 @@ const App10 = () => {
                                     <button
                                         onClick={submitPrice}
                                         disabled={loading}
-                                        className={`w-full py-3 rounded-lg font-medium transition-colors shadow-md ${loading
+                                        className={`w-full py-3 rounded-lg font-medium transition-all shadow-md ${loading
                                             ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                                            : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
+                                            : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 active:scale-[0.98]'
                                             }`}
                                     >
                                         {loading ? 'Enregistrement...' : user ? 'Enregistrer le prix (+10 pts)' : 'Enregistrer le prix'}
@@ -1892,7 +1892,7 @@ const App10 = () => {
                                                 <div
                                                     key={price.id}
                                                     onClick={() => setSelectedProductId(price.productId)}
-                                                    className={`bg-white border rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${isCurrentUser ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}
+                                                    className={`bg-white border rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md active:scale-[0.99] transition-all ${isCurrentUser ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}
                                                 >
                                                     <div className="flex justify-between items-start">
                                                         <div className="flex-1">
@@ -2117,7 +2117,7 @@ const App10 = () => {
                                     localStorage.setItem('welcome_v1_shown', '1');
                                     setShowWelcome(false);
                                 }}
-                                className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-bold text-lg hover:from-orange-600 hover:to-red-600 transition-colors mt-2"
+                                className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-bold text-lg hover:from-orange-600 hover:to-red-600 active:scale-[0.98] transition-all mt-2"
                             >
                                 Commencer !
                             </button>

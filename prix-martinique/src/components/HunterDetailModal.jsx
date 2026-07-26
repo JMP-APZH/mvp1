@@ -255,7 +255,7 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                                                 <div
                                                     key={item.id}
                                                     onClick={() => setSelectedProductId(item.products?.id)}
-                                                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white cursor-pointer hover:shadow-md hover:border-orange-200 transition-all"
+                                                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-white cursor-pointer hover:shadow-md hover:border-orange-200 active:scale-[0.99] transition-all"
                                                 >
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-bold text-gray-900 truncate">{item.products?.name || 'Produit inconnu'}</p>
