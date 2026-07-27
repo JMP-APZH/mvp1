@@ -230,6 +230,13 @@ Added `posthog-js` and a minimal `src/posthogClient.js` (inits from `VITE_POSTHO
 
 **`vercel.json` created** (didn't exist before): besides the PostHog vars, formalizes `framework`/`buildCommand`/`outputDirectory`, COEP/COOP headers, and separate production/preview env blocks for the Supabase vars (referenced via Vercel secret refs, `@vite_supabase_..._production` / `..._staging`). `VITE_POSTHOG_KEY`/`VITE_POSTHOG_HOST` are set directly as literal values instead of secret refs, deliberately — PostHog's project key is a public, write-only client token meant to ship in the browser bundle (unlike treating it as a secret, which would just add a manual Vercel-dashboard step for no security benefit).
 
+**Broke the build** — see "Jul 27, 2026 — vercel.json Build Failure Fixed" below; the "separate production/preview env blocks" described above aren't a real Vercel construct.
+
+### Jul 27, 2026 — vercel.json Build Failure Fixed
+Deployment following the PostHog commit above (`bc63751`) failed schema validation: `should NOT have additional property 'preview'`. Root cause: `vercel.json`'s top-level `"preview": { "env": {...} }` block was invented when the file was first authored the day before — Vercel's `vercel.json` schema has no per-environment (`preview`/`production`) sub-block for scoping env vars; the top-level `env` key applies to every environment uniformly. Per-environment env var scoping is only configurable in the Vercel Dashboard (Project Settings → Environment Variables, each var individually scoped to Production/Preview/Development) or via `vercel env add`, not in JSON.
+
+**Fix**: removed the `preview` block from `vercel.json` (`5de9f0f`). The staging Supabase secret refs (`@vite_supabase_url_staging`, `@vite_supabase_anon_key_staging`) it referenced are no longer wired to anything — if Preview deployments should still use the staging Supabase project, that split needs to be set up manually in the Vercel Dashboard.
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
@@ -292,6 +299,6 @@ Required in `.env.local`:
 2. **Next Milestone** — TBD.
 
 ---
-**Last Updated**: 2026-07-26
+**Last Updated**: 2026-07-27
 **Current Version**: MVP v1.5 (App10)
 **Status**: Launched — Production
