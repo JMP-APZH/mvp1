@@ -13,8 +13,6 @@
     }
   ],
   "env": {
-    "VITE_SUPABASE_URL": "@vite_supabase_url_production",
-    "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key_production",
     "VITE_POSTHOG_KEY": "phc_n3K7FFkuCsF7CGooUj9tMM4BA8jb2XP5LX2LzJVg4b6D",
     "VITE_POSTHOG_HOST": "https://eu.i.posthog.com"
   }
