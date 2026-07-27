@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Star, Wallet, TrendingDown, Pencil } from 'lucide-react';
+import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Star, Wallet, TrendingDown, Pencil, ChefHat } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { posthog } from '../posthogClient';
 
-const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, supabase }) => {
+const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, onSelectRecipe, supabase }) => {
     const { userProfile, userFavorites, updateProfile } = useAuth();
     const [comparison, setComparison] = useState(null);
     const [loadingComparison, setLoadingComparison] = useState(false);
@@ -13,6 +14,97 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
     const [loadingFavorites, setLoadingFavorites] = useState(false);
     const [editingBudget, setEditingBudget] = useState(false);
     const [budgetInput, setBudgetInput] = useState('');
+    const [recipes, setRecipes] = useState([]);
+    const [loadingRecipes, setLoadingRecipes] = useState(false);
+    const [ingredientsByRecipe, setIngredientsByRecipe] = useState({});
+    const [recipePriceInfo, setRecipePriceInfo] = useState({});
+
+    // Idées recettes -- loaded once on mount, independent of the items list
+    // (unlike the price comparator below, which only makes sense once the
+    // panier has items in it).
+    useEffect(() => {
+        const loadRecipes = async () => {
+            setLoadingRecipes(true);
+            try {
+                const { data: recipeRows, error: recipesError } = await supabase
+                    .from('recipes')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('name', { ascending: true });
+                if (recipesError) throw recipesError;
+                setRecipes(recipeRows || []);
+
+                const recipeIds = (recipeRows || []).map(r => r.id);
+                if (recipeIds.length === 0) {
+                    setIngredientsByRecipe({});
+                    setRecipePriceInfo({});
+                    return;
+                }
+
+                const { data: ingredientRows, error: ingredientsError } = await supabase
+                    .from('recipe_ingredients')
+                    .select('*')
+                    .in('recipe_id', recipeIds)
+                    .order('display_order', { ascending: true });
+                if (ingredientsError) throw ingredientsError;
+
+                const byRecipe = {};
+                (ingredientRows || []).forEach(i => {
+                    if (!byRecipe[i.recipe_id]) byRecipe[i.recipe_id] = [];
+                    byRecipe[i.recipe_id].push(i);
+                });
+                setIngredientsByRecipe(byRecipe);
+
+                const productIds = [...new Set((ingredientRows || []).filter(i => i.product_id).map(i => i.product_id))];
+                let cheapestByProduct = {};
+                if (productIds.length > 0) {
+                    const { data: priceRows } = await supabase
+                        .from('prices')
+                        .select('product_id, price, created_at, origin_region_code')
+                        .in('product_id', productIds)
+                        .order('created_at', { ascending: false });
+                    // Never .neq('origin_region_code', 'Hexagone') server-side -- NULL rows
+                    // (the normal case for Martinique scans) get dropped by three-valued logic.
+                    const byProduct = {};
+                    (priceRows || []).forEach(r => {
+                        if (r.origin_region_code === 'Hexagone') return;
+                        if (!byProduct[r.product_id]) byProduct[r.product_id] = [];
+                        byProduct[r.product_id].push(r.price);
+                    });
+                    Object.entries(byProduct).forEach(([pid, prices]) => {
+                        cheapestByProduct[pid] = Math.min(...prices);
+                    });
+                }
+
+                const priceInfo = {};
+                (recipeRows || []).forEach(r => {
+                    const ingredients = byRecipe[r.id] || [];
+                    const matched = ingredients.filter(i => i.product_id && cheapestByProduct[i.product_id] != null);
+                    priceInfo[r.id] = {
+                        estimatedTotal: matched.reduce((sum, i) => sum + cheapestByProduct[i.product_id], 0),
+                        matchedCount: matched.length,
+                        totalCount: ingredients.length,
+                    };
+                });
+                setRecipePriceInfo(priceInfo);
+            } catch (err) {
+                console.error('Error loading recipes:', err);
+            } finally {
+                setLoadingRecipes(false);
+            }
+        };
+        loadRecipes();
+    }, [supabase]);
+
+    const addAllIngredients = (recipe, ingredients) => {
+        const toAdd = ingredients.filter(i => i.product_id && !items.some(it => it.productId === i.product_id));
+        toAdd.forEach(i => onAddItem?.({ id: i.product_id, name: i.ingredient_name, productPhotoUrl: null }));
+        posthog.capture('recipe_ingredients_added_to_list', {
+            recipe_id: recipe.id,
+            ingredient_count: toAdd.length,
+            source: 'card',
+        });
+    };
 
     // Favorites watchlist -- build the panier from your favorites
     useEffect(() => {
@@ -363,6 +455,57 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                                                 }`}
                                         >
                                             {inPanier ? 'Ajouté ✓' : '+ Panier'}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Idées recettes -- browse a curated recipe, add its ingredients in one tap */}
+                <div>
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-2 text-sm">
+                        <ChefHat className="w-4 h-4 text-orange-600" /> Idées recettes
+                    </h3>
+                    {loadingRecipes ? (
+                        <div className="p-4 text-center text-gray-400 text-xs bg-white rounded-lg border">Chargement...</div>
+                    ) : recipes.length === 0 ? (
+                        <div className="p-4 text-center text-gray-400 text-xs bg-white rounded-lg border border-dashed">
+                            Aucune recette disponible pour le moment.
+                        </div>
+                    ) : (
+                        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                            {recipes.map(recipe => {
+                                const ingredients = ingredientsByRecipe[recipe.id] || [];
+                                const priceInfo = recipePriceInfo[recipe.id];
+                                const matchedIngredients = ingredients.filter(i => i.product_id);
+                                const allAdded = matchedIngredients.length > 0 &&
+                                    matchedIngredients.every(i => items.some(it => it.productId === i.product_id));
+                                return (
+                                    <div key={recipe.id} className="flex-shrink-0 w-32 bg-white border border-gray-200 rounded-lg p-2">
+                                        <button onClick={() => onSelectRecipe?.(recipe.id)} className="block w-full text-left">
+                                            <div className="w-full h-16 rounded bg-gray-100 flex items-center justify-center overflow-hidden mb-1.5">
+                                                {recipe.photo_url ? (
+                                                    <img src={recipe.photo_url} alt={recipe.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <ChefHat className="w-6 h-6 text-gray-300" />
+                                                )}
+                                            </div>
+                                            <p className="text-[11px] font-medium text-gray-900 leading-tight line-clamp-2 h-8">{recipe.name}</p>
+                                            <p className="text-xs font-bold text-gray-700 mt-0.5">
+                                                {priceInfo?.matchedCount ? `~${priceInfo.estimatedTotal.toFixed(2)}€` : '—'}
+                                            </p>
+                                            <p className="text-[9px] text-gray-400">
+                                                {priceInfo ? `${priceInfo.matchedCount} sur ${priceInfo.totalCount} prix connu${priceInfo.matchedCount > 1 ? 's' : ''}` : ''}
+                                            </p>
+                                        </button>
+                                        <button
+                                            onClick={() => addAllIngredients(recipe, ingredients)}
+                                            disabled={allAdded || matchedIngredients.length === 0}
+                                            className={`w-full mt-1.5 text-[10px] font-bold py-1.5 rounded transition-colors ${allAdded ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
+                                        >
+                                            {allAdded ? 'Ajoutés ✓' : '+ Tout'}
                                         </button>
                                     </div>
                                 );

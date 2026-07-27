@@ -11,14 +11,16 @@ import {
     ShieldCheck,
     MapPin,
     X,
-    Wrench
+    Wrench,
+    ChefHat
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import ProductCompletion from './ProductCompletion';
 import MainlandPriceAdmin from './MainlandPriceAdmin';
+import RecipeAdmin from './RecipeAdmin';
 
 const AdminDashboard = ({ onClose }) => {
-    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland'
+    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes'
     const [stats, setStats] = useState({
         totalScans: 0,
         uniqueUsers: 0,
@@ -158,6 +160,13 @@ const AdminDashboard = ({ onClose }) => {
                     >
                         <span>🇫🇷</span> Prix France Hexagonale
                     </button>
+                    <button
+                        onClick={() => setSubTab('recipes')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'recipes' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <ChefHat className="w-3.5 h-3.5" /> Recettes
+                    </button>
                 </div>
             </div>
 
@@ -168,6 +177,10 @@ const AdminDashboard = ({ onClose }) => {
             ) : subTab === 'mainland' ? (
                 <div className="flex-1 overflow-y-auto p-6">
                     <MainlandPriceAdmin />
+                </div>
+            ) : subTab === 'recipes' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                    <RecipeAdmin />
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">

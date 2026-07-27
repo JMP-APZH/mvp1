@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import BQPVerifier from './components/BQPVerifier';
 import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
+import RecipeDetailModal from './components/RecipeDetailModal';
 
 import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy } from 'lucide-react';
 import { supabase } from './supabaseClient';
@@ -81,12 +82,20 @@ const App10 = () => {
     const [categories, setCategories] = useState([]);
     const [imageViewer, setImageViewer] = useState(null); // { images: string[], index: number, labels: string[] } | null
     const [selectedProductId, setSelectedProductId] = useState(null);
+    const [selectedRecipeId, setSelectedRecipeId] = useState(null);
 
     // Auto-open the product detail modal when arriving via a shared link (?product=<id>)
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const sharedProductId = params.get('product');
         if (sharedProductId) setSelectedProductId(sharedProductId);
+    }, []);
+
+    // Auto-open the recipe detail modal when arriving via a shared link (?recipe=<id>)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sharedRecipeId = params.get('recipe');
+        if (sharedRecipeId) setSelectedRecipeId(sharedRecipeId);
     }, []);
     const touchStartXRef = useRef(0);
     const [categoryFilter, setCategoryFilter] = useState(null);
@@ -214,6 +223,7 @@ const App10 = () => {
             setStores(data || []);
         } catch (err) {
             console.error('Error loading stores:', err);
+            posthog.captureException(err, { context: 'load_stores' });
             toast.error('Impossible de charger les magasins. Vérifiez votre connexion.');
         }
     };
@@ -305,12 +315,14 @@ const App10 = () => {
                 }
             } catch (mainlandErr) {
                 console.error('Error loading mainland comparison data:', mainlandErr);
+                posthog.captureException(mainlandErr, { context: 'load_mainland_comparison' });
                 setMainlandByProduct({});
             }
 
             setLoading(false);
         } catch (err) {
             console.error('Error loading prices:', err);
+            posthog.captureException(err, { context: 'load_recent_prices' });
             toast.error('Impossible de charger les prix. Vérifiez votre connexion.');
             setLoading(false);
         }
@@ -411,6 +423,7 @@ const App10 = () => {
 
         } catch (err) {
             console.error('Error checking BQP status:', err);
+            posthog.captureException(err, { context: 'check_bqp_status' });
             toast.error('Erreur de lecture. Veuillez saisir le produit manuellement.');
         }
     };
@@ -440,6 +453,7 @@ const App10 = () => {
 
         } catch (err) {
             console.error('Error linking BQP:', err);
+            posthog.captureException(err, { context: 'link_bqp' });
             toast.error('Erreur lors de l\'association BQP');
         } finally {
             setLoading(false);
@@ -503,6 +517,7 @@ const App10 = () => {
             }
         } catch (err) {
             console.error('Error voting on quality:', err);
+            posthog.captureException(err, { context: 'bqp_quality_vote' });
         }
     };
 
@@ -579,6 +594,7 @@ const App10 = () => {
 
         } catch (err) {
             console.error('Error voting:', err);
+            posthog.captureException(err, { context: 'bqp_association_vote' });
             toast.error('Erreur lors du vote');
         }
     };
@@ -658,6 +674,7 @@ const App10 = () => {
             loadRecentPrices();
         } catch (err) {
             console.error('Error toggling like:', err);
+            posthog.captureException(err, { context: 'toggle_like' });
         }
     };
 
@@ -743,6 +760,7 @@ const App10 = () => {
 
                 if (uploadError) {
                     console.error('Product photo upload error:', uploadError);
+                    posthog.captureException(uploadError, { context: 'product_photo_upload' });
                 } else {
                     const { data: urlData } = supabase.storage
                         .from('product-photos')
@@ -768,6 +786,7 @@ const App10 = () => {
 
                 if (uploadError) {
                     console.error('Price tag photo upload error:', uploadError);
+                    posthog.captureException(uploadError, { context: 'price_tag_photo_upload' });
                 } else {
                     const { data: urlData } = supabase.storage
                         .from('price-tag-photos')
@@ -905,6 +924,7 @@ const App10 = () => {
 
         } catch (err) {
             console.error('Error submitting price:', err);
+            posthog.captureException(err, { context: 'submit_price' });
             setError('Erreur lors de l\'enregistrement du prix. Veuillez réessayer.');
             setLoading(false);
         }
@@ -1459,7 +1479,10 @@ const App10 = () => {
                                                             toast.success('Prix confirmé ! +5 points');
                                                             setBqpCheckResult(null);
                                                             loadRecentPrices();
-                                                        } catch (err) { console.error(err); }
+                                                        } catch (err) {
+                                                            console.error(err);
+                                                            posthog.captureException(err, { context: 'submit_price_quick_confirm' });
+                                                        }
                                                         finally { setLoading(false); }
                                                     }}
                                                     className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold text-xs shadow-sm hover:bg-green-700"
@@ -2091,6 +2114,7 @@ const App10 = () => {
                                 onRemoveItem={removeFromShoppingList}
                                 onClearList={clearShoppingList}
                                 onAddItem={addToShoppingList}
+                                onSelectRecipe={setSelectedRecipeId}
                                 supabase={supabase}
                                 user={user}
                             />
@@ -2177,6 +2201,17 @@ const App10 = () => {
                     productId={selectedProductId}
                     onClose={() => setSelectedProductId(null)}
                     onRequireAuth={() => setShowAuthModal(true)}
+                />
+            )}
+
+            {/* Recipe Detail Modal */}
+            {selectedRecipeId && (
+                <RecipeDetailModal
+                    recipeId={selectedRecipeId}
+                    onClose={() => setSelectedRecipeId(null)}
+                    onRequireAuth={() => setShowAuthModal(true)}
+                    onAddItem={addToShoppingList}
+                    shoppingListItems={shoppingList}
                 />
             )}
 
