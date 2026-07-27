@@ -4,7 +4,7 @@ import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 import RecipeDetailModal from './components/RecipeDetailModal';
 
-import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy } from 'lucide-react';
+import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy, PartyPopper } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { posthog } from './posthogClient';
 import { useAuth } from './contexts/AuthContext';
@@ -53,6 +53,16 @@ const App10 = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [bqpCheckResult, setBqpCheckResult] = useState(null); // { status: 'loading' | 'found' | 'not_found', product: ..., category: ... }
+    const [scanCelebration, setScanCelebration] = useState(null); // { points: number, productName: string } | null -- post-submit "next page" choice overlay
+
+    // Auto-dismiss the celebration overlay if the user doesn't choose within a
+    // reasonable window, so it can't trap someone who just walks away -- dismissing
+    // is equivalent to "Scanner un autre article" since the form is already reset.
+    useEffect(() => {
+        if (!scanCelebration) return;
+        const timer = setTimeout(() => setScanCelebration(null), 9000);
+        return () => clearTimeout(timer);
+    }, [scanCelebration]);
     const [showPersoStats, setShowPersoStats] = useState(false);
     const [showAdminDashboard, setShowAdminDashboard] = useState(false);
     const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
@@ -891,6 +901,7 @@ const App10 = () => {
             }
 
             toast.success(successMessage);
+            setScanCelebration({ points: pointsAwarded, productName: manualEntry.productName });
 
             // Reset form but conditionally set BQP prompt
             setManualEntry(prev => ({
@@ -1477,6 +1488,7 @@ const App10 = () => {
                                                             }
                                                             if (user) await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
                                                             toast.success('Prix confirmé ! +5 points');
+                                                            setScanCelebration({ points: user ? 5 : 0, productName: bqpCheckResult.product.name });
                                                             setBqpCheckResult(null);
                                                             loadRecentPrices();
                                                         } catch (err) {
@@ -2213,6 +2225,53 @@ const App10 = () => {
                     onAddItem={addToShoppingList}
                     shoppingListItems={shoppingList}
                 />
+            )}
+
+            {/* Scan Success Celebration -- "next page" choice after a price is recorded */}
+            {scanCelebration && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center relative animate-in zoom-in-95 duration-300">
+                        <button
+                            onClick={() => setScanCelebration(null)}
+                            className="absolute top-4 right-4 p-1.5 text-gray-300 hover:text-gray-500 transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                        <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-3 animate-in zoom-in duration-500">
+                            <PartyPopper className="w-8 h-8 text-green-600" />
+                        </div>
+                        <h3 className="font-bold text-gray-900 text-lg">Prix enregistré !</h3>
+                        <p className="text-sm text-gray-500 mt-1 truncate">{scanCelebration.productName}</p>
+                        {scanCelebration.points > 0 ? (
+                            <p className="text-sm font-bold text-green-600 mt-2">+{scanCelebration.points} points 🎉</p>
+                        ) : (
+                            <p className="text-sm text-gray-500 mt-2">Merci pour votre contribution !</p>
+                        )}
+                        <div className="flex flex-col gap-2 mt-5">
+                            <button
+                                onClick={() => {
+                                    posthog.capture('scan_celebration_choice', { choice: 'scan_another' });
+                                    setScanCelebration(null);
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold text-sm py-3 rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all"
+                            >
+                                <Camera className="w-4 h-4" /> Scanner un autre article
+                            </button>
+                            <button
+                                onClick={() => {
+                                    posthog.capture('scan_celebration_choice', { choice: 'view_list' });
+                                    setScanCelebration(null);
+                                    setActiveTab('search');
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="w-full flex items-center justify-center gap-2 bg-gray-50 border border-gray-200 text-gray-700 font-bold text-sm py-3 rounded-xl hover:bg-gray-100 active:scale-95 transition-all"
+                            >
+                                <Search className="w-4 h-4" /> Voir mes articles scannés
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Image Zoom Modal */}
