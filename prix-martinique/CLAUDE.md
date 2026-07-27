@@ -278,6 +278,9 @@ First piece of a longer-term gamification arc discussed with Jean-Marie: let use
 - **Backend**: Supabase.
   - `supabaseClient.js` uses standard VITE_ env vars.
 
+### PostHog Instrumentation Convention
+Nothing is tracked automatically — PostHog only records what's explicitly wrapped in a `posthog.capture()` call. When building any new feature, identify its 2-4 meaningful user actions (not every click — the moments that answer "is this feature actually being used") and instrument them as part of the build itself, not as a follow-up pass. Follow the existing conventions: `snake_case` event names distinct per action (don't reuse one event string across unrelated actions — see the `'price_submission'` reuse wart flagged in the Jul 21, 2026 bug-sweep entry above, which made two different actions indistinguishable in the data), and verify events actually land with a direct PostHog SQL query against the raw `events` table before calling the feature shipped (same "verified live before shipping" convention used everywhere else in this file).
+
 ### Key Source Files
 - `src/App10.jsx` — Main app entry point.
 - `src/hooks/useShoppingList.js` — Shopping list state + Supabase sync logic.
