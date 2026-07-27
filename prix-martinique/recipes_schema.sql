@@ -9,7 +9,7 @@
 -- submission) doesn't require a schema change later.
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
--- Status: NOT YET APPLIED as of writing (2026-07-27).
+-- Status: APPLIED and verified live 2026-07-27.
 
 -- 1. Recipes
 create table if not exists recipes (

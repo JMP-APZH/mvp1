@@ -19,7 +19,7 @@
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run, AFTER
 -- recipes_schema.sql.
--- Status: NOT YET APPLIED as of writing (2026-07-27).
+-- Status: APPLIED and verified live 2026-07-27.
 
 -- 1. Colombo de poulet
 insert into recipes (id, name, description, servings, prep_time_minutes, category, difficulty, is_active) values
