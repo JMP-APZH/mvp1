@@ -4,7 +4,7 @@ import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 import RecipeDetailModal from './components/RecipeDetailModal';
 
-import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Plus, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy, PartyPopper } from 'lucide-react';
+import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy, PartyPopper } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { posthog } from './posthogClient';
 import { useAuth } from './contexts/AuthContext';
@@ -1434,7 +1434,13 @@ const App10 = () => {
                                         </div>
                                     )}
 
-                                    {(bqpCheckResult && (bqpCheckResult.status === 'not_found' || bqpCheckResult.status === 'new_product')) && (
+                                    {/* Linking a BQP category requires a real product row (product_bqp_associations.product_id)
+                                        -- only offer the picker once bqpCheckResult carries a confirmed .product (an
+                                        existing matched product, or the row just created by submitPrice). A brand-new
+                                        scanned barcode has no .product yet, so the picker would silently no-op or,
+                                        worse, reuse a stale scannedProduct left over from a previous scan and link the
+                                        category to the WRONG item. Guide to the form below instead in that case. */}
+                                    {bqpCheckResult && (bqpCheckResult.status === 'not_found' || bqpCheckResult.status === 'new_product') && bqpCheckResult.product && (
                                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <Info className="w-5 h-5 text-blue-600" />
@@ -1449,6 +1455,18 @@ const App10 = () => {
                                             >
                                                 Lier à une catégorie BQP
                                             </button>
+                                        </div>
+                                    )}
+
+                                    {bqpCheckResult && bqpCheckResult.status === 'new_product' && !bqpCheckResult.product && (
+                                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Info className="w-5 h-5 text-orange-600" />
+                                                <h3 className="font-bold text-orange-800 text-sm">Nouveau produit !</h3>
+                                            </div>
+                                            <p className="text-xs text-orange-700">
+                                                Ce code-barres n'existe pas encore. Complétez le prix ci-dessous pour l'ajouter — vous pourrez ensuite le lier à une catégorie BQP.
+                                            </p>
                                         </div>
                                     )}
 
@@ -1671,6 +1689,23 @@ const App10 = () => {
 
 
 
+                                    {/* Prix -- moved right after the photos: it's the one thing the user
+                                        already has in front of them (on the shelf / price tag they just
+                                        photographed), before the slower classification fields below. */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Prix (EUR) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={manualEntry.price}
+                                            onChange={(e) => setManualEntry({ ...manualEntry, price: e.target.value })}
+                                            placeholder="Ex: 2.45"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        />
+                                    </div>
+
                                     {/* Category Selector */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1735,20 +1770,6 @@ const App10 = () => {
                                         />
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Prix (EUR) *
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={manualEntry.price}
-                                            onChange={(e) => setManualEntry({ ...manualEntry, price: e.target.value })}
-                                            placeholder="Ex: 2.45"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                        />
-                                    </div>
-
                                     {/* BQP Check in Manual Entry */}
                                     <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
                                         <div className="flex items-center justify-between">
@@ -1766,17 +1787,9 @@ const App10 = () => {
 
                                         {manualEntry.isDeclaredBqp && (
                                             <div className="animate-in slide-in-from-top-2 duration-300">
-                                                <button
-                                                    onClick={() => setShowBqpSelector(true)}
-                                                    className="w-full py-2 px-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold flex items-center justify-between hover:bg-blue-100 transition-colors"
-                                                >
-                                                    <span>
-                                                        {manualEntry.categoryId
-                                                            ? `Catégorie: ${categories.find(c => c.id === manualEntry.categoryId)?.name || 'Sélectionnée'}`
-                                                            : 'Choisir la catégorie BQP...'}
-                                                    </span>
-                                                    <Plus className="w-4 h-4" />
-                                                </button>
+                                                <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                                    Enregistrez d'abord le prix — vous pourrez choisir la catégorie BQP juste après.
+                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -2247,7 +2260,8 @@ const App10 = () => {
                         ) : (
                             <p className="text-sm text-gray-500 mt-2">Merci pour votre contribution !</p>
                         )}
-                        <div className="flex flex-col gap-2 mt-5">
+                        <p className="text-xs text-gray-400 mt-4 mb-1">Que souhaitez-vous faire ?</p>
+                        <div className="flex flex-col gap-2">
                             <button
                                 onClick={() => {
                                     posthog.capture('scan_celebration_choice', { choice: 'scan_another' });
@@ -2256,7 +2270,7 @@ const App10 = () => {
                                 }}
                                 className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold text-sm py-3 rounded-xl shadow-md hover:shadow-lg active:scale-95 transition-all"
                             >
-                                <Camera className="w-4 h-4" /> Scanner un autre article
+                                <Camera className="w-4 h-4" /> Continuer à scanner
                             </button>
                             <button
                                 onClick={() => {
@@ -2267,7 +2281,7 @@ const App10 = () => {
                                 }}
                                 className="w-full flex items-center justify-center gap-2 bg-gray-50 border border-gray-200 text-gray-700 font-bold text-sm py-3 rounded-xl hover:bg-gray-100 active:scale-95 transition-all"
                             >
-                                <Search className="w-4 h-4" /> Voir mes articles scannés
+                                <Search className="w-4 h-4" /> Voir les prix et détails enregistrés
                             </button>
                         </div>
                     </div>
