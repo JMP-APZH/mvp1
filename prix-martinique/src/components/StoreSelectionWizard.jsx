@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { detectUserLocation, getCityList, getStoresSortedByDistance } from '../utils/geocoding';
+import { detectUserLocation, getCityList, getPostalCode, getStoresSortedByDistance } from '../utils/geocoding';
 import { posthog } from '../posthogClient';
 
 const STEP_NAMES = { 1: 'city', 2: 'chain', 3: 'store' };
@@ -438,13 +438,16 @@ export default function StoreSelectionWizard({
                             ) : (
                                 filteredCities.map(city => {
                                     const storeCount = stores.filter(s => s.city === city).length;
+                                    const postalCode = getPostalCode(city);
                                     return (
                                         <button
                                             key={city}
                                             onClick={() => handleCitySelect(city)}
                                             className="w-full text-left px-4 py-3 hover:bg-orange-50 rounded-lg border border-transparent hover:border-orange-300 transition-colors flex items-center justify-between group"
                                         >
-                                            <span className="font-medium text-gray-900">{city}</span>
+                                            <span className="font-medium text-gray-900">
+                                                {city}{postalCode ? ` (${postalCode})` : ''}
+                                            </span>
                                             <span className="text-sm text-gray-500 group-hover:text-orange-600">
                                                 {storeCount} magasin{storeCount > 1 ? 's' : ''}
                                             </span>
