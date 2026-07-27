@@ -253,6 +253,7 @@ export const AuthProvider = ({ children }) => {
         // Mark as initialized so future SIGNED_IN events are handled
         isInitialized = true;
       } catch (err) {
+        posthog.captureException(err, { context: 'auth_initialization' });
         if (isMounted) setLoading(false);
         isInitialized = true;
       } finally {
@@ -294,6 +295,7 @@ export const AuthProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       console.error('Sign up error:', error);
+      posthog.captureException(error, { context: 'sign_up' });
       return { data: null, error };
     }
   };
@@ -310,6 +312,7 @@ export const AuthProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       console.error('Sign in error:', error);
+      posthog.captureException(error, { context: 'sign_in' });
       return { data: null, error };
     }
   };
@@ -335,6 +338,7 @@ export const AuthProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       console.error('Google sign in error:', error);
+      posthog.captureException(error, { context: 'sign_in_google' });
       return { data: null, error };
     }
   };
@@ -354,6 +358,7 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Sign out error:', error);
+      posthog.captureException(error, { context: 'sign_out' });
       return { error };
     }
   };
@@ -368,6 +373,7 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Reset password error:', error);
+      posthog.captureException(error, { context: 'reset_password' });
       return { error };
     }
   };
@@ -381,6 +387,7 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Update password error:', error);
+      posthog.captureException(error, { context: 'update_password' });
       return { error };
     }
   };
@@ -402,6 +409,7 @@ export const AuthProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       console.error('Award points error:', error);
+      posthog.captureException(error, { context: 'award_points', activityType });
       return { data: null, error };
     }
   };
@@ -436,6 +444,7 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Toggle favorite error:', error);
+      posthog.captureException(error, { context: 'toggle_favorite' });
       setUserFavorites(previousFavorites);
       return { error };
     }
@@ -476,6 +485,7 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Toggle favorite store error:', error);
+      posthog.captureException(error, { context: 'toggle_favorite_store' });
       setUserFavoriteStores(previousFavoriteStores);
       return { error };
     }
@@ -516,6 +526,7 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Error updating profile:', error);
+      posthog.captureException(error, { context: 'update_profile' });
       return { error };
     }
   };

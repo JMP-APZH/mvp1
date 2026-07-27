@@ -1,7 +1,7 @@
 import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import './posthogClient'
+import { posthog } from './posthogClient'
 import App10 from './App10.jsx'
 import { AuthProvider } from './contexts/AuthContext'
 class ErrorBoundary extends React.Component {
@@ -16,6 +16,7 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("Uncaught error:", error, errorInfo);
+    posthog.captureException(error, { context: 'react_error_boundary', componentStack: errorInfo?.componentStack });
   }
 
   render() {
