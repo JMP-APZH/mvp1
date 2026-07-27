@@ -394,7 +394,7 @@ const RecipeForm = ({
             />
         </div>
         <input
-            type="url"
+            type="text"
             value={form.photo_url}
             onChange={(e) => setForm(f => ({ ...f, photo_url: e.target.value }))}
             placeholder="URL de la photo (optionnel)"
