@@ -20,6 +20,7 @@ import { useShoppingList } from './hooks/useShoppingList';
 import Community from './components/Community';
 import PersoStats from './components/PersoStats';
 import MyScansModal from './components/MyScansModal';
+import WantedScansModal from './components/WantedScansModal';
 import AdminDashboard from './components/AdminDashboard';
 import PriceDuel from './components/PriceDuel';
 import { ToastContainer } from './components/Toast';
@@ -67,6 +68,7 @@ const App10 = () => {
     const [showPersoStats, setShowPersoStats] = useState(false);
     const [showAdminDashboard, setShowAdminDashboard] = useState(false);
     const [showMyScans, setShowMyScans] = useState(false);
+    const [showWantedScans, setShowWantedScans] = useState(false);
     const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
     const [bqpQualityStats, setBqpQualityStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 });
     const [priceHistory, setPriceHistory] = useState([]);
@@ -1049,6 +1051,7 @@ const App10 = () => {
                         onOpenStats={() => setShowPersoStats(true)}
                         onOpenAdmin={() => setShowAdminDashboard(true)}
                         onOpenMyScans={() => setShowMyScans(true)}
+                        onOpenWantedScans={() => setShowWantedScans(true)}
                         stores={stores}
                     />
                 </div>
@@ -1068,6 +1071,9 @@ const App10 = () => {
                         shoppingListItems={shoppingList}
                     />
                 )}
+
+                {/* Wanted Scans View */}
+                {showWantedScans && <WantedScansModal onClose={() => setShowWantedScans(false)} />}
 
                 {/* Points indicator for logged in users */}
                 {user && userProfile && (

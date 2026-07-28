@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock, ScanLine, Info } from 'lucide-react';
+import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock, ScanLine, Info, Target } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabaseClient';
 import { calculateSavings } from '../utils/userStats';
+import { getWantedScans } from '../utils/scanRequests';
 
 const CHAIN_ICONS = {
   'Carrefour': '🔵',
@@ -20,10 +21,11 @@ const CHAIN_ICONS = {
   'Carrefour Express': '🔵',
 };
 
-const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, stores }) => {
+const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOpenWantedScans, stores }) => {
   const { user, userProfile, userBadges, userRoles, loading, signOut, updateProfile, updatePassword, userFavoriteStores, toggleFavoriteStore } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [savings, setSavings] = useState(null);
+  const [wantedCount, setWantedCount] = useState(null);
   const [isUpdatingCity, setIsUpdatingCity] = useState(false);
   const [showStoreSearch, setShowStoreSearch] = useState(false);
   const [storeSearchQuery, setStoreSearchQuery] = useState("");
@@ -77,8 +79,9 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, stor
   useEffect(() => {
     if (isOpen && user) {
       calculateSavings(supabase, user.id).then(setSavings);
+      getWantedScans(supabase, [...(userFavoriteStores || [])]).then(results => setWantedCount(results.length));
     }
-  }, [isOpen, user]);
+  }, [isOpen, user, userFavoriteStores]);
 
   const handleCityChange = async (city) => {
     setIsUpdatingCity(true);
@@ -314,6 +317,32 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, stor
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-orange-300" />
+            </button>
+          </div>
+
+          <div className="p-2 border-b border-gray-100">
+            <button
+              onClick={() => {
+                onOpenWantedScans();
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-500 p-2 rounded-lg text-white shadow-sm group-hover:scale-110 transition-transform relative">
+                  <Target className="w-5 h-5" />
+                  {wantedCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                      {wantedCount}
+                    </span>
+                  )}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-900">Prix recherchés</p>
+                  <p className="text-[10px] text-blue-600 font-medium tracking-tight">Aidez la communauté dans vos magasins</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-blue-300" />
             </button>
           </div>
 

@@ -8,7 +8,8 @@
 -- this can't be cleaned up from the app itself; needs to run here.
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
--- Status: NOT YET APPLIED as of writing.
+-- Status: APPLIED and verified live 2026-07-28 (zero rows remaining across
+-- feature_requests/feature_votes/feature_request_comments for this title).
 
 delete from feature_request_comments
 where feature_id in (select id from feature_requests where title = 'TEST QA Feature Comments');

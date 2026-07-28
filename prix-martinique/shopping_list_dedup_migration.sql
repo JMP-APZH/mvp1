@@ -22,7 +22,8 @@
 -- merged manually before this runs -- the merge steps just no-op).
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
--- Status: NOT YET APPLIED as of writing (2026-07-28).
+-- Status: APPLIED and verified live 2026-07-28 (affected account back to a
+-- single primary list, all scattered items merged, confirmed via direct query).
 
 -- Step 1: merge every item from duplicate primary lists into the oldest
 -- (canonical) primary list per user, summing quantities on conflict.

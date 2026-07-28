@@ -18,7 +18,8 @@
 -- in CLAUDE.md.
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
--- Status: NOT YET APPLIED as of writing (2026-07-28).
+-- Status: APPLIED and verified live 2026-07-28 (comment post + admin reply
+-- round-trip both confirmed via direct query).
 
 create table if not exists feature_request_comments (
   id uuid primary key default gen_random_uuid(),

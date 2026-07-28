@@ -347,6 +347,16 @@ Follow-up review, same session: asked to critique "Mes Économies" itself, not j
 - **Explainer added**: a small info icon + native tooltip next to "Mes Économies" in the dropdown states the methodology plainly ("Comparé au prix moyen observé... sur les 12 derniers mois"), and `PersoStats.jsx`'s existing "Comment c'est calculé ?" box was updated to match the new wording (was still describing the old max-based method).
 - **Verified live**: the real number changed from 12.30€ (old max-based) to 6.15€ (new average-based) for the same test account and data — confirms the methodology change actually took effect, not just a re-run of the old formula. Confirmed the "Mes Scans" summary banner shows the identical 6.15€, and per-row badges only appear on scans that genuinely beat their product's average (verified several correctly showing badges, several correctly showing none).
 
+### Jul 28, 2026 — "Prix Recherchés": Signal Community Demand to Users' Favorite Stores
+Raised while looking at Panier: if a product interests someone but has only been priced at a store that isn't in *their* favorite stores, could the app nudge users who *do* frequent that store to go scan it? Discussed the design before building, since one real decision was buried in it: the natural "someone wants this" signal is `user_favorites`, but that table's RLS is intentionally `auth.uid() = user_id` (own rows only) — individual favorite lists are private. Rather than broadening that (which would expose who favorited what), chose the narrower option: a single-purpose aggregate.
+
+- **`product_favorite_counts_migration.sql`** (new, **not yet applied**): adds `get_product_favorite_counts()`, a `SECURITY DEFINER` SQL function returning only `(product_id, favorite_count)` pairs — never which user favorited what. `user_favorites`' own RLS is untouched; this is the one narrow, purpose-built exception, matching the same reasoning already used for `award_points()`.
+- **`src/utils/scanRequests.js`** (new): `getWantedScans(supabase, storeIds)` — for the user's own favorite stores, finds community-favorited products not yet priced at each one, joins in names, sorts by demand.
+- **`src/components/WantedScansModal.jsx`** (new): "🎯 Prix recherchés", grouped by store, each item showing "N personnes le veulent". Three states handled explicitly and honestly: no favorite stores set (prompts to add some), favorite stores set but nothing missing ("Bravo, tout est à jour !"), and the populated list.
+- **`UserMenu.jsx`**: new action row (mirrors the existing "Mon Impact" row) opening the modal, with a live count badge on the icon once the dropdown is opened.
+- **Verified live, including the not-yet-applied-migration case**: confirmed the empty-favorite-stores state renders correctly; temporarily added a real favorite store and confirmed that with the RPC not yet applied, `getWantedScans` degrades gracefully to the positive empty state (no crash, no visible error) rather than breaking — the code already checks `countsError` defensively. Removed the temporary test store afterward.
+- **Two follow-up ideas logged as `status: 'planned'` feature requests, not built**: a contextual "N produits recherchés ici" banner once a store is picked in the Scanner flow (the most actionable moment, deferred to keep this pass scoped), and a public Top-20-most-wanted-products ranking (by category, and a parallel one for BQP products specifically), which would reuse the same `get_product_favorite_counts()` function once it exists.
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
@@ -396,6 +406,8 @@ Nothing is tracked automatically — PostHog only records what's explicitly wrap
 - `src/components/FeatureRequestAdmin.jsx` — Admin-only feature-request triage: set status, write the official reply (Console Admin "Suggestions" sub-tab).
 - `src/components/MyScansModal.jsx` — "Mes Scans": a user's own submitted prices, most recent first, with quick favorite/add-to-panier actions (profile dropdown → "Mes contributions à l'effort collectif").
 - `src/utils/userStats.js` — Shared `calculateSavings()`, single source of truth used by both `PersoStats.jsx` and `UserMenu.jsx`.
+- `src/components/WantedScansModal.jsx` — "Prix recherchés": community-favorited products not yet priced at the user's favorite stores (profile dropdown).
+- `src/utils/scanRequests.js` — `getWantedScans()`, backing `WantedScansModal.jsx`.
 - `src/posthogClient.js` — PostHog init (product analytics).
 
 ### Database Schema (Critical Tables)

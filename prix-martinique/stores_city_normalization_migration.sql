@@ -11,7 +11,8 @@
 -- split across two separate "city" entries in the wizard.
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
--- Status: NOT YET APPLIED as of writing (2026-07-27).
+-- Status: APPLIED and verified live 2026-07-28 (zero rows matching the old
+-- postal-code-prefixed format; city counts merged as expected).
 
 update stores set city = 'Fort-de-France' where city = '97200 Fort-de-France';
 update stores set city = 'Ducos'          where city = '97224 Ducos';
