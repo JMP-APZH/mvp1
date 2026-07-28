@@ -3,6 +3,7 @@ import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Ch
 import { useAuth } from '../contexts/AuthContext';
 import { posthog } from '../posthogClient';
 import UnmatchedItemsModal from './UnmatchedItemsModal';
+import FlagFrance from './flags/FlagFrance';
 
 const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, onSelectRecipe, supabase }) => {
     const { userProfile, userFavorites, updateProfile, toggleFavorite } = useAuth();
@@ -714,7 +715,7 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                         {mainlandComparison && (
                             <div className="space-y-2">
                                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                    <span>🇫🇷</span> Comparaison France Hexagonale
+                                    <FlagFrance className="w-4 h-4" /> Comparaison France Hexagonale
                                 </h3>
                                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
                                     {mainlandComparison.bestFoundCount < mainlandComparison.totalCount && (

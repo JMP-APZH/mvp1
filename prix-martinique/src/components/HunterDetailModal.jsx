@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Star, Store, Package, Loader2, MapPin, Tag } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import ProductDetailModal from './ProductDetailModal';
+import FlagFrance from './flags/FlagFrance';
 
 const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
     const [loading, setLoading] = useState(true);
@@ -265,12 +266,12 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                                                         {mainland ? (
                                                             <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full mt-1 ${isCheaper ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                                                 }`}>
-                                                                <span>🇫🇷</span>
+                                                                <FlagFrance className="w-3 h-3" />
                                                                 {mainland.price.toFixed(2)}€ · {diff > 0 ? '+' : ''}{diff.toFixed(2)}€ ({pct > 0 ? '+' : ''}{pct.toFixed(0)}%)
                                                             </span>
                                                         ) : (
                                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full mt-1 bg-gray-100 text-gray-400">
-                                                                <span>🇫🇷</span> Pas encore dispo
+                                                                <FlagFrance className="w-3 h-3" /> Pas encore dispo
                                                             </span>
                                                         )}
                                                     </div>

@@ -22,6 +22,7 @@ import MainlandPriceAdmin from './MainlandPriceAdmin';
 import RecipeAdmin from './RecipeAdmin';
 import FeatureRequestAdmin from './FeatureRequestAdmin';
 import TestDataAdmin from './TestDataAdmin';
+import FlagFrance from './flags/FlagFrance';
 
 const AdminDashboard = ({ onClose }) => {
     const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes' | 'suggestions' | 'testdata'
@@ -164,7 +165,7 @@ const AdminDashboard = ({ onClose }) => {
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'mainland' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
                             }`}
                     >
-                        <span>🇫🇷</span> Prix France Hexagonale
+                        <FlagFrance className="w-3.5 h-3.5" /> Prix France Hexagonale
                     </button>
                     <button
                         onClick={() => setSubTab('recipes')}

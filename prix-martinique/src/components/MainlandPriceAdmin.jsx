@@ -3,10 +3,11 @@ import { Plus, Loader2, Link2, Trash2, ZoomIn, X, Camera, AlertTriangle } from '
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { MAINLAND_CHAINS as CHAINS } from '../constants/mainlandChains';
+import FlagFrance from './flags/FlagFrance';
 
 const FILTERS = [
     { value: 'all', label: 'Tous' },
-    { value: 'missing-mainland', label: 'Sans prix 🇫🇷' },
+    { value: 'missing-mainland', label: 'Sans prix France' },
 ];
 
 const MainlandPriceAdmin = () => {
@@ -204,7 +205,7 @@ const MainlandPriceAdmin = () => {
     return (
         <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs text-blue-800 flex items-start gap-2">
-                <span className="flex-shrink-0">🇫🇷</span>
+                <FlagFrance className="w-4 h-4 flex-shrink-0" />
                 <p>
                     Ajoutez un prix de référence trouvé en ligne pour l'équivalent d'un produit en France
                     Hexagonale, avec une capture d'écran du site du magasin comme preuve. Il apparaîtra

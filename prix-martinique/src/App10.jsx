@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import BQPVerifier from './components/BQPVerifier';
+import FlagMartinique from './components/flags/FlagMartinique';
+import FlagFrance from './components/flags/FlagFrance';
 import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 import RecipeDetailModal from './components/RecipeDetailModal';
@@ -1325,7 +1327,7 @@ const App10 = () => {
                                                 : 'bg-white border-gray-200 text-gray-500'
                                                 }`}
                                         >
-                                            🇲🇶 Martinique
+                                            <FlagMartinique className="w-4 h-4" /> Martinique
                                         </button>
                                         <button
                                             onClick={() => setManualEntry({ ...manualEntry, isMainland: true, storeId: '' })}
@@ -1334,7 +1336,7 @@ const App10 = () => {
                                                 : 'bg-white border-gray-200 text-gray-500'
                                                 }`}
                                         >
-                                            <span>🇫🇷</span> France Hexagonale
+                                            <FlagFrance className="w-4 h-4" /> France Hexagonale
                                         </button>
                                     </div>
 
@@ -1369,7 +1371,7 @@ const App10 = () => {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-lg ${manualEntry.isMainland ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
-                                            {manualEntry.isMainland ? <span className="text-lg leading-none">🇫🇷</span> : <MapPin className="w-5 h-5" />}
+                                            {manualEntry.isMainland ? <FlagFrance className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">
@@ -1779,8 +1781,8 @@ const App10 = () => {
                                             <Leaf className="w-5 h-5 text-green-600" />
                                         </div>
                                         <div className="flex-1">
-                                            <label htmlFor="isLocal" className="block text-sm font-bold text-green-900">
-                                                Produit Local ? 🇲🇶
+                                            <label htmlFor="isLocal" className="block text-sm font-bold text-green-900 flex items-center gap-1.5">
+                                                Produit Local ? <FlagMartinique className="w-4 h-4" />
                                             </label>
                                             <p className="text-xs text-green-700">Cochez si produit en Martinique</p>
                                         </div>
@@ -2076,7 +2078,7 @@ const App10 = () => {
                                                                 if (!mainland) {
                                                                     return (
                                                                         <span className="text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap flex items-center gap-1 bg-gray-100 text-gray-400">
-                                                                            <span>🇫🇷</span> Pas encore dispo
+                                                                            <FlagFrance className="w-3 h-3" /> Pas encore dispo
                                                                         </span>
                                                                     );
                                                                 }
@@ -2089,7 +2091,7 @@ const App10 = () => {
                                                                             }`}
                                                                         title={`vs ${mainland.chain || 'France Hexagonale'} : ${mainland.price.toFixed(2)}€`}
                                                                     >
-                                                                        <span>🇫🇷</span>
+                                                                        <FlagFrance className="w-3 h-3" />
                                                                         {mainland.price.toFixed(2)}€ · {diff > 0 ? '+' : ''}{diff.toFixed(2)}€ ({pct > 0 ? '+' : ''}{pct.toFixed(0)}%)
                                                                     </span>
                                                                 );

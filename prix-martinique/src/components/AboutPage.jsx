@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megaphone, ChevronLeft, ArrowRight, Star, Bookmark, ShoppingBasket, Leaf, TrendingDown } from 'lucide-react';
+import FlagMartinique from './flags/FlagMartinique';
 
 const SubHeader = ({ title, onBack }) => (
   <div
@@ -147,7 +148,7 @@ const AboutPage = () => {
                 <Leaf className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <h4 className="font-bold text-gray-900">Produits Locaux 🇲🇶</h4>
+                <h4 className="font-bold text-gray-900 flex items-center gap-1.5">Produits Locaux <FlagMartinique className="w-4 h-4" /></h4>
                 <p className="text-sm text-gray-700">
                   Privilégiez la production locale ! Repérez le badge <strong>Feuille</strong> ou activez l'option lors de votre saisie.
                 </p>
