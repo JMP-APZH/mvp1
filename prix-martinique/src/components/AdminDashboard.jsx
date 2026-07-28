@@ -13,16 +13,18 @@ import {
     X,
     Wrench,
     ChefHat,
-    MessageSquare
+    MessageSquare,
+    FlaskConical
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import ProductCompletion from './ProductCompletion';
 import MainlandPriceAdmin from './MainlandPriceAdmin';
 import RecipeAdmin from './RecipeAdmin';
 import FeatureRequestAdmin from './FeatureRequestAdmin';
+import TestDataAdmin from './TestDataAdmin';
 
 const AdminDashboard = ({ onClose }) => {
-    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes' | 'suggestions'
+    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes' | 'suggestions' | 'testdata'
     const [stats, setStats] = useState({
         totalScans: 0,
         uniqueUsers: 0,
@@ -178,6 +180,13 @@ const AdminDashboard = ({ onClose }) => {
                     >
                         <MessageSquare className="w-3.5 h-3.5" /> Suggestions
                     </button>
+                    <button
+                        onClick={() => setSubTab('testdata')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'testdata' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <FlaskConical className="w-3.5 h-3.5" /> Données test
+                    </button>
                 </div>
             </div>
 
@@ -196,6 +205,10 @@ const AdminDashboard = ({ onClose }) => {
             ) : subTab === 'suggestions' ? (
                 <div className="flex-1 overflow-y-auto p-6">
                     <FeatureRequestAdmin />
+                </div>
+            ) : subTab === 'testdata' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                    <TestDataAdmin />
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">

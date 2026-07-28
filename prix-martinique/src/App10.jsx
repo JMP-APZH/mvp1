@@ -282,7 +282,7 @@ const App10 = () => {
             // evidence screenshot rather than a real in-store scan).
             const localData = data.filter(item => item.origin_region_code !== 'Hexagone');
 
-            const transformedPrices = localData.map(item => ({
+            let transformedPrices = localData.map(item => ({
                 id: item.id,
                 productId: item.products?.id,
                 categoryId: item.products?.category_id,
@@ -301,6 +301,29 @@ const App10 = () => {
                 likesCount: item.price_likes?.length || 0,
                 isLikedByUser: item.price_likes?.some(l => l.user_id === user?.id)
             }));
+
+            // Exclude products flagged is_test_data (Console Admin > Données test) --
+            // kept in the database for demos/reference, just not shown to end users.
+            // Fetched separately and isolated in its own try/catch, deliberately not
+            // part of the main query above: is_test_data is a newer column, and a
+            // missing-column error here must never take down the whole Comparer feed.
+            try {
+                const productIds = [...new Set(transformedPrices.map(p => p.productId).filter(Boolean))];
+                if (productIds.length > 0) {
+                    const { data: testFlagged, error: testFlagError } = await supabase
+                        .from('products')
+                        .select('id')
+                        .in('id', productIds)
+                        .eq('is_test_data', true);
+                    if (testFlagError) throw testFlagError;
+                    const testIds = new Set((testFlagged || []).map(p => p.id));
+                    if (testIds.size > 0) {
+                        transformedPrices = transformedPrices.filter(p => !testIds.has(p.productId));
+                    }
+                }
+            } catch (testFlagErr) {
+                console.error('Error filtering test-flagged products (non-fatal):', testFlagErr);
+            }
 
             setRecentPrices(transformedPrices);
 
