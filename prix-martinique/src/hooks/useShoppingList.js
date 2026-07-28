@@ -47,22 +47,29 @@ export function useShoppingList(supabase, user) {
     // ── Supabase helpers ────────────────────────────────────────────────────
 
     const getOrCreatePrimaryList = async () => {
-        const { data } = await supabase
+        // .maybeSingle() errors out (returning null data, silently swallowed here
+        // since only `data` was destructured) whenever more than one row matches --
+        // which then fell through to creating ANOTHER primary list every time this
+        // ran, compounding indefinitely. .limit(1) + explicit ordering tolerates
+        // duplicates deterministically (oldest wins) instead of erroring.
+        const { data, error } = await supabase
             .from('shopping_lists')
             .select('id')
             .eq('user_id', user.id)
             .eq('is_primary', true)
-            .maybeSingle();
+            .order('created_at', { ascending: true })
+            .limit(1);
 
-        if (data) return data.id;
+        if (error) throw error;
+        if (data && data.length > 0) return data[0].id;
 
-        const { data: newList, error } = await supabase
+        const { data: newList, error: insertError } = await supabase
             .from('shopping_lists')
             .insert({ user_id: user.id, name: 'Mon Panier', is_primary: true })
             .select('id')
             .single();
 
-        if (error) throw error;
+        if (insertError) throw insertError;
         return newList.id;
     };
 
