@@ -176,6 +176,36 @@ export function useShoppingList(supabase, user) {
                         quantity: 1,
                         photo: product.productPhotoUrl || null,
                     }]);
+                } else if (error.code === '23505') {
+                    // Unique-constraint conflict: the item is already in the DB list
+                    // but local state didn't know that (stale after a slow round-trip,
+                    // a second tab/device, etc.) -- previously this branch did nothing,
+                    // leaving the "+ Panier" button stuck forever with no feedback,
+                    // indistinguishable from the add having silently failed. Resync
+                    // local state to the real DB row instead of dropping it.
+                    const { data: row } = await supabase
+                        .from('shopping_list_items')
+                        .select('quantity')
+                        .eq('list_id', currentListId)
+                        .eq('product_id', product.id)
+                        .single();
+
+                    if (row) {
+                        setShoppingList(prev => {
+                            const alreadyTracked = prev.some(i => i.productId === product.id);
+                            if (alreadyTracked) {
+                                return prev.map(i => i.productId === product.id ? { ...i, quantity: row.quantity } : i);
+                            }
+                            return [...prev, {
+                                productId: product.id,
+                                name: product.name || product.product,
+                                quantity: row.quantity,
+                                photo: product.productPhotoUrl || null,
+                            }];
+                        });
+                    }
+                } else {
+                    console.error('Erreur ajout panier:', error);
                 }
             }
         } else {
