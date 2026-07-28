@@ -1437,7 +1437,7 @@ const App10 = () => {
                                                     <button
                                                         onClick={() => handleToggleFavorite(bqpCheckResult.product.id)}
                                                         className="p-2 rounded-full bg-white border border-gray-200 hover:bg-yellow-50 hover:border-yellow-300 transition-colors"
-                                                        title="Ajouter aux favoris"
+                                                        title={userFavorites.has(bqpCheckResult.product.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                                                     >
                                                         <Bookmark className={`w-5 h-5 ${userFavorites.has(bqpCheckResult.product.id) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
                                                     </button>
@@ -2104,7 +2104,7 @@ const App10 = () => {
                                                                         ? 'bg-yellow-50 border-yellow-200 text-yellow-500'
                                                                         : 'bg-transparent border-transparent text-gray-300 hover:text-yellow-400'
                                                                         }`}
-                                                                    title="Ajouter aux favoris (Sauvegarder)"
+                                                                    title={userFavorites.has(price.productId) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                                                                 >
                                                                     <Bookmark
                                                                         className={`w-5 h-5 ${userFavorites.has(price.productId) ? 'fill-yellow-400' : ''}`}

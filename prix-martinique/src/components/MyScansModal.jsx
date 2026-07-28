@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Package, ScanLine, Star, Check, TrendingDown } from 'lucide-react';
+import { X, Loader2, Package, ScanLine, Bookmark, Check, TrendingDown } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { posthog } from '../posthogClient';
@@ -161,9 +161,9 @@ const MyScansModal = ({ onClose, onAddItem, shoppingListItems, initialFilter = '
                                             <button
                                                 onClick={() => toggleFavorite(scan.product_id)}
                                                 className={`p-1.5 rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-400'}`}
-                                                title="Ajouter aux favoris"
+                                                title={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                                             >
-                                                <Star className="w-4 h-4" fill={isFavorite ? 'currentColor' : 'none'} />
+                                                <Bookmark className="w-4 h-4" fill={isFavorite ? 'currentColor' : 'none'} />
                                             </button>
                                             <button
                                                 onClick={() => handleAdd(scan)}

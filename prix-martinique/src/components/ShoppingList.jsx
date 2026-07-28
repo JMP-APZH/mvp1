@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Star, Wallet, TrendingDown, Pencil, ChefHat, ChevronRight } from 'lucide-react';
+import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Bookmark, Wallet, TrendingDown, Pencil, ChefHat, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { posthog } from '../posthogClient';
 import UnmatchedItemsModal from './UnmatchedItemsModal';
 
 const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, onSelectRecipe, supabase }) => {
-    const { userProfile, userFavorites, updateProfile } = useAuth();
+    const { userProfile, userFavorites, updateProfile, toggleFavorite } = useAuth();
     const [comparison, setComparison] = useState(null);
     const [loadingComparison, setLoadingComparison] = useState(false);
     const [expandedStore, setExpandedStore] = useState(null);
@@ -439,13 +439,13 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                 {/* Favorites watchlist -- build your panier from your favorites */}
                 <div>
                     <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-2 text-sm">
-                        <Star className="w-4 h-4 text-yellow-500" /> Mes Favoris
+                        <Bookmark className="w-4 h-4 text-yellow-500 fill-yellow-400" /> Mes Favoris
                     </h3>
                     {loadingFavorites ? (
                         <div className="p-4 text-center text-gray-400 text-xs bg-white rounded-lg border">Chargement...</div>
                     ) : favoritesDetails.length === 0 ? (
                         <div className="p-4 text-center text-gray-400 text-xs bg-white rounded-lg border border-dashed">
-                            Appuyez sur l'étoile ⭐ d'un produit dans "Comparer" pour l'ajouter ici.
+                            Appuyez sur le signet 🔖 d'un produit dans "Comparer" pour l'ajouter ici.
                         </div>
                     ) : (
                         <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -453,12 +453,19 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                                 const inPanier = items.some(i => i.productId === fav.id);
                                 return (
                                     <div key={fav.id} className="flex-shrink-0 w-28 bg-white border border-gray-200 rounded-lg p-2">
-                                        <div className="w-full h-16 rounded bg-gray-100 flex items-center justify-center overflow-hidden mb-1.5">
+                                        <div className="relative w-full h-16 rounded bg-gray-100 flex items-center justify-center overflow-hidden mb-1.5">
                                             {fav.photo ? (
                                                 <img src={fav.photo} alt={fav.name} className="w-full h-full object-cover" />
                                             ) : (
                                                 <Package className="w-6 h-6 text-gray-300" />
                                             )}
+                                            <button
+                                                onClick={() => toggleFavorite(fav.id)}
+                                                className="absolute top-1 right-1 p-1 rounded-full bg-white/90 text-yellow-500 hover:bg-white transition-colors shadow-sm"
+                                                title="Retirer des favoris"
+                                            >
+                                                <Bookmark className="w-3.5 h-3.5 fill-yellow-400" />
+                                            </button>
                                         </div>
                                         <p className="text-[11px] font-medium text-gray-900 leading-tight line-clamp-2 h-8">{fav.name}</p>
                                         <p className="text-xs font-bold text-gray-700 mt-0.5">

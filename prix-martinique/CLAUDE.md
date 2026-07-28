@@ -381,6 +381,15 @@ Two issues raised after checking the profile dropdown on mobile: (1) "Mes Écono
 - **Scroll indicator added**: a small bouncing chevron-down over a white fade-gradient appears at the bottom of the dropdown's scrollable section whenever there's more content below, and disappears once scrolled to the bottom (tracked via `scrollHeight - scrollTop - clientHeight`, rechecked on open and on every scroll).
 - **Verified live**: confirmed the gradient+chevron renders correctly on open; clicked "Mes Économies" and confirmed it opens with "Avec économies (6)" active and a filtered list; clicked "Mes contributions" separately and confirmed it opens with "Tous mes scans (8)" active and the full list -- genuinely distinct now, not the same page twice.
 
+### Jul 28, 2026 — Favorites: Icon/Wording Consistency + Un-favorite from Every View
+Reported: Panier's "Mes Favoris" empty-state text said "l'étoile ⭐" but Comparer's actual favorite control isn't a star; also believed favorites couldn't be removed once added. Investigated rather than assuming either claim was fully accurate:
+
+- **Confirmed real**: three different icons for one concept across the app -- Comparer's feed cards and the BQP flow use a `Bookmark` icon (2 places, the actual majority convention), `MyScansModal.jsx` used a `Star` icon (an inconsistency introduced when that view was built), and Panier's empty-state copy referenced a star that doesn't exist anywhere in the UI.
+- **Correction surfaced during investigation**: Comparer's own bookmark toggle already worked both ways -- verified live (click → favorited, click again → unfavorited, confirmed via the actual CSS/state change). The real gap was that Panier's "Mes Favoris" watchlist cards had **no remove control at all** -- only "+ Panier" -- so a user could add a favorite from Comparer but had no way to undo it from the Panier view itself.
+- **Standardized on `Bookmark` everywhere**: swapped `MyScansModal.jsx`'s Star for Bookmark, fixed Panier's empty-state text ("le signet 🔖"), and made the previously-static "Ajouter aux favoris" tooltips in `App10.jsx` (Comparer feed + BQP flow) dynamic ("Retirer des favoris" when already favorited).
+- **Added the missing remove control**: Panier's "Mes Favoris" cards now have a small bookmark button overlaid on the product photo, wired to the same `toggleFavorite()` already used everywhere else -- no new logic, just reusing the proven toggle. Un-favoriting is independent of the cart (separate tables, `user_favorites` vs `shopping_list_items`), confirmed live: removed a favorite that was also in the cart and the cart count didn't change.
+- **Verified live end-to-end**: favorited a product from Comparer, confirmed it appeared in Panier's "Mes Favoris" with the new bookmark overlay, clicked it to remove, confirmed the item disappeared and the corrected empty-state text appeared, and confirmed the cart (13 items) was unaffected. Also confirmed `MyScansModal.jsx` now renders the outline Bookmark icon instead of Star.
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
