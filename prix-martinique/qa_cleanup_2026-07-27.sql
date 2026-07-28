@@ -7,7 +7,8 @@
 -- cleanup, safe to delete this file after running.
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
--- Status: NOT YET APPLIED as of writing.
+-- Status: APPLIED and verified live 2026-07-28 (zero rows remaining across
+-- products/prices/product_bqp_associations; no orphaned shopping_list_items).
 
 delete from product_bqp_associations
 where product_id in (select id from products where name ilike 'TEST QA Celebration Overlay%');
