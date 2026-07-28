@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Star, Wallet, TrendingDown, Pencil, ChefHat } from 'lucide-react';
+import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Star, Wallet, TrendingDown, Pencil, ChefHat, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { posthog } from '../posthogClient';
+import UnmatchedItemsModal from './UnmatchedItemsModal';
 
 const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, onSelectRecipe, supabase }) => {
     const { userProfile, userFavorites, updateProfile } = useAuth();
@@ -10,6 +11,7 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
     const [expandedStore, setExpandedStore] = useState(null);
     const [savingsOpportunities, setSavingsOpportunities] = useState([]);
     const [mainlandComparison, setMainlandComparison] = useState(null);
+    const [showUnmatchedModal, setShowUnmatchedModal] = useState(false);
     const [favoritesDetails, setFavoritesDetails] = useState([]);
     const [loadingFavorites, setLoadingFavorites] = useState(false);
     const [editingBudget, setEditingBudget] = useState(false);
@@ -291,12 +293,24 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                     let martiniqueTotal = 0;
                     let mainlandTotal = 0;
                     let matchedCount = 0;
+                    let unmatchedAmount = 0;
+                    const unmatchedItems = [];
                     best.foundItems.forEach(item => {
                         const mainlandPrice = cheapestMainlandByProduct[item.productId];
                         if (mainlandPrice != null) {
                             martiniqueTotal += item.price * item.quantity;
                             mainlandTotal += mainlandPrice * item.quantity;
                             matchedCount++;
+                        } else {
+                            const lineTotal = item.price * item.quantity;
+                            unmatchedAmount += lineTotal;
+                            unmatchedItems.push({
+                                productId: item.productId,
+                                name: items.find(i => i.productId === item.productId)?.name || 'Produit inconnu',
+                                price: item.price,
+                                quantity: item.quantity,
+                                lineTotal,
+                            });
                         }
                     });
 
@@ -305,6 +319,10 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                         mainlandTotal,
                         matchedCount,
                         totalCount: items.length,
+                        bestFoundCount: best.foundCount,
+                        bestStoreName: best.storeName,
+                        unmatchedAmount,
+                        unmatchedItems,
                     } : null);
                 } else {
                     setMainlandComparison(null);
@@ -692,8 +710,13 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                                     <span>🇫🇷</span> Comparaison France Hexagonale
                                 </h3>
                                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                                    {mainlandComparison.bestFoundCount < mainlandComparison.totalCount && (
+                                        <p className="text-[10px] text-blue-500 mb-2 pb-2 border-b border-blue-100">
+                                            {mainlandComparison.bestFoundCount} sur {mainlandComparison.totalCount} article{mainlandComparison.totalCount > 1 ? 's' : ''} de votre panier disponible{mainlandComparison.bestFoundCount > 1 ? 's' : ''} chez {mainlandComparison.bestStoreName}.
+                                        </p>
+                                    )}
                                     <div className="flex justify-between items-baseline mb-1">
-                                        <span className="text-sm text-blue-800">Ce panier en Martinique</span>
+                                        <span className="text-sm text-blue-800">Ce panier en Martinique (articles comparables)</span>
                                         <span className="text-base font-black tabular-nums text-gray-900">{mainlandComparison.martiniqueTotal.toFixed(2)}€</span>
                                     </div>
                                     <div className="flex justify-between items-baseline mb-2">
@@ -707,15 +730,35 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                                             {' '}de perte de pouvoir d'achat
                                         </p>
                                         <p className="text-[10px] text-blue-500 mt-1">
-                                            Basé sur {mainlandComparison.matchedCount} sur {mainlandComparison.totalCount} article{mainlandComparison.totalCount > 1 ? 's' : ''} de votre panier ayant un prix France Hexagonale connu.
+                                            Basé sur {mainlandComparison.matchedCount} sur {mainlandComparison.bestFoundCount} article{mainlandComparison.bestFoundCount > 1 ? 's' : ''} disponible{mainlandComparison.bestFoundCount > 1 ? 's' : ''} chez {mainlandComparison.bestStoreName} ayant un prix France Hexagonale connu.
                                         </p>
                                     </div>
+                                    {mainlandComparison.unmatchedItems.length > 0 && (
+                                        <button
+                                            onClick={() => setShowUnmatchedModal(true)}
+                                            className="w-full mt-3 pt-3 border-t border-blue-200 flex items-center justify-between text-left group"
+                                        >
+                                            <span className="text-[11px] text-orange-700 font-medium group-hover:underline">
+                                                ⚠ {mainlandComparison.unmatchedAmount.toFixed(2)}€ non comparés — {mainlandComparison.unmatchedItems.length} article{mainlandComparison.unmatchedItems.length > 1 ? 's' : ''} sans prix France Hexagonale
+                                            </span>
+                                            <ChevronRight className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
                     </>
                 )}
             </div>
+
+            {showUnmatchedModal && mainlandComparison && (
+                <UnmatchedItemsModal
+                    items={mainlandComparison.unmatchedItems}
+                    storeName={mainlandComparison.bestStoreName}
+                    totalAmount={mainlandComparison.unmatchedAmount}
+                    onClose={() => setShowUnmatchedModal(false)}
+                />
+            )}
         </div>
     );
 };

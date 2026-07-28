@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Loader2, Link2, Trash2, ZoomIn, X, Camera } from 'lucide-react';
+import { Plus, Loader2, Link2, Trash2, ZoomIn, X, Camera, AlertTriangle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { MAINLAND_CHAINS as CHAINS } from '../constants/mainlandChains';
 
+const FILTERS = [
+    { value: 'all', label: 'Tous' },
+    { value: 'missing-mainland', label: 'Sans prix 🇫🇷' },
+];
+
 const MainlandPriceAdmin = () => {
     const { user } = useAuth();
     const [items, setItems] = useState([]);
+    const [missingMartiniqueItems, setMissingMartiniqueItems] = useState([]);
+    const [filter, setFilter] = useState('all');
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState(null);
     const [zoomedImage, setZoomedImage] = useState(null);
@@ -73,9 +80,29 @@ const MainlandPriceAdmin = () => {
                     ...item,
                     mainlandEntries: byProductMainland[item.product.id] || [],
                 })));
+
+                // Products with a France Hexagonale reference price but no Martinique
+                // scan at all -- not part of `items` above (which requires a local
+                // photo to be browsable). Surfaced separately so admin can monitor
+                // and prioritize getting them scanned in Martinique.
+                const missingMartinique = [];
+                byProduct.forEach((entry, pid) => {
+                    const mainlandEntries = byProductMainland[pid];
+                    if (entry.localPrices.length === 0 && mainlandEntries?.length > 0) {
+                        const bestMainland = mainlandEntries.reduce((min, r) => r.price < min.price ? r : min, mainlandEntries[0]);
+                        missingMartinique.push({
+                            product: entry.product,
+                            mainlandPrice: bestMainland.price,
+                            mainlandChain: bestMainland.mainland_chain,
+                        });
+                    }
+                });
+                missingMartinique.sort((a, b) => a.product.name.localeCompare(b.product.name));
+                setMissingMartiniqueItems(missingMartinique);
             } catch (mainlandErr) {
                 console.error('Error loading mainland prices (migration may not be applied yet):', mainlandErr);
                 setItems(prev => prev.map(item => ({ ...item, mainlandEntries: [] })));
+                setMissingMartiniqueItems([]);
             }
         } catch (err) {
             console.error('Error loading products for mainland pricing:', err);
@@ -185,11 +212,54 @@ const MainlandPriceAdmin = () => {
                 </p>
             </div>
 
-            {items.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">Aucun produit avec photo à comparer.</p>
-            ) : (
+            {missingMartiniqueItems.length > 0 && (
+                <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4">
+                    <h4 className="text-xs font-bold text-orange-800 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Sans prix Martinique ({missingMartiniqueItems.length})
+                    </h4>
+                    <p className="text-[11px] text-orange-700 mb-3">
+                        Ces produits ont un prix France Hexagonale mais n'ont jamais été scannés en Martinique.
+                    </p>
+                    <div className="space-y-1.5">
+                        {missingMartiniqueItems.map(item => (
+                            <div key={item.product.id} className="flex items-center justify-between bg-white rounded-xl px-3 py-2">
+                                <span className="text-xs font-bold text-gray-900 truncate">{item.product.name}</span>
+                                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
+                                    {item.mainlandChain || '?'} : {item.mainlandPrice.toFixed(2)}€
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="flex gap-2">
+                {FILTERS.map(f => (
+                    <button
+                        key={f.value}
+                        onClick={() => setFilter(f.value)}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${filter === f.value
+                            ? 'bg-red-600 border-red-600 text-white'
+                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                            }`}
+                    >
+                        {f.label}
+                    </button>
+                ))}
+            </div>
+
+            {(() => {
+                const filteredItems = filter === 'missing-mainland'
+                    ? items.filter(i => (i.mainlandEntries || []).length === 0)
+                    : items;
+
+                if (filteredItems.length === 0) {
+                    return <p className="text-sm text-gray-400 text-center py-8">{items.length === 0 ? 'Aucun produit avec photo à comparer.' : 'Aucun produit ne correspond à ce filtre.'}</p>;
+                }
+
+                return (
                 <div className="space-y-3">
-                    {items.map(item => {
+                    {filteredItems.map(item => {
                         const isExpanded = expandedId === item.product.id;
                         const entries = item.mainlandEntries || [];
 
@@ -348,7 +418,8 @@ const MainlandPriceAdmin = () => {
                         );
                     })}
                 </div>
-            )}
+                );
+            })()}
 
             {/* Zoom modal for product photos / evidence photos */}
             {zoomedImage && (
