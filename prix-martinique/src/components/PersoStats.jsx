@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { calculateSavings } from '../utils/userStats';
 
 const PersoStats = ({ onClose }) => {
     const { user, userProfile, userBadges } = useAuth();
@@ -72,34 +73,8 @@ const PersoStats = ({ onClose }) => {
                     }
                 }
 
-                // 4. "Mes économies": for each product the user has priced, compare their
-                // price against the highest price observed for that same product across
-                // all stores/users, and sum the positive differences.
-                let savings = 0;
-                const { data: ownPrices } = await supabase
-                    .from('prices')
-                    .select('product_id, price')
-                    .eq('user_id', user.id);
-
-                const productIds = [...new Set((ownPrices || []).map(p => p.product_id))];
-                if (productIds.length > 0) {
-                    const { data: allPricesForProducts } = await supabase
-                        .from('prices')
-                        .select('product_id, price')
-                        .in('product_id', productIds);
-
-                    const maxByProduct = {};
-                    (allPricesForProducts || []).forEach(p => {
-                        if (!(p.product_id in maxByProduct) || p.price > maxByProduct[p.product_id]) {
-                            maxByProduct[p.product_id] = p.price;
-                        }
-                    });
-
-                    savings = (ownPrices || []).reduce((total, p) => {
-                        const highest = maxByProduct[p.product_id] ?? p.price;
-                        return total + Math.max(0, highest - p.price);
-                    }, 0);
-                }
+                // 4. "Mes économies" -- shared calculation, see userStats.js.
+                const savings = await calculateSavings(supabase, user.id);
 
                 setStats({
                     firstScan: firstScan?.created_at,

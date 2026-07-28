@@ -325,6 +325,19 @@ Reported: in Panier → Mes Favoris, a card's button correctly switches "+ Panie
 - **Verified live** by deliberately reproducing the race: inserted a product directly into the DB (simulating "another tab/device already added it" while local state didn't know), then clicked that same product's "+ Panier" button in the UI — confirmed it now correctly resyncs to "Ajouté ✓" (disabled) with the real DB quantity, instead of staying stuck.
 - **Noted, not fully root-caused**: while live-debugging this, the test account's cart quantity total was observed to have dropped between two points in the same session (20 → 12) without an intentional removal action being taken. Most likely explanation is cross-talk from an earlier browser tab in this same debugging session that had become unresponsive and was later closed, not a new production code path — the item timestamps recovered are consistent with earlier test data, not a fresh loss. Flagged here for visibility rather than silently ignored, since it couldn't be fully forensically confirmed.
 
+### Jul 28, 2026 — Profile Dropdown "Mes Contributions" Fixed + New "Mes Scans" List
+Asked to review "Mes contributions à l'effort collectif" (profile dropdown, next to "Mes Économies") and brainstorm how to make it more valuable. Traced `UserMenu.jsx` rather than guessing:
+
+- **Confirmed broken**: the tile showed `🔥 {userProfile?.streak_count || 1}` — `streak_count` is never written anywhere in the codebase (grepped repo-wide), so every user, permanently, saw "🔥 1" regardless of activity. It also wasn't clickable at all.
+- **A second, unrelated bug found right next to it**: "Mes Économies" in this same dropdown computed `(total_contributions || 0) * 0.85`€ — a fabricated multiplier applied to the user's *scan count*, not an actual savings figure. This was a separate, still-broken copy of a calculation that had already been fixed correctly in `PersoStats.jsx` on Jul 21, 2026 (compare each priced product to the highest price observed for it, sum the positive differences) — the fix never propagated to this second copy, which is exactly the kind of drift duplicated logic invites.
+- **`src/utils/userStats.js`** (new): extracted `calculateSavings(supabase, userId)` as the single shared implementation. `PersoStats.jsx` now calls it instead of carrying its own inline copy; `UserMenu.jsx` calls it lazily (only when the dropdown is actually opened) instead of maintaining a second formula. One source of truth going forward.
+- **"Mes contributions" now shows the real count**: `userProfile.total_contributions` — already a genuine, trigger-maintained column (`sync_total_contributions()`, kept in sync with the user's own `prices` rows) already used correctly elsewhere (Leaderboard's "X prix") but never wired into this tile. The tile is now a real button.
+- **`src/components/MyScansModal.jsx`** (new) — clicking the tile opens "Mes Scans": every price the user has personally submitted, most recent first (photo, product name, store, relative date -- "Aujourd'hui"/"Hier"/"Il y a N jours"/"Il y a N mois"), each with its own favorite-star toggle and "+ Panier" quick-add (reusing the exact same `inPanier`-disabled pattern and conflict-resync fix from the Favoris cards earlier today). Closes the loop the user asked for: contribute a scan → find it again later → re-add it to the cart or favorite it, without re-searching.
+- **Verified live**: both dropdown tiles show real numbers (savings recalculated correctly, contribution count matching the real row count); opened "Mes Scans" and confirmed real scans render with correct photos/stores/relative dates/favorite state; used the quick "+ Panier" button and confirmed it correctly flips to "Ajouté" using the same resync-safe path fixed earlier today.
+- **Brainstormed enhancements, deliberately not built this pass** — logged instead as `status: 'planned'` rows in `feature_requests` (reusing the Communauté/admin-Suggestions system built earlier today rather than inventing a separate "pending features" panel), so they're visible both in Console Admin → Suggestions and publicly in Communauté → Améliorations marked "Prévu" with an official comment:
+  - **"Grouper mes scans par magasin"** — once a user has many scans, group by store (mirrors how people actually shop) instead of one flat list.
+  - **"Système de séries (streak) de contribution réel"** — replace the old dead streak placeholder with genuine consecutive-active-days tracking; needs new backend tracking, not yet built.
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
@@ -372,6 +385,8 @@ Nothing is tracked automatically — PostHog only records what's explicitly wrap
 - `src/components/RecipeAdmin.jsx` — Admin-only recipe + ingredient CRUD, incl. product search/associate (Console Admin "Recettes" sub-tab).
 - `src/components/FeatureRequestDetailModal.jsx` — Suggestion detail card: full description, vote, official admin reply, comment thread (Communauté "Améliorations").
 - `src/components/FeatureRequestAdmin.jsx` — Admin-only feature-request triage: set status, write the official reply (Console Admin "Suggestions" sub-tab).
+- `src/components/MyScansModal.jsx` — "Mes Scans": a user's own submitted prices, most recent first, with quick favorite/add-to-panier actions (profile dropdown → "Mes contributions à l'effort collectif").
+- `src/utils/userStats.js` — Shared `calculateSavings()`, single source of truth used by both `PersoStats.jsx` and `UserMenu.jsx`.
 - `src/posthogClient.js` — PostHog init (product analytics).
 
 ### Database Schema (Critical Tables)

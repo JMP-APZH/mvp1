@@ -19,6 +19,7 @@ import ShoppingList from './components/ShoppingList';
 import { useShoppingList } from './hooks/useShoppingList';
 import Community from './components/Community';
 import PersoStats from './components/PersoStats';
+import MyScansModal from './components/MyScansModal';
 import AdminDashboard from './components/AdminDashboard';
 import PriceDuel from './components/PriceDuel';
 import { ToastContainer } from './components/Toast';
@@ -65,6 +66,7 @@ const App10 = () => {
     }, [scanCelebration]);
     const [showPersoStats, setShowPersoStats] = useState(false);
     const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+    const [showMyScans, setShowMyScans] = useState(false);
     const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
     const [bqpQualityStats, setBqpQualityStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 });
     const [priceHistory, setPriceHistory] = useState([]);
@@ -1046,6 +1048,7 @@ const App10 = () => {
                         onSignInClick={() => setShowAuthModal(true)}
                         onOpenStats={() => setShowPersoStats(true)}
                         onOpenAdmin={() => setShowAdminDashboard(true)}
+                        onOpenMyScans={() => setShowMyScans(true)}
                         stores={stores}
                     />
                 </div>
@@ -1056,6 +1059,15 @@ const App10 = () => {
 
                 {/* Perso Stats View */}
                 {showPersoStats && <PersoStats onClose={() => setShowPersoStats(false)} />}
+
+                {/* My Scans View */}
+                {showMyScans && (
+                    <MyScansModal
+                        onClose={() => setShowMyScans(false)}
+                        onAddItem={addToShoppingList}
+                        shoppingListItems={shoppingList}
+                    />
+                )}
 
                 {/* Points indicator for logged in users */}
                 {user && userProfile && (
