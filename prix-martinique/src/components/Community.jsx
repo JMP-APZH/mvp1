@@ -43,27 +43,27 @@ const Community = ({ onRequireAuth }) => {
     const loadCommunityStats = async () => {
         setLoadingStats(true);
         try {
-            // Calculate Sovereignty Score: (BQP or Local products) / Total unique products in last 30 days
-            // For now: basic count comparison
+            // Sovereignty Score: (BQP-declared OR locally-produced) / total catalogued products.
+            // Uses .or() so a product counting under either flag is only counted once.
             const { count: totalProducts } = await supabase
                 .from('products')
                 .select('*', { count: 'exact', head: true });
 
-            const { count: bqpProducts } = await supabase
+            const { count: bqpOrLocalProducts } = await supabase
                 .from('products')
                 .select('*', { count: 'exact', head: true })
-                .eq('is_declared_bqp', true);
+                .or('is_declared_bqp.eq.true,is_local_production.eq.true');
 
             const { count: pricesCount } = await supabase
                 .from('prices')
                 .select('*', { count: 'exact', head: true });
 
-            const score = totalProducts > 0 ? Math.round((bqpProducts / totalProducts) * 100) : 0;
+            const score = totalProducts > 0 ? Math.round((bqpOrLocalProducts / totalProducts) * 100) : 0;
 
             setCommunityStats({
                 sovereigntyScore: score,
                 verifiedPrices: pricesCount || 0,
-                localProducts: bqpProducts || 0
+                localProducts: bqpOrLocalProducts || 0
             });
         } catch (err) {
             console.error('Error loading community stats:', err);
@@ -365,7 +365,6 @@ const Community = ({ onRequireAuth }) => {
                                 <>
                                     <div className="flex items-end gap-3 mb-2">
                                         <span className="text-4xl font-black">{communityStats.sovereigntyScore}%</span>
-                                        <span className="text-indigo-200 text-xs pb-1 mb-1">+2% ce mois</span>
                                     </div>
                                     <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
                                         <div
