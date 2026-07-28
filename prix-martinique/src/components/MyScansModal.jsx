@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Package, ScanLine, Star, Check } from 'lucide-react';
+import { X, Loader2, Package, ScanLine, Star, Check, TrendingDown } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { posthog } from '../posthogClient';
+import { calculateSavingsBreakdown } from '../utils/userStats';
 
 // "il y a X" -- kept coarse (days, not hours/minutes) since a price's
 // relevance is about staleness for re-verification, not precise timing.
@@ -20,6 +21,8 @@ const MyScansModal = ({ onClose, onAddItem, shoppingListItems }) => {
     const { user, userFavorites, toggleFavorite } = useAuth();
     const [loading, setLoading] = useState(true);
     const [scans, setScans] = useState([]);
+    const [savingsByScanId, setSavingsByScanId] = useState({});
+    const [totalSavings, setTotalSavings] = useState(null);
 
     useEffect(() => {
         if (!user) return;
@@ -27,15 +30,20 @@ const MyScansModal = ({ onClose, onAddItem, shoppingListItems }) => {
         const load = async () => {
             setLoading(true);
             try {
-                const { data, error } = await supabase
-                    .from('prices')
-                    .select('id, product_id, price, created_at, product_photo_url, products(name), stores(name)')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false })
-                    .limit(200);
+                const [{ data, error }, breakdown] = await Promise.all([
+                    supabase
+                        .from('prices')
+                        .select('id, product_id, price, created_at, product_photo_url, products(name), stores(name)')
+                        .eq('user_id', user.id)
+                        .order('created_at', { ascending: false })
+                        .limit(200),
+                    calculateSavingsBreakdown(supabase, user.id),
+                ]);
 
                 if (error) throw error;
                 setScans(data || []);
+                setSavingsByScanId(breakdown.byScanId);
+                setTotalSavings(breakdown.total);
                 posthog.capture('my_scans_opened', { scan_count: data?.length || 0 });
             } catch (err) {
                 console.error('Error loading my scans:', err);
@@ -78,9 +86,18 @@ const MyScansModal = ({ onClose, onAddItem, shoppingListItems }) => {
                     </div>
                 ) : (
                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                        {totalSavings > 0 && (
+                            <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-2xl px-4 py-3 mb-2">
+                                <TrendingDown className="w-5 h-5 text-green-600 flex-shrink-0" />
+                                <p className="text-sm text-green-800">
+                                    <span className="font-bold">{totalSavings.toFixed(2)}€ économisés</span> par rapport au prix moyen des produits que vous avez scannés (12 derniers mois).
+                                </p>
+                            </div>
+                        )}
                         {scans.map(scan => {
                             const inPanier = isInPanier(scan.product_id);
                             const isFavorite = userFavorites?.has(scan.product_id);
+                            const scanSavings = savingsByScanId[scan.id];
                             return (
                                 <div key={scan.id} className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3">
                                     <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
@@ -96,7 +113,14 @@ const MyScansModal = ({ onClose, onAddItem, shoppingListItems }) => {
                                         <p className="text-[10px] text-gray-400 mt-0.5">{formatRelativeDate(scan.created_at)}</p>
                                     </div>
                                     <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                                        <span className="text-sm font-bold text-gray-900">{scan.price?.toFixed(2)}€</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-sm font-bold text-gray-900">{scan.price?.toFixed(2)}€</span>
+                                            {scanSavings > 0 && (
+                                                <span className="text-[9px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+                                                    −{scanSavings.toFixed(2)}€
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-1.5">
                                             <button
                                                 onClick={() => toggleFavorite(scan.product_id)}

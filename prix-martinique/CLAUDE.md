@@ -338,6 +338,15 @@ Asked to review "Mes contributions à l'effort collectif" (profile dropdown, nex
   - **"Grouper mes scans par magasin"** — once a user has many scans, group by store (mirrors how people actually shop) instead of one flat list.
   - **"Système de séries (streak) de contribution réel"** — replace the old dead streak placeholder with genuine consecutive-active-days tracking; needs new backend tracking, not yet built.
 
+### Jul 28, 2026 — "Mes Économies" Methodology Overhauled
+Follow-up review, same session: asked to critique "Mes Économies" itself, not just its (already-fixed) duplicate-logic bug. Flagged that comparing against the highest price *ever recorded* for a product is the most flattering baseline mathematically possible, not a representative one, and has no time bound (a stale outlier from months ago could inflate the number indefinitely). User asked to build all four proposed fixes:
+
+- **`userStats.js` methodology changed**: now compares each submitted price against the **average** price for that product (not the max), restricted to a **12-month window** (`SAVINGS_WINDOW_DAYS = 365`) — a stale outlier no longer distorts the figure forever. `calculateSavings()` is now a thin wrapper around a new `calculateSavingsBreakdown()`, which also returns a **per-scan** (`byScanId`) breakdown, not just the aggregate total.
+- **"Mes Économies" is now clickable** (was a static div), opening the same "Mes Scans" modal as "Mes contributions" — both tiles now lead to one place rather than needing two separate detail views.
+- **Per-scan savings badges in `MyScansModal.jsx`**: each scan row that beat the 12-month average shows a small green "−X,XX€" badge, plus a summary banner at the top of the list ("X€ économisés...") that matches the dropdown tile's number exactly — turns a previously inert aggregate into something explorable.
+- **Explainer added**: a small info icon + native tooltip next to "Mes Économies" in the dropdown states the methodology plainly ("Comparé au prix moyen observé... sur les 12 derniers mois"), and `PersoStats.jsx`'s existing "Comment c'est calculé ?" box was updated to match the new wording (was still describing the old max-based method).
+- **Verified live**: the real number changed from 12.30€ (old max-based) to 6.15€ (new average-based) for the same test account and data — confirms the methodology change actually took effect, not just a re-run of the old formula. Confirmed the "Mes Scans" summary banner shows the identical 6.15€, and per-row badges only appear on scans that genuinely beat their product's average (verified several correctly showing badges, several correctly showing none).
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix

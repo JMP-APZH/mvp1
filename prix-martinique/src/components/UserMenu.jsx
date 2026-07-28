@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock, ScanLine } from 'lucide-react';
+import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock, ScanLine, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabaseClient';
 import { calculateSavings } from '../utils/userStats';
@@ -270,12 +270,20 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, stor
           {/* Main User Stats */}
           <div className="p-4 border-b border-gray-100">
             <div className="grid grid-cols-2 gap-4 text-center">
-              <div className="bg-orange-50 p-3 rounded-xl border border-orange-100">
+              <button
+                onClick={() => { onOpenMyScans(); setIsOpen(false); }}
+                className="bg-orange-50 hover:bg-orange-100 p-3 rounded-xl border border-orange-100 transition-colors"
+              >
                 <div className="text-2xl font-bold text-orange-600">
                   {savings === null ? '…' : `${savings.toFixed(2)}€`}
                 </div>
-                <div className="text-[10px] uppercase tracking-wider font-bold text-orange-400">Mes Économies</div>
-              </div>
+                <div
+                  className="text-[10px] uppercase tracking-wider font-bold text-orange-400 flex items-center justify-center gap-1"
+                  title="Comparé au prix moyen observé pour ces produits sur les 12 derniers mois, tous magasins confondus."
+                >
+                  Mes Économies <Info className="w-2.5 h-2.5" />
+                </div>
+              </button>
               <button
                 onClick={() => { onOpenMyScans(); setIsOpen(false); }}
                 className="bg-blue-50 hover:bg-blue-100 p-3 rounded-xl border border-blue-100 transition-colors"

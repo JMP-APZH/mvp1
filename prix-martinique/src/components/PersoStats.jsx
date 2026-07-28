@@ -181,7 +181,7 @@ const PersoStats = ({ onClose }) => {
                             <div>
                                 <h4 className="font-bold text-blue-900 mb-1">Comment c'est calculé ?</h4>
                                 <p className="text-sm text-blue-800/80 leading-relaxed">
-                                    Pour chaque produit que vous avez scanné, on compare votre prix au prix le plus élevé observé pour ce même produit (tous magasins confondus), et on additionne les écarts positifs. Plus vous trouvez de bons plans, plus votre score grimpe !
+                                    Pour chaque produit que vous avez scanné, on compare votre prix au prix moyen observé pour ce même produit sur les 12 derniers mois (tous magasins confondus), et on additionne les écarts positifs. Un produit que vous êtes seul(e) à avoir scanné n'a pas encore assez de données pour être comparé.
                                 </p>
                             </div>
                         </div>
