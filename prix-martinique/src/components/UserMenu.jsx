@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock, ScanLine, Info, Target } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabaseClient';
@@ -26,6 +26,8 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
   const [isOpen, setIsOpen] = useState(false);
   const [savings, setSavings] = useState(null);
   const [wantedCount, setWantedCount] = useState(null);
+  const scrollRef = useRef(null);
+  const [showScrollHint, setShowScrollHint] = useState(false);
   const [isUpdatingCity, setIsUpdatingCity] = useState(false);
   const [showStoreSearch, setShowStoreSearch] = useState(false);
   const [storeSearchQuery, setStoreSearchQuery] = useState("");
@@ -82,6 +84,22 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
       getWantedScans(supabase, [...(userFavoriteStores || [])]).then(results => setWantedCount(results.length));
     }
   }, [isOpen, user, userFavoriteStores]);
+
+  // "More to see" hint: the dropdown's lower section (budget, magasins,
+  // géographie, etc.) scrolls but gave no visual cue that it did -- reported
+  // as not obvious. Re-checked on open and on every scroll.
+  const checkScrollable = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowScrollHint(el.scrollHeight - el.scrollTop - el.clientHeight > 10);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      const t = setTimeout(checkScrollable, 100);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, checkScrollable]);
 
   const handleCityChange = async (city) => {
     setIsUpdatingCity(true);
@@ -274,7 +292,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
           <div className="p-4 border-b border-gray-100">
             <div className="grid grid-cols-2 gap-4 text-center">
               <button
-                onClick={() => { onOpenMyScans(); setIsOpen(false); }}
+                onClick={() => { onOpenMyScans('savings'); setIsOpen(false); }}
                 className="bg-orange-50 hover:bg-orange-100 p-3 rounded-xl border border-orange-100 transition-colors"
               >
                 <div className="text-2xl font-bold text-orange-600">
@@ -288,7 +306,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
                 </div>
               </button>
               <button
-                onClick={() => { onOpenMyScans(); setIsOpen(false); }}
+                onClick={() => { onOpenMyScans('all'); setIsOpen(false); }}
                 className="bg-blue-50 hover:bg-blue-100 p-3 rounded-xl border border-blue-100 transition-colors"
               >
                 <div className="text-2xl font-bold text-blue-600 flex items-center justify-center gap-1">
@@ -346,7 +364,8 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
             </button>
           </div>
 
-          <div className="max-h-[350px] overflow-y-auto">
+          <div className="relative">
+          <div ref={scrollRef} onScroll={checkScrollable} className="max-h-[350px] overflow-y-auto">
             {/* Badges section remains similar but maybe moved... I'll keep it as is for now or move it to PersoStats */}
 
             {/* Budget Settings */}
@@ -618,6 +637,12 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
                 <span>Deconnexion</span>
               </button>
             </div>
+          </div>
+          {showScrollHint && (
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent flex items-end justify-center pb-1 pointer-events-none">
+              <ChevronDown className="w-4 h-4 text-gray-400 animate-bounce" />
+            </div>
+          )}
           </div>
         </div>
       )

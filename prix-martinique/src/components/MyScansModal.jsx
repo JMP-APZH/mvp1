@@ -17,12 +17,13 @@ const formatRelativeDate = (dateStr) => {
     return `Il y a ${Math.floor(months / 12)} an${months >= 24 ? 's' : ''}`;
 };
 
-const MyScansModal = ({ onClose, onAddItem, shoppingListItems }) => {
+const MyScansModal = ({ onClose, onAddItem, shoppingListItems, initialFilter = 'all' }) => {
     const { user, userFavorites, toggleFavorite } = useAuth();
     const [loading, setLoading] = useState(true);
     const [scans, setScans] = useState([]);
     const [savingsByScanId, setSavingsByScanId] = useState({});
     const [totalSavings, setTotalSavings] = useState(null);
+    const [filter, setFilter] = useState(initialFilter === 'savings' ? 'savings' : 'all');
 
     useEffect(() => {
         if (!user) return;
@@ -61,18 +62,47 @@ const MyScansModal = ({ onClose, onAddItem, shoppingListItems }) => {
         posthog.capture('my_scans_item_added_to_panier', { product_id: scan.product_id });
     };
 
+    const visibleScans = filter === 'savings' ? scans.filter(s => savingsByScanId[s.id] > 0) : scans;
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div className="bg-white w-full max-w-lg sm:rounded-[2rem] rounded-t-[2rem] max-h-[92vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
                     <div>
-                        <h3 className="text-lg font-bold text-gray-900">Mes Scans</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">Tous vos prix partagés avec la communauté</p>
+                        <h3 className="text-lg font-bold text-gray-900">{filter === 'savings' ? 'Mes Économies' : 'Mes Scans'}</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            {filter === 'savings'
+                                ? 'Les prix où vous avez payé moins cher que la moyenne'
+                                : 'Tous vos prix partagés avec la communauté'}
+                        </p>
                     </div>
                     <button onClick={onClose} className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded-full text-gray-400 transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
+
+                {!loading && scans.length > 0 && (
+                    <div className="flex gap-2 px-4 pt-3 flex-shrink-0">
+                        <button
+                            onClick={() => setFilter('all')}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${filter === 'all'
+                                ? 'bg-orange-500 border-orange-500 text-white'
+                                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                }`}
+                        >
+                            Tous mes scans ({scans.length})
+                        </button>
+                        <button
+                            onClick={() => setFilter('savings')}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors border ${filter === 'savings'
+                                ? 'bg-green-600 border-green-600 text-white'
+                                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                }`}
+                        >
+                            Avec économies ({Object.keys(savingsByScanId).length})
+                        </button>
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="flex-1 flex items-center justify-center py-16">
@@ -84,9 +114,15 @@ const MyScansModal = ({ onClose, onAddItem, shoppingListItems }) => {
                         <p className="text-gray-600 font-medium">Vous n'avez pas encore scanné de prix</p>
                         <p className="text-sm text-gray-400 mt-1">Direction l'onglet Scanner pour contribuer votre premier prix !</p>
                     </div>
+                ) : visibleScans.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-16 px-6 text-center">
+                        <TrendingDown className="w-12 h-12 text-gray-300 mb-3" />
+                        <p className="text-gray-600 font-medium">Aucune économie pour le moment</p>
+                        <p className="text-sm text-gray-400 mt-1">Continuez à scanner -- dès qu'un de vos prix bat la moyenne, il apparaîtra ici.</p>
+                    </div>
                 ) : (
                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                        {totalSavings > 0 && (
+                        {filter === 'all' && totalSavings > 0 && (
                             <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-2xl px-4 py-3 mb-2">
                                 <TrendingDown className="w-5 h-5 text-green-600 flex-shrink-0" />
                                 <p className="text-sm text-green-800">
@@ -94,7 +130,7 @@ const MyScansModal = ({ onClose, onAddItem, shoppingListItems }) => {
                                 </p>
                             </div>
                         )}
-                        {scans.map(scan => {
+                        {visibleScans.map(scan => {
                             const inPanier = isInPanier(scan.product_id);
                             const isFavorite = userFavorites?.has(scan.product_id);
                             const scanSavings = savingsByScanId[scan.id];

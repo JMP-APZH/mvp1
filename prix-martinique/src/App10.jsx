@@ -68,6 +68,7 @@ const App10 = () => {
     const [showPersoStats, setShowPersoStats] = useState(false);
     const [showAdminDashboard, setShowAdminDashboard] = useState(false);
     const [showMyScans, setShowMyScans] = useState(false);
+    const [myScansFilter, setMyScansFilter] = useState('all');
     const [showWantedScans, setShowWantedScans] = useState(false);
     const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
     const [bqpQualityStats, setBqpQualityStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 });
@@ -1073,7 +1074,7 @@ const App10 = () => {
                         onSignInClick={() => setShowAuthModal(true)}
                         onOpenStats={() => setShowPersoStats(true)}
                         onOpenAdmin={() => setShowAdminDashboard(true)}
-                        onOpenMyScans={() => setShowMyScans(true)}
+                        onOpenMyScans={(filter) => { setMyScansFilter(filter || 'all'); setShowMyScans(true); }}
                         onOpenWantedScans={() => setShowWantedScans(true)}
                         stores={stores}
                     />
@@ -1092,6 +1093,7 @@ const App10 = () => {
                         onClose={() => setShowMyScans(false)}
                         onAddItem={addToShoppingList}
                         shoppingListItems={shoppingList}
+                        initialFilter={myScansFilter}
                     />
                 )}
 
