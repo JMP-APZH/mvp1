@@ -12,15 +12,17 @@ import {
     MapPin,
     X,
     Wrench,
-    ChefHat
+    ChefHat,
+    MessageSquare
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import ProductCompletion from './ProductCompletion';
 import MainlandPriceAdmin from './MainlandPriceAdmin';
 import RecipeAdmin from './RecipeAdmin';
+import FeatureRequestAdmin from './FeatureRequestAdmin';
 
 const AdminDashboard = ({ onClose }) => {
-    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes'
+    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes' | 'suggestions'
     const [stats, setStats] = useState({
         totalScans: 0,
         uniqueUsers: 0,
@@ -137,35 +139,44 @@ const AdminDashboard = ({ onClose }) => {
                     </button>
                 </div>
 
-                {/* Sub-tabs */}
-                <div className="flex gap-2 mt-4">
+                {/* Sub-tabs -- horizontally scrollable so all 5 stay reachable on narrow
+                    (mobile) viewports instead of overflowing the fixed-width header and
+                    getting clipped with no way to reach the hidden ones. */}
+                <div className="flex gap-2 mt-4 overflow-x-auto no-scrollbar -mx-6 px-6">
                     <button
                         onClick={() => setSubTab('overview')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'overview' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'overview' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
                             }`}
                     >
                         <BarChart3 className="w-3.5 h-3.5" /> Vue d'ensemble
                     </button>
                     <button
                         onClick={() => setSubTab('complete')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'complete' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'complete' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
                             }`}
                     >
                         <Wrench className="w-3.5 h-3.5" /> Compléter produit
                     </button>
                     <button
                         onClick={() => setSubTab('mainland')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'mainland' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'mainland' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
                             }`}
                     >
                         <span>🇫🇷</span> Prix France Hexagonale
                     </button>
                     <button
                         onClick={() => setSubTab('recipes')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${subTab === 'recipes' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'recipes' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
                             }`}
                     >
                         <ChefHat className="w-3.5 h-3.5" /> Recettes
+                    </button>
+                    <button
+                        onClick={() => setSubTab('suggestions')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'suggestions' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <MessageSquare className="w-3.5 h-3.5" /> Suggestions
                     </button>
                 </div>
             </div>
@@ -181,6 +192,10 @@ const AdminDashboard = ({ onClose }) => {
             ) : subTab === 'recipes' ? (
                 <div className="flex-1 overflow-y-auto p-6">
                     <RecipeAdmin />
+                </div>
+            ) : subTab === 'suggestions' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                    <FeatureRequestAdmin />
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">

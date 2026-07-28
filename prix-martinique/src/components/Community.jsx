@@ -3,10 +3,12 @@ import { Trophy, Vote, BarChart3, Plus, MessageSquare, ThumbsUp, ThumbsDown, Che
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import Leaderboard from './Leaderboard';
+import FeatureRequestDetailModal from './FeatureRequestDetailModal';
 
 const Community = ({ onRequireAuth }) => {
     const [subTab, setSubTab] = useState('ranking'); // 'ranking', 'voting', 'stats'
     const [featureRequests, setFeatureRequests] = useState([]);
+    const [selectedFeatureId, setSelectedFeatureId] = useState(null);
     const [loadingFeatures, setLoadingFeatures] = useState(false);
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const [newFeature, setNewFeature] = useState({ title: '', description: '', category: 'General' });
@@ -79,7 +81,21 @@ const Community = ({ onRequireAuth }) => {
                 .order('net_votes', { ascending: false });
 
             if (error) throw error;
-            setFeatureRequests(data || []);
+
+            let rows = data || [];
+            // feature_request_stats has no per-user context, so "already voted"
+            // highlighting needs a separate query merged in client-side.
+            if (user && rows.length > 0) {
+                const { data: myVotes } = await supabase
+                    .from('feature_votes')
+                    .select('feature_id, vote_type')
+                    .eq('user_id', user.id)
+                    .in('feature_id', rows.map(r => r.id));
+                const voteByFeature = Object.fromEntries((myVotes || []).map(v => [v.feature_id, v.vote_type]));
+                rows = rows.map(r => ({ ...r, userVote: voteByFeature[r.id] ?? null }));
+            }
+
+            setFeatureRequests(rows);
         } catch (err) {
             console.error('Error loading features:', err);
         } finally {
@@ -271,9 +287,16 @@ const Community = ({ onRequireAuth }) => {
                         ) : (
                             <div className="space-y-4">
                                 {featureRequests.map((feature) => (
-                                    <div key={feature.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:border-orange-200 transition-colors">
+                                    <div
+                                        key={feature.id}
+                                        onClick={() => setSelectedFeatureId(feature.id)}
+                                        className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:border-orange-200 transition-colors cursor-pointer"
+                                    >
                                         <div className="flex gap-4">
-                                            <div className="flex flex-col items-center gap-1 bg-gray-50 rounded-xl p-2 min-w-[3.5rem] self-start">
+                                            <div
+                                                className="flex flex-col items-center gap-1 bg-gray-50 rounded-xl p-2 min-w-[3.5rem] self-start"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
                                                 <button
                                                     onClick={() => handleVote(feature.id, 1)}
                                                     className={`p-1.5 rounded-lg transition-colors ${feature.userVote === 1 ? 'bg-orange-100 text-orange-600' : 'text-gray-400 hover:text-orange-500'}`}
@@ -305,9 +328,16 @@ const Community = ({ onRequireAuth }) => {
                                                         {getStatusIcon(feature.status)}
                                                         <span className="text-[11px] font-bold text-gray-600">{getStatusLabel(feature.status)}</span>
                                                     </div>
-                                                    <span className="text-[10px] text-gray-400">
-                                                        {new Date(feature.created_at).toLocaleDateString()}
-                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        {feature.comment_count > 0 && (
+                                                            <span className="flex items-center gap-1 text-[10px] text-gray-400 font-bold">
+                                                                <MessageSquare className="w-3 h-3" /> {feature.comment_count}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-[10px] text-gray-400">
+                                                            {new Date(feature.created_at).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -430,6 +460,17 @@ const Community = ({ onRequireAuth }) => {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {selectedFeatureId && (
+                <FeatureRequestDetailModal
+                    featureId={selectedFeatureId}
+                    onClose={() => {
+                        setSelectedFeatureId(null);
+                        loadFeatureRequests();
+                    }}
+                    onRequireAuth={onRequireAuth}
+                />
             )}
         </div>
     );
