@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChefHat, Loader2, Share2, Link2, Check, ShoppingBasket, Clock, Users as UsersIcon, Flame } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { posthog } from '../posthogClient';
 
 const RECIPE_COOKED_POINTS = 15;

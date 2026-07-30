@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScanLine, Flag, RefreshCw, CheckCircle2, Loader2, AlertTriangle, UserCheck, ShieldCheck, X, ZoomIn, Tag } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 const STATUS_BADGES = {
     flagged: { label: 'Signalé', className: 'bg-amber-100 text-amber-700' },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Loader2, Link2, Trash2, ZoomIn, X, Camera, AlertTriangle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { MAINLAND_CHAINS as CHAINS } from '../constants/mainlandChains';
 import FlagFrance from './flags/FlagFrance';
 

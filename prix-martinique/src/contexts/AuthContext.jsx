@@ -1,8 +1,7 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { posthog } from '../posthogClient';
-
-const AuthContext = createContext({});
+import { AuthContext } from './authContextValue';
 
 // Supabase doesn't flag "this OAuth sign-in was a brand-new signup" directly --
 // approximate it by checking whether the account was created just before this
@@ -10,14 +9,6 @@ const AuthContext = createContext({});
 const isLikelyNewOAuthSignup = (authUser) => {
   if (!authUser?.created_at || !authUser?.last_sign_in_at) return false;
   return Math.abs(new Date(authUser.last_sign_in_at) - new Date(authUser.created_at)) < 15000;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };
 
 export const AuthProvider = ({ children }) => {
@@ -44,6 +35,7 @@ export const AuthProvider = ({ children }) => {
       }
       return data;
     } catch (err) {
+      console.error('Error fetching user profile:', err);
       return null;
     }
   };
@@ -73,6 +65,7 @@ export const AuthProvider = ({ children }) => {
       }
       return data || [];
     } catch (err) {
+      console.error('Error fetching user badges:', err);
       return [];
     }
   };
@@ -89,6 +82,7 @@ export const AuthProvider = ({ children }) => {
       if (error) return [];
       return data.map(r => r.role);
     } catch (err) {
+      console.error('Error fetching user roles:', err);
       return [];
     }
   };
@@ -104,6 +98,7 @@ export const AuthProvider = ({ children }) => {
       if (error) return new Set();
       return new Set(data.map(item => item.product_id));
     } catch (err) {
+      console.error('Error fetching user favorites:', err);
       return new Set();
     }
   };
@@ -119,6 +114,7 @@ export const AuthProvider = ({ children }) => {
       if (error) return new Set();
       return new Set(data.map(item => item.store_id));
     } catch (err) {
+      console.error('Error fetching user favorite stores:', err);
       return new Set();
     }
   };

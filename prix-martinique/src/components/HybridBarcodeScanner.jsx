@@ -291,7 +291,9 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
       try {
         Quagga.stop();
         Quagga.offDetected();
-      } catch (e) {}
+      } catch {
+        // Quagga.stop() throws if it wasn't running -- safe to ignore during cleanup
+      }
     };
   }, [scanMethod, isAndroid, isIOS, hasBarcodeDetector, onDetected, isInitializing]);
 
@@ -325,7 +327,9 @@ const HybridBarcodeScanner = ({ onDetected, onClose }) => {
     }
     try {
       Quagga.stop();
-    } catch (e) {}
+    } catch {
+      // Quagga.stop() throws if it wasn't running -- safe to ignore
+    }
 
     setScanMethod('native');
     setIsInitializing(false);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ThumbsUp, ThumbsDown, ShieldCheck, MessageSquare, Loader2, CheckCircle2, Clock, Ban, Send } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { posthog } from '../posthogClient';
 
 const getStatusIcon = (status) => {

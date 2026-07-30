@@ -1,7 +1,7 @@
 const CACHE_NAME = 'prix-martinique-v2';
 
 // Install service worker and skip waiting to activate immediately
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
