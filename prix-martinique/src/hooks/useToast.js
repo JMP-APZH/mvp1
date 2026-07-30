@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 let nextId = 0;
 
@@ -11,11 +11,16 @@ export function useToast() {
         setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
     }, []);
 
-    const toast = {
+    // Memoized so callers can safely list `toast` in a useCallback/useEffect
+    // dependency array without it changing identity every render -- an
+    // unmemoized object literal here previously caused an infinite
+    // fetch loop in App10.jsx (loadStores/loadRecentPrices depended on
+    // `toast`, which was a new object every render).
+    const toast = useMemo(() => ({
         success: (msg) => addToast(msg, 'success'),
         error:   (msg) => addToast(msg, 'error', 5000),
         info:    (msg) => addToast(msg, 'info'),
-    };
+    }), [addToast]);
 
     return { toasts, toast };
 }
