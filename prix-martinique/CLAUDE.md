@@ -398,6 +398,14 @@ Reported: on laptop, the Scanner tab's "Martinique" / "France Hexagonale" region
 - **Verified live**: confirmed both flags render correctly and clearly even at small size (zoomed screenshot of the Scanner region toggle) and spot-checked the Comparer feed's diff/pending badges -- all show the real flag now, no remaining "MQ"/"FR" text fallback anywhere.
 - **Follow-up, same day**: the Twemoji-matched design above was the traditional blue-field "fer-de-lance" flag -- deliberately chosen at the time specifically to match what the 🇲🇶 emoji already showed on mobile. Told directly that this design reads as a colonial-era symbol rather than a flag of Martinique, and asked to switch to the official 2023 redesign (black field, green band, red triangle) instead. Swapped `FlagMartinique.jsx`'s path data to the version from `flag-icons` (https://github.com/lipis/flag-icons, MIT) -- the exact source found and set aside during the original investigation specifically because it *didn't* match the emoji, which turned out to be the right call once it was clear "match the emoji" wasn't actually the goal. `FlagFrance.jsx` and every other call site untouched -- only the Martinique component's internals changed, verified live via a zoomed screenshot of the Scanner region toggle.
 
+### Jul 30, 2026 — `dev` Branch + PR Workflow Introduced (Repo Config, Not App Code)
+Set up a staging branch so changes can be tested before reaching production, rather than every change landing directly on `main`.
+
+- **`dev` branch** created off `main` on GitHub (`JMP-APZH/mvp1`) and is now where all day-to-day changes land first. Vercel's Production Branch is still `main` (unchanged) — pushing to `dev` only triggers `dev`'s own separate preview deployment, never production. Default cadence: one discrete change → commit to `dev` → open a `dev → main` PR right away; a request that naturally splits into several sub-changes gets batched on `dev` and PR'd as one group once the whole piece is done.
+- **`.github/workflows/pr-build-check.yml`** (lint + build on PRs) now triggers on PRs targeting `dev` as well as `main` — previously `main`-only.
+- **Classic branch protection rule added on `main`**: requires a PR before merging, requires status checks to pass (no specific check selected yet — GitHub only allows requiring a check that has already run at least once via a real PR; add "Validate build" here once the first `dev → main` PR runs it), blocks force-push and branch deletion. No required-approval count set (solo maintainer) and admin bypass left on.
+- **Caveat: not actually enforced yet.** `mvp1` is a private repo on GitHub's free plan, and branch protection rules on private repos are configurable but not enforced until upgrading to GitHub Team/Enterprise or making the repo public — confirmed via the "Not enforced" label GitHub shows next to the rule. Kept private for now; this is scaffolding for when that changes, not an active gate today. In the meantime the `dev`/`main` split and PR discipline are enforced by convention, not by GitHub.
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
@@ -475,6 +483,6 @@ Required in `.env.local`:
 2. **Next Milestone** — TBD.
 
 ---
-**Last Updated**: 2026-07-28
+**Last Updated**: 2026-07-30
 **Current Version**: MVP v1.5 (App10)
 **Status**: Launched — Production
