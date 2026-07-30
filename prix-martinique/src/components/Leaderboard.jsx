@@ -1,21 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, Medal, Star, TrendingUp, Crown } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import HunterDetailModal from './HunterDetailModal';
 
 const Leaderboard = ({ city, onRequireAuth }) => {
   const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState('all'); // 'all', 'month', 'week'
+  const [timeframe] = useState('all'); // 'all', 'month', 'week' -- selector UI currently disabled, see commented-out block below
   const [selectedHunterId, setSelectedHunterId] = useState(null);
   const { user } = useAuth();
 
-  useEffect(() => {
-    loadLeaderboard();
-  }, [timeframe, city]);
-
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = useCallback(async () => {
     setLoading(true);
     try {
       let query = supabase
@@ -37,7 +33,11 @@ const Leaderboard = ({ city, onRequireAuth }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [city]);
+
+  useEffect(() => {
+    loadLeaderboard();
+  }, [timeframe, city, loadLeaderboard]);
 
   const getRankIcon = (rank) => {
     switch (rank) {
@@ -63,22 +63,6 @@ const Leaderboard = ({ city, onRequireAuth }) => {
       default:
         return 'bg-white border-gray-100';
     }
-  };
-
-  const getLevelTitle = (level) => {
-    const titles = {
-      1: 'Débutant',
-      2: 'Contributeur',
-      3: 'Chasseur',
-      4: 'Expert',
-      5: 'Champion',
-      6: 'Légende',
-      7: 'Maître',
-      8: 'Grand Maître',
-      9: 'Élite',
-      10: 'Héros'
-    };
-    return titles[level] || `Niv.${level}`;
   };
 
   if (loading) {

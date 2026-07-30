@@ -1,25 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, ScanLine, Store, Leaf, MapPin, Loader2, MessageSquare, Heart, Share2, Link2, Trophy, Check, Globe2, Users, Camera, HelpCircle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import PriceHistoryChart from './PriceHistoryChart';
 
 // One row of the 4-source price comparison. Renders a price + source-diff
 // badge when data exists, or an honest "information manquante" placeholder
 // when it doesn't -- never just hides the row, so it's clear what's missing.
-const ComparisonSource = ({ icon: Icon, label, iconColor, children, empty, emptyText }) => (
-    <div className="border border-gray-100 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-            <Icon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
-            <span className="text-xs font-bold text-gray-700">{label}</span>
+const ComparisonSource = ({ icon, label, iconColor, children, empty, emptyText }) => {
+    const Icon = icon;
+    return (
+        <div className="border border-gray-100 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+                <Icon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
+                <span className="text-xs font-bold text-gray-700">{label}</span>
+            </div>
+            {empty ? (
+                <p className="text-xs text-gray-400 italic px-3 py-3">{emptyText || 'Information manquante'}</p>
+            ) : (
+                <div className="p-3">{children}</div>
+            )}
         </div>
-        {empty ? (
-            <p className="text-xs text-gray-400 italic px-3 py-3">{emptyText || 'Information manquante'}</p>
-        ) : (
-            <div className="p-3">{children}</div>
-        )}
-    </div>
-);
+    );
+};
 
 const DiffBadge = ({ diff }) => {
     if (!diff) return null;
@@ -53,7 +56,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
     // Isolated from the core prices query above: mainland_chain/source_type/source_url
     // are new columns (mainland_price_migration.sql) that may not exist yet on a given
     // environment, so a failure here must not break the rest of the card.
-    const loadMainlandPrices = async () => {
+    const loadMainlandPrices = useCallback(async () => {
         try {
             const { data, error } = await supabase
                 .from('prices')
@@ -77,9 +80,9 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
             console.error('Error loading mainland prices:', err);
             setMainlandPrices([]);
         }
-    };
+    }, [productId]);
 
-    const loadComments = async () => {
+    const loadComments = useCallback(async () => {
         const { data: commentRows, error } = await supabase
             .from('product_comments')
             .select('id, content, created_at, user_id, product_comment_likes(user_id)')
@@ -112,7 +115,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
         })).sort((a, b) => b.likeCount - a.likeCount || new Date(b.createdAt) - new Date(a.createdAt));
 
         setComments(enriched);
-    };
+    }, [productId, user]);
 
     const submitComment = async () => {
         if (!user) {
@@ -262,7 +265,7 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
         };
 
         load();
-    }, [productId]);
+    }, [productId, loadComments, loadMainlandPrices]);
 
     if (!productId) return null;
 

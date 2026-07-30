@@ -38,7 +38,7 @@ const AdminDashboard = ({ onClose }) => {
         diasporaRegions: [],
         recentActivity: []
     });
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
 
     useEffect(() => {
         fetchAdminStats();

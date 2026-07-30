@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock, ScanLine, Info, Target } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { supabase } from '../supabaseClient';
 import { calculateSavings } from '../utils/userStats';
 import { getWantedScans } from '../utils/scanRequests';
@@ -32,6 +32,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
   const [showStoreSearch, setShowStoreSearch] = useState(false);
   const [storeSearchQuery, setStoreSearchQuery] = useState("");
   const [cityInput, setCityInput] = useState(userProfile?.city || "");
+  const [syncedProfileCity, setSyncedProfileCity] = useState(userProfile?.city);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -67,12 +68,15 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
     setIsOpen(false);
   };
 
-  // Sync cityInput when userProfile changes
-  useEffect(() => {
+  // Reset the editable city buffer when the profile's city changes externally
+  // (initial async load, or an update from elsewhere) -- adjusted during render
+  // rather than in an effect, per React's guidance for resetting state from props.
+  if (userProfile?.city !== syncedProfileCity) {
+    setSyncedProfileCity(userProfile?.city);
     if (userProfile?.city) {
       setCityInput(userProfile.city);
     }
-  }, [userProfile?.city]);
+  }
 
   // Fetch the real savings figure only when the dropdown is actually opened
   // (shares the same methodology as PersoStats.jsx via calculateSavings --
@@ -514,7 +518,7 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
                   ) : (
                     <input
                       type="text"
-                      value={userProfile?.city || ""}
+                      value={cityInput}
                       onChange={(e) => setCityInput(e.target.value)}
                       onBlur={() => handleCityChange(cityInput)}
                       placeholder="Ma Ville..."

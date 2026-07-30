@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Package, ScanLine, Bookmark, Check, TrendingDown } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { posthog } from '../posthogClient';
 import { calculateSavingsBreakdown } from '../utils/userStats';
 

@@ -13,7 +13,7 @@ import {
     Wallet
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { calculateSavings } from '../utils/userStats';
 
 const PersoStats = ({ onClose }) => {
@@ -24,7 +24,7 @@ const PersoStats = ({ onClose }) => {
         estimatedSavings: 0,
         bestOffers: []
     });
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchPersonalData = async () => {

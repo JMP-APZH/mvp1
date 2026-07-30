@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, Vote, BarChart3, Plus, MessageSquare, ThumbsUp, ThumbsDown, CheckCircle2, Clock, Ban, Loader2, Sparkles, Target, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import Leaderboard from './Leaderboard';
 import FeatureRequestDetailModal from './FeatureRequestDetailModal';
 
@@ -31,14 +31,6 @@ const Community = ({ onRequireAuth }) => {
         "Le Morne-Rouge", "Le Morne-Vert", "Le Carbet", "Le Prêcheur",
         "Fond-Saint-Denis", "Sainte-Anne", "Macouba", "Le Marigot", "Bellefontaine"
     ].sort();
-
-    useEffect(() => {
-        if (subTab === 'voting') {
-            loadFeatureRequests();
-        } else if (subTab === 'stats') {
-            loadCommunityStats();
-        }
-    }, [subTab]);
 
     const loadCommunityStats = async () => {
         setLoadingStats(true);
@@ -72,7 +64,7 @@ const Community = ({ onRequireAuth }) => {
         }
     };
 
-    const loadFeatureRequests = async () => {
+    const loadFeatureRequests = useCallback(async () => {
         setLoadingFeatures(true);
         try {
             const { data, error } = await supabase
@@ -101,7 +93,15 @@ const Community = ({ onRequireAuth }) => {
         } finally {
             setLoadingFeatures(false);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        if (subTab === 'voting') {
+            loadFeatureRequests();
+        } else if (subTab === 'stats') {
+            loadCommunityStats();
+        }
+    }, [subTab, loadFeatureRequests]);
 
     const handleVote = async (featureId, type) => {
         if (!user) {

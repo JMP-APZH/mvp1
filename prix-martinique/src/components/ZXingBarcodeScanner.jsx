@@ -11,7 +11,7 @@
  * - Manual entry fallback
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { initBarcodeDetector, isBarcodeDetectorSupported } from '../utils/scannerInit';
 import {
   calculateScanRegion,
@@ -24,7 +24,7 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
   // State
   const [scannerType, setScannerType] = useState(''); // 'native' or 'polyfill'
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+  const [, setIsScanning] = useState(false);
   const [error, setError] = useState('');
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -39,39 +39,71 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
   const scanRegionRef = useRef(null);
   const cameraInputRef = useRef(null);
 
-  // Initialize barcode detector on mount
-  useEffect(() => {
-    let mounted = true;
+  // Stop scanning and cleanup
+  const stopScanning = useCallback(() => {
+    setIsScanning(false);
 
-    async function initialize() {
-      try {
-        console.log('🔧 Initializing barcode detector...');
-        const type = await initBarcodeDetector();
-        if (mounted) {
-          setScannerType(type);
-          setIsInitialized(true);
-          console.log(`✅ Barcode detector initialized: ${type}`);
-          // Auto-start scanning after init
-          startScanning();
-        }
-      } catch (err) {
-        console.error('❌ Failed to initialize barcode detector:', err);
-        if (mounted) {
-          setError('Échec de l\'initialisation du scanner. Veuillez rafraîchir la page.');
-        }
-      }
+    // Cancel animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
 
-    initialize();
+    // Stop camera stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
 
-    return () => {
-      mounted = false;
-      stopScanning();
-    };
+    // Clear video
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
   }, []);
 
+  // Main scanning loop with optimizations
+  const scanLoop = useCallback(async () => {
+    if (!videoRef.current || !detectorRef.current || !offscreenCanvasRef.current || !scanRegionRef.current) {
+      return;
+    }
+
+    try {
+      const { canvas, ctx } = offscreenCanvasRef.current;
+      const scanRegion = scanRegionRef.current;
+
+      // Apply contrast enhancement and crop to scan region
+      applyContrastEnhancement(ctx, videoRef.current, scanRegion);
+
+      // Detect barcodes from the processed canvas
+      const barcodes = await detectorRef.current.detect(canvas);
+
+      if (barcodes.length > 0) {
+        const code = barcodes[0].rawValue;
+        console.log('📷 Barcode detected:', code);
+
+        // Vibrate if supported
+        if (navigator.vibrate) {
+          navigator.vibrate(200);
+        }
+
+        // Stop scanning and report result
+        stopScanning();
+        onDetected(code);
+        return;
+      }
+
+      // Continue scanning
+      animationFrameRef.current = requestAnimationFrame(scanLoop);
+
+    } catch (err) {
+      console.error('Error during detection:', err);
+      // Continue scanning even if one frame fails
+      animationFrameRef.current = requestAnimationFrame(scanLoop);
+    }
+  }, [onDetected, stopScanning]);
+
   // Start camera and scanning
-  const startScanning = async () => {
+  const startScanning = useCallback(async () => {
     try {
       setError('');
 
@@ -152,70 +184,38 @@ const ZXingBarcodeScanner = ({ onDetected, onClose }) => {
       }
       // Don't stop, allow manual entry
     }
-  };
+  }, [scanLoop]);
 
-  // Main scanning loop with optimizations
-  const scanLoop = async () => {
-    if (!videoRef.current || !detectorRef.current || !offscreenCanvasRef.current || !scanRegionRef.current) {
-      return;
-    }
+  // Initialize barcode detector on mount
+  useEffect(() => {
+    let mounted = true;
 
-    try {
-      const { canvas, ctx } = offscreenCanvasRef.current;
-      const scanRegion = scanRegionRef.current;
-
-      // Apply contrast enhancement and crop to scan region
-      applyContrastEnhancement(ctx, videoRef.current, scanRegion);
-
-      // Detect barcodes from the processed canvas
-      const barcodes = await detectorRef.current.detect(canvas);
-
-      if (barcodes.length > 0) {
-        const code = barcodes[0].rawValue;
-        console.log('📷 Barcode detected:', code);
-
-        // Vibrate if supported
-        if (navigator.vibrate) {
-          navigator.vibrate(200);
+    async function initialize() {
+      try {
+        console.log('🔧 Initializing barcode detector...');
+        const type = await initBarcodeDetector();
+        if (mounted) {
+          setScannerType(type);
+          setIsInitialized(true);
+          console.log(`✅ Barcode detector initialized: ${type}`);
+          // Auto-start scanning after init
+          startScanning();
         }
-
-        // Stop scanning and report result
-        stopScanning();
-        onDetected(code);
-        return;
+      } catch (err) {
+        console.error('❌ Failed to initialize barcode detector:', err);
+        if (mounted) {
+          setError('Échec de l\'initialisation du scanner. Veuillez rafraîchir la page.');
+        }
       }
-
-      // Continue scanning
-      animationFrameRef.current = requestAnimationFrame(scanLoop);
-
-    } catch (err) {
-      console.error('Error during detection:', err);
-      // Continue scanning even if one frame fails
-      animationFrameRef.current = requestAnimationFrame(scanLoop);
-    }
-  };
-
-  // Stop scanning and cleanup
-  const stopScanning = () => {
-    setIsScanning(false);
-
-    // Cancel animation frame
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
     }
 
-    // Stop camera stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
+    initialize();
 
-    // Clear video
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  };
+    return () => {
+      mounted = false;
+      stopScanning();
+    };
+  }, [startScanning, stopScanning]);
 
   // Handle manual code submission
   const handleManualSubmit = () => {

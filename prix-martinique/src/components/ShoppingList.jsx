@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Bookmark, Wallet, TrendingDown, Pencil, ChefHat, ChevronRight } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { posthog } from '../posthogClient';
 import UnmatchedItemsModal from './UnmatchedItemsModal';
 import FlagFrance from './flags/FlagFrance';

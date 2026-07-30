@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
   const [mode, setMode] = useState(initialMode); // 'signin' | 'signup' | 'forgot_password' | 'set_password'

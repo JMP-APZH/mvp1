@@ -44,7 +44,7 @@ export default function StoreSelectionWizard({
     const [selectedCity, setSelectedCity] = useState(null);
     const [selectedChain, setSelectedChain] = useState(null);
     const [userFavorites, setUserFavorites] = useState([]);
-    const [loadingFavorites, setLoadingFavorites] = useState(false);
+    const [, setLoadingFavorites] = useState(false);
 
     // Data state
     const [stores, setStores] = useState([]);
@@ -61,14 +61,6 @@ export default function StoreSelectionWizard({
     const [userLocation, setUserLocation] = useState(null);
     const [gpsCity, setGpsCity] = useState(null);
 
-    // Load stores and cities on mount
-    useEffect(() => {
-        loadStores();
-        loadCities();
-        attemptGPSDetection();
-        loadUserFavorites();
-    }, []);
-
     useEffect(() => {
         posthog.capture('store_wizard_step_viewed', { step_number: step, step_name: STEP_NAMES[step] });
     }, [step]);
@@ -81,7 +73,7 @@ export default function StoreSelectionWizard({
         }
     }, [selectedStoreId]);
 
-    async function loadUserFavorites() {
+    const loadUserFavorites = useCallback(async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -102,9 +94,9 @@ export default function StoreSelectionWizard({
         } finally {
             setLoadingFavorites(false);
         }
-    }
+    }, [supabase]);
 
-    async function loadStores() {
+    const loadStores = useCallback(async () => {
         try {
             const { data, error } = await supabase
                 .from('stores')
@@ -119,14 +111,14 @@ export default function StoreSelectionWizard({
             console.error('Error loading stores:', err);
             setLoading(false);
         }
-    }
+    }, [supabase]);
 
-    async function loadCities() {
+    const loadCities = useCallback(async () => {
         const cityList = await getCityList(supabase);
         setCities(cityList);
-    }
+    }, [supabase]);
 
-    async function attemptGPSDetection() {
+    const attemptGPSDetection = useCallback(async () => {
         setGpsDetecting(true);
         const location = await detectUserLocation();
 
@@ -141,7 +133,15 @@ export default function StoreSelectionWizard({
         }
 
         setGpsDetecting(false);
-    }
+    }, []);
+
+    // Load stores and cities on mount
+    useEffect(() => {
+        loadStores();
+        loadCities();
+        attemptGPSDetection();
+        loadUserFavorites();
+    }, [loadStores, loadCities, attemptGPSDetection, loadUserFavorites]);
 
     // Filter cities by search
     const filteredCities = useMemo(() => {

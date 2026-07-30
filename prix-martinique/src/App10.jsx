@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import BQPVerifier from './components/BQPVerifier';
 import FlagMartinique from './components/flags/FlagMartinique';
 import FlagFrance from './components/flags/FlagFrance';
@@ -9,7 +9,7 @@ import RecipeDetailModal from './components/RecipeDetailModal';
 import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy, PartyPopper } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { posthog } from './posthogClient';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/useAuth';
 import { MAINLAND_CHAINS } from './constants/mainlandChains';
 import AuthModal from './components/AuthModal';
 import UserMenu from './components/UserMenu';
@@ -73,7 +73,6 @@ const App10 = () => {
     const [myScansFilter, setMyScansFilter] = useState('all');
     const [showWantedScans, setShowWantedScans] = useState(false);
     const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
-    const [bqpQualityStats, setBqpQualityStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 });
     const [priceHistory, setPriceHistory] = useState([]);
     const [showBqpSelector, setShowBqpSelector] = useState(false);
     const [scannedProduct, setScannedProduct] = useState(null);
@@ -128,7 +127,7 @@ const App10 = () => {
     const { toasts, toast } = useToast();
 
     // Auth context
-    const { user, userProfile, awardPoints, refreshProfile, userFavorites, toggleFavorite, passwordRecoveryMode } = useAuth();
+    const { user, userProfile, awardPoints, userFavorites, toggleFavorite, passwordRecoveryMode } = useAuth();
 
     // Open modal in password-reset mode when user arrives via reset email link
     useEffect(() => {
@@ -197,39 +196,14 @@ const App10 = () => {
         // iOS instructions are shown inline, no action needed
     };
 
-    // Load stores from Supabase
-    useEffect(() => {
-        loadStores();
-    }, []);
-
-    // Load recent prices from Supabase
-    useEffect(() => {
-        loadRecentPrices();
-
-        // Set up real-time subscription for new prices
-        const subscription = supabase
-            .channel('prices_channel')
-            .on('postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'prices' },
-                (payload) => {
-                    loadRecentPrices(); // Reload when new price is added
-                }
-            )
-            .subscribe();
-
-        return () => {
-            subscription.unsubscribe();
-        };
-    }, []);
-
     // Set username from profile when user logs in
     useEffect(() => {
         if (userProfile?.display_name && !manualEntry.userName) {
             setManualEntry(prev => ({ ...prev, userName: userProfile.display_name }));
         }
-    }, [userProfile]);
+    }, [userProfile, manualEntry.userName]);
 
-    const loadStores = async () => {
+    const loadStores = useCallback(async () => {
         try {
             const { data, error } = await supabase
                 .from('stores')
@@ -243,9 +217,9 @@ const App10 = () => {
             posthog.captureException(err, { context: 'load_stores' });
             toast.error('Impossible de charger les magasins. Vérifiez votre connexion.');
         }
-    };
+    }, [toast]);
 
-    const loadRecentPrices = async () => {
+    const loadRecentPrices = useCallback(async () => {
         try {
             setLoading(true);
 
@@ -366,7 +340,32 @@ const App10 = () => {
             toast.error('Impossible de charger les prix. Vérifiez votre connexion.');
             setLoading(false);
         }
-    };
+    }, [user, toast]);
+
+    // Load stores from Supabase
+    useEffect(() => {
+        loadStores();
+    }, [loadStores]);
+
+    // Load recent prices from Supabase
+    useEffect(() => {
+        loadRecentPrices();
+
+        // Set up real-time subscription for new prices
+        const subscription = supabase
+            .channel('prices_channel')
+            .on('postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'prices' },
+                () => {
+                    loadRecentPrices(); // Reload when new price is added
+                }
+            )
+            .subscribe();
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [loadRecentPrices]);
 
     // Handle barcode detection from ZXingBarcodeScanner
     // Handle barcode detection from ZXingBarcodeScanner
@@ -516,48 +515,8 @@ const App10 = () => {
                 downvotes: data.downvotes || 0,
                 userVote: data.user_vote || 0,
             });
-            setBqpQualityStats({
-                upvotes:  data.quality_upvotes  || 0,
-                downvotes: data.quality_downvotes || 0,
-                userVote: data.quality_user_vote || 0,
-            });
         } catch (err) {
             console.error('Error fetching votes:', err);
-        }
-    };
-
-    const handleQualityVote = async (voteValue) => {
-        if (!user) {
-            setShowAuthModal(true);
-            return;
-        }
-        if (!bqpCheckResult?.product?.id) return;
-
-        try {
-            const productId = bqpCheckResult.product.id;
-            const newVote = bqpQualityStats.userVote === voteValue ? 0 : voteValue;
-
-            // Optimistic update
-            setBqpQualityStats(prev => {
-                let newUp = prev.upvotes - (prev.userVote === 1 ? 1 : 0);
-                let newDown = prev.downvotes - (prev.userVote === -1 ? 1 : 0);
-                if (newVote === 1) newUp++;
-                if (newVote === -1) newDown++;
-                return { upvotes: newUp, downvotes: newDown, userVote: newVote };
-            });
-
-            if (newVote === 0) {
-                await supabase.from('bqp_quality_votes').delete().eq('product_id', productId).eq('user_id', user.id);
-            } else {
-                await supabase.from('bqp_quality_votes').upsert({
-                    product_id: productId,
-                    user_id: user.id,
-                    vote: voteValue
-                }, { onConflict: 'user_id, product_id' });
-            }
-        } catch (err) {
-            console.error('Error voting on quality:', err);
-            posthog.captureException(err, { context: 'bqp_quality_vote' });
         }
     };
 
@@ -794,7 +753,7 @@ const App10 = () => {
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-                const { data: uploadData, error: uploadError } = await supabase.storage
+                const { error: uploadError } = await supabase.storage
                     .from('product-photos')
                     .upload(fileName, blob);
 
@@ -820,7 +779,7 @@ const App10 = () => {
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-                const { data: uploadData, error: uploadError } = await supabase.storage
+                const { error: uploadError } = await supabase.storage
                     .from('price-tag-photos')
                     .upload(fileName, blob);
 
@@ -1010,54 +969,6 @@ const App10 = () => {
     };
 
     // Calculate Community Basket (Standard essential items)
-    const getCommunityBasket = () => {
-        // Essential items identifiers (keywords in name)
-        const essentials = [
-            { name: 'Lait', icon: '🥛' },
-            { name: 'Pain', icon: '🥖' },
-            { name: 'Oeufs', icon: '🥚' },
-            { name: 'Riz', icon: '🍚' },
-            { name: 'Pâtes', icon: '🍝' },
-            { name: 'Eau', icon: '💧' }
-        ];
-
-        // Group by chain (Carrefour, Super U, etc.)
-        const chainCosts = {};
-
-        recentPrices.forEach(p => {
-            const chain = p.store.split(' ')[0]; // Basic chain detection from store name
-            if (!chainCosts[chain]) chainCosts[chain] = { total: 0, items: new Set() };
-
-            essentials.forEach(ess => {
-                if (p.product.toLowerCase().includes(ess.name.toLowerCase())) {
-                    // Update if it's the latest price for this essential in this chain
-                    chainCosts[chain].total += p.price;
-                    chainCosts[chain].items.add(ess.name);
-                }
-            });
-        });
-
-        // Filter chains that have at least 3 essential items
-        return Object.entries(chainCosts)
-            .filter(([_, data]) => data.items.size >= 2)
-            .map(([chain, data]) => ({
-                chain,
-                total: data.total / data.items.size, // Average cost per item for fair comparison
-                count: data.items.size
-            }))
-            .sort((a, b) => a.total - b.total);
-    };
-
-    // Get Top Price Gaps (high variance)
-    const getPriceGaps = () => {
-        const uniqueProducts = [...new Set(recentPrices.map(p => p.product))];
-        return uniqueProducts
-            .map(name => ({ name, stats: getProductStats(name) }))
-            .filter(item => item.stats.count > 1 && item.stats.variance > 15) // At least 2 prices and 15% gap
-            .sort((a, b) => b.stats.variance - a.stats.variance)
-            .slice(0, 3);
-    };
-
     return (
         <div className="max-w-2xl mx-auto bg-white min-h-screen">
             {/* ZXingBarcodeScanner - Full screen overlay when active */}
@@ -2230,14 +2141,17 @@ const App10 = () => {
                                     { Icon: Euro, text: 'Saisissez le prix affiché sur l\'étiquette' },
                                     { Icon: BarChart3, text: 'Comparez les prix entre supermarchés' },
                                     { Icon: Trophy, text: 'Gagnez des points et montez dans le classement' },
-                                ].map(({ Icon, text }) => (
-                                    <li key={text} className="flex items-center gap-3 text-sm text-gray-600">
-                                        <span className="w-9 h-9 flex-shrink-0 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
-                                            <Icon className="w-4 h-4" />
-                                        </span>
-                                        {text}
-                                    </li>
-                                ))}
+                                ].map((step) => {
+                                    const StepIcon = step.Icon;
+                                    return (
+                                        <li key={step.text} className="flex items-center gap-3 text-sm text-gray-600">
+                                            <span className="w-9 h-9 flex-shrink-0 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
+                                                <StepIcon className="w-4 h-4" />
+                                            </span>
+                                            {step.text}
+                                        </li>
+                                    );
+                                })}
                             </ul>
                             <button
                                 onClick={() => {
