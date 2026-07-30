@@ -14,8 +14,16 @@ import {
     Wrench,
     ChefHat,
     MessageSquare,
-    FlaskConical
+    FlaskConical,
+    LineChart,
+    ExternalLink
 } from 'lucide-react';
+
+// PostHog project dashboard -- kept as an external link rather than embedded,
+// since embedding would require PostHog's public share links (bypassing our
+// own admin-only auth gate) or a backend proxy for a read API key (this app
+// has none). See CLAUDE.md's Jul 30, 2026 PostHog entry for the reasoning.
+const POSTHOG_DASHBOARD_URL = 'https://eu.posthog.com/project/232864/dashboard/862895';
 import { supabase } from '../supabaseClient';
 import ProductCompletion from './ProductCompletion';
 import MainlandPriceAdmin from './MainlandPriceAdmin';
@@ -187,6 +195,12 @@ const AdminDashboard = ({ onClose }) => {
                             }`}
                     >
                         <FlaskConical className="w-3.5 h-3.5" /> Données test
+                    </button>
+                    <button
+                        onClick={() => window.open(POSTHOG_DASHBOARD_URL, '_blank', 'noopener,noreferrer')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap bg-white/10 text-white"
+                    >
+                        <LineChart className="w-3.5 h-3.5" /> Analytics <ExternalLink className="w-3 h-3 opacity-60" />
                     </button>
                 </div>
             </div>
