@@ -406,6 +406,14 @@ Set up a staging branch so changes can be tested before reaching production, rat
 - **Classic branch protection rule added on `main`**: requires a PR before merging, requires status checks to pass (no specific check selected yet — GitHub only allows requiring a check that has already run at least once via a real PR; add "Validate build" here once the first `dev → main` PR runs it), blocks force-push and branch deletion. No required-approval count set (solo maintainer) and admin bypass left on.
 - **Caveat: not actually enforced yet.** `mvp1` is a private repo on GitHub's free plan, and branch protection rules on private repos are configurable but not enforced until upgrading to GitHub Team/Enterprise or making the repo public — confirmed via the "Not enforced" label GitHub shows next to the rule. Kept private for now; this is scaffolding for when that changes, not an active gate today. In the meantime the `dev`/`main` split and PR discipline are enforced by convention, not by GitHub.
 
+### Jul 30, 2026 — Infinite Fetch Loop from Unmemoized `useToast` Object (Hotfix)
+Found while testing an unrelated PR's Vercel preview on a phone before merging — exactly the kind of check this session's new `dev`/PR workflow exists to enable. Confirmed via an instrumented `fetch` wrapper in a live browser session: loading the Scanner tab fired the same batch of Supabase requests (`stores`, `categories`, `prices`, mainland-prices, test-flag check) over 500 times in a few seconds, all succeeding (200 OK) — a genuine infinite loop, not a data problem.
+
+- **Root cause**: `useToast.js`'s `toast` object (`{ success, error, info }`) was a plain object literal recreated on every render, never memoized. Earlier the same day, fixing ESLint's `exhaustive-deps` warnings added `toast` to the dependency arrays of `loadStores`/`loadRecentPrices` (`useCallback`s in `App10.jsx`) — correct per the lint rule, but since `toast`'s identity changed every render, those callbacks never stabilized: their `useEffect`s (deps `[loadStores]`/`[loadRecentPrices]`) re-fired every render, each setState triggering another render, ad infinitum.
+- **Already live in production** at the time this was found — it shipped as part of the same-day ESLint cleanup PR, not something newly introduced by this hotfix.
+- **Fix**: wrapped the `toast` object in `useMemo(..., [addToast])` in `useToast.js` — `addToast` itself was already stable (`useCallback` with `[]` deps), so this is the only change needed. `App10.jsx` untouched.
+- **Verified live**: re-ran the same instrumented-fetch test against this fix's Vercel preview — confirmed the request flood is gone (each fetch fires once per real state change, not continuously).
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
