@@ -1,0 +1,38 @@
+name: PR Build Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  build:
+    name: Validate build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: prix-martinique
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: prix-martinique/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_STAGING }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_STAGING }}
