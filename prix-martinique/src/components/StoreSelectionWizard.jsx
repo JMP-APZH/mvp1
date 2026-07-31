@@ -65,13 +65,21 @@ export default function StoreSelectionWizard({
         posthog.capture('store_wizard_step_viewed', { step_number: step, step_name: STEP_NAMES[step] });
     }, [step]);
 
-    // Fires once per mount, on the transition into "a store is selected" --
-    // covers every path (city→chain→store, favorites shortcut, nearest-store shortcut).
-    useEffect(() => {
-        if (selectedStoreId) {
-            posthog.capture('store_wizard_completed', { store_id: selectedStoreId });
+    // Fires the moment a store is actually chosen, covering every path
+    // (city→chain→store, single-store auto-select, favorites shortcut,
+    // nearest-store shortcut). Previously this lived in a useEffect watching
+    // `selectedStoreId`, but the parent unmounts this component in the same
+    // render that prop would have become truthy (it swaps to a "store chosen"
+    // summary view), so that effect could never actually observe the change --
+    // store_wizard_completed had zero real events despite looking correctly
+    // wired. Firing it here, at the actual point of selection, is reachable
+    // regardless of what the parent does afterward.
+    const selectStore = useCallback((storeId) => {
+        if (storeId) {
+            posthog.capture('store_wizard_completed', { store_id: storeId });
         }
-    }, [selectedStoreId]);
+        onStoreSelect(storeId);
+    }, [onStoreSelect]);
 
     const loadUserFavorites = useCallback(async () => {
         try {
@@ -219,50 +227,50 @@ export default function StoreSelectionWizard({
     const handleCitySelect = useCallback((city) => {
         setSelectedCity(city);
         setSelectedChain(null);
-        onStoreSelect(null);
+        selectStore(null);
         setStep(2);
-    }, [onStoreSelect]);
+    }, [selectStore]);
 
     const handleChainSelect = useCallback((chain) => {
         const cityStores = stores.filter(s => s.city === selectedCity && s.chain === chain);
 
         if (cityStores.length === 1) {
             // Only one store in this city/chain - select it automatically and finish
-            onStoreSelect(cityStores[0].id);
+            selectStore(cityStores[0].id);
             // No need to setStep(3) if it's already selected and we want to skip
         } else {
             setSelectedChain(chain);
-            onStoreSelect(null);
+            selectStore(null);
             setStep(3);
         }
-    }, [stores, selectedCity, onStoreSelect]);
+    }, [stores, selectedCity, selectStore]);
 
     const handleStoreSelect = useCallback((store) => {
-        onStoreSelect(store.id);
-    }, [onStoreSelect]);
+        selectStore(store.id);
+    }, [selectStore]);
 
     const handleBack = useCallback(() => {
         if (step === 3) {
             setStep(2);
             setSelectedChain(null);
-            onStoreSelect(null);
+            selectStore(null);
         } else if (step === 2) {
             setStep(1);
             setSelectedCity(null);
             setSelectedChain(null);
-            onStoreSelect(null);
+            selectStore(null);
         }
-    }, [step, onStoreSelect]);
+    }, [step, selectStore]);
 
     const handleReset = useCallback(() => {
         setStep(1);
         setSelectedCity(null);
         setSelectedChain(null);
-        onStoreSelect(null);
+        selectStore(null);
         setCitySearch('');
         setChainSearch('');
         setStoreSearch('');
-    }, [onStoreSelect]);
+    }, [selectStore]);
 
     if (loading) {
         return (
@@ -374,7 +382,7 @@ export default function StoreSelectionWizard({
                                             onClick={() => {
                                                 setSelectedCity(store.city);
                                                 setSelectedChain(store.chain);
-                                                onStoreSelect(store.id);
+                                                selectStore(store.id);
                                                 setStep(3); // Go directly to summary/confirmation
                                             }}
                                             className="w-full text-left p-3 bg-orange-50 rounded-xl border-2 border-orange-100 hover:border-orange-400 transition-all group flex items-center justify-between"
@@ -409,7 +417,7 @@ export default function StoreSelectionWizard({
                                             onClick={() => {
                                                 setSelectedCity(store.city);
                                                 setSelectedChain(store.chain);
-                                                onStoreSelect(store.id);
+                                                selectStore(store.id);
                                                 setStep(3);
                                             }}
                                             className="w-full text-left p-3 bg-blue-50 rounded-xl border border-blue-100 hover:border-blue-400 transition-colors group flex items-center justify-between"
