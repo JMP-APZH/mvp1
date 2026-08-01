@@ -7,7 +7,10 @@
 -- cleanup, safe to delete this file after running.
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
--- Status: NOT YET APPLIED.
+-- Status: APPLIED and verified live 2026-08-01 (jm.philocles@gmail.com's
+-- points and "Mes contributions" count both reverted correctly in the app:
+-- 80 -> 70 points, 9 -> 8 contributions -- the latter via
+-- sync_total_contributions()'s trigger, no manual fix needed).
 
 delete from product_bqp_associations
 where product_id in (select id from products where name ilike 'Test Offline Auth Round Trip QA%');
