@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { enqueueCartOp } from '../utils/offlineDb';
 
 /**
  * useShoppingList
@@ -11,8 +12,14 @@ import { useState, useEffect, useRef } from 'react';
  *
  * Item shape (UI): { productId: uuid, name: string, quantity: number, photo: string|null }
  * DB shape: shopping_lists (one per user, is_primary=true) + shopping_list_items rows
+ *
+ * Offline: when `isOnline` is false (or a write fails mid-flight), the four write
+ * actions below skip the Supabase call, queue the operation in IndexedDB instead
+ * (see offlineDb.js / syncQueue.js for the drain-on-reconnect side), and still apply
+ * the same optimistic local-state update as the online path -- so the UI behaves
+ * identically either way, only the persistence timing differs.
  */
-export function useShoppingList(supabase, user) {
+export function useShoppingList(supabase, user, isOnline = true) {
     const [shoppingList, setShoppingList] = useState([]);
     const [listId, setListId] = useState(null);
 
@@ -20,10 +27,12 @@ export function useShoppingList(supabase, user) {
     const userRef = useRef(user);
     const listIdRef = useRef(listId);
     const shoppingListRef = useRef(shoppingList);
+    const isOnlineRef = useRef(isOnline);
 
     useEffect(() => { userRef.current = user; }, [user]);
     useEffect(() => { listIdRef.current = listId; }, [listId]);
     useEffect(() => { shoppingListRef.current = shoppingList; }, [shoppingList]);
+    useEffect(() => { isOnlineRef.current = isOnline; }, [isOnline]);
 
     // ── Supabase helpers ────────────────────────────────────────────────────
 
@@ -89,6 +98,12 @@ export function useShoppingList(supabase, user) {
         }));
     };
 
+    // Small local snapshot of the authenticated cart, refreshed on every change --
+    // exists purely so a reload while offline (before syncShoppingList's Supabase
+    // call can succeed) has something better to fall back to than an empty list.
+    // Not a source of truth; Supabase always wins once reachable.
+    const cacheKeyForUser = (userId) => `shoppingList_cache_${userId}`;
+
     // Loads the shopping list from the right source for the current auth state --
     // Supabase for a signed-in user, localStorage for an anonymous one. Kept as a
     // single function (rather than an if/else directly in the effect below) with
@@ -134,25 +149,40 @@ export function useShoppingList(supabase, user) {
             }
         } catch (err) {
             console.error('Erreur chargement panier:', err);
+            // Offline (or Supabase otherwise unreachable) on initial/refresh load for
+            // an authenticated user -- fall back to the last known local snapshot
+            // instead of leaving the cart looking empty until connectivity returns.
+            if (user) {
+                const cached = localStorage.getItem(cacheKeyForUser(user.id));
+                if (cached) setShoppingList(JSON.parse(cached));
+            }
         }
     };
 
     // Switch data source when auth state changes. Standard fetch-on-dependency-change
     // effect (same pattern used cleanly elsewhere in this codebase, e.g.
-    // Leaderboard.jsx/Community.jsx). The set-state-in-effect disable below is a
-    // confirmed false positive, not a real issue: isolated repro testing showed this
-    // rule's trigger here depends on unrelated surface details (e.g. whether an
-    // unrelated `throw` statement appears before the setState call), not on anything
-    // about this effect's actual correctness -- eslint-plugin-react-hooks@7.0.1's
-    // set-state-in-effect analysis is very new and inconsistent on this exact shape.
+    // Leaderboard.jsx/Community.jsx). (Previously carried an additional
+    // `react-hooks/set-state-in-effect` suppression -- confirmed a false positive at
+    // the time per eslint-plugin-react-hooks@7.0.1's known inconsistency on this
+    // shape, and no longer triggers at all after the offline-fallback catch block
+    // above changed this function's surface shape.)
     useEffect(() => {
-        syncShoppingList(); // eslint-disable-line react-hooks/set-state-in-effect
+        syncShoppingList();
     }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Persist to localStorage for anonymous users only
     useEffect(() => {
         if (!userRef.current) {
             localStorage.setItem('shoppingList', JSON.stringify(shoppingList));
+        }
+    }, [shoppingList]);
+
+    // Mirror the authenticated cart into its own fallback cache too (see
+    // syncShoppingList's catch above) -- cheap, no photos, just the same
+    // small shape already used for the anonymous localStorage path.
+    useEffect(() => {
+        if (userRef.current) {
+            localStorage.setItem(cacheKeyForUser(userRef.current.id), JSON.stringify(shoppingList));
         }
     }, [shoppingList]);
 
@@ -167,27 +197,46 @@ export function useShoppingList(supabase, user) {
         if (currentUser && currentListId) {
             if (existing) {
                 const newQty = existing.quantity + 1;
-                await supabase
-                    .from('shopping_list_items')
-                    .update({ quantity: newQty })
-                    .eq('list_id', currentListId)
-                    .eq('product_id', product.id);
+
+                if (!isOnlineRef.current) {
+                    await enqueueCartOp({ type: 'update_quantity', productId: product.id, quantity: newQty });
+                } else {
+                    try {
+                        const { error } = await supabase
+                            .from('shopping_list_items')
+                            .update({ quantity: newQty })
+                            .eq('list_id', currentListId)
+                            .eq('product_id', product.id);
+                        if (error) throw error;
+                    } catch (err) {
+                        console.error('Erreur mise à jour quantité (mise en attente):', err);
+                        await enqueueCartOp({ type: 'update_quantity', productId: product.id, quantity: newQty });
+                    }
+                }
 
                 setShoppingList(prev =>
                     prev.map(i => i.productId === product.id ? { ...i, quantity: newQty } : i)
                 );
             } else {
+                const newItem = {
+                    productId: product.id,
+                    name: product.name || product.product,
+                    quantity: 1,
+                    photo: product.productPhotoUrl || null,
+                };
+
+                if (!isOnlineRef.current) {
+                    await enqueueCartOp({ type: 'add', productId: product.id, quantity: 1 });
+                    setShoppingList(prev => [...prev, newItem]);
+                    return;
+                }
+
                 const { error } = await supabase
                     .from('shopping_list_items')
                     .insert({ list_id: currentListId, product_id: product.id, quantity: 1 });
 
                 if (!error) {
-                    setShoppingList(prev => [...prev, {
-                        productId: product.id,
-                        name: product.name || product.product,
-                        quantity: 1,
-                        photo: product.productPhotoUrl || null,
-                    }]);
+                    setShoppingList(prev => [...prev, newItem]);
                 } else if (error.code === '23505') {
                     // Unique-constraint conflict: the item is already in the DB list
                     // but local state didn't know that (stale after a slow round-trip,
@@ -208,16 +257,15 @@ export function useShoppingList(supabase, user) {
                             if (alreadyTracked) {
                                 return prev.map(i => i.productId === product.id ? { ...i, quantity: row.quantity } : i);
                             }
-                            return [...prev, {
-                                productId: product.id,
-                                name: product.name || product.product,
-                                quantity: row.quantity,
-                                photo: product.productPhotoUrl || null,
-                            }];
+                            return [...prev, { ...newItem, quantity: row.quantity }];
                         });
                     }
                 } else {
-                    console.error('Erreur ajout panier:', error);
+                    // Any other failure (including a connection drop mid-request) --
+                    // queue it for retry rather than silently losing the add.
+                    console.error('Erreur ajout panier (mise en attente):', error);
+                    await enqueueCartOp({ type: 'add', productId: product.id, quantity: 1 });
+                    setShoppingList(prev => [...prev, newItem]);
                 }
             }
         } else {
@@ -244,11 +292,21 @@ export function useShoppingList(supabase, user) {
         const currentListId = listIdRef.current;
 
         if (currentUser && currentListId) {
-            await supabase
-                .from('shopping_list_items')
-                .delete()
-                .eq('list_id', currentListId)
-                .eq('product_id', productId);
+            if (!isOnlineRef.current) {
+                await enqueueCartOp({ type: 'remove', productId });
+            } else {
+                try {
+                    const { error } = await supabase
+                        .from('shopping_list_items')
+                        .delete()
+                        .eq('list_id', currentListId)
+                        .eq('product_id', productId);
+                    if (error) throw error;
+                } catch (err) {
+                    console.error('Erreur suppression panier (mise en attente):', err);
+                    await enqueueCartOp({ type: 'remove', productId });
+                }
+            }
         }
         setShoppingList(prev => prev.filter(i => i.productId !== productId));
     };
@@ -262,11 +320,21 @@ export function useShoppingList(supabase, user) {
         const currentListId = listIdRef.current;
 
         if (currentUser && currentListId) {
-            await supabase
-                .from('shopping_list_items')
-                .update({ quantity: newQuantity })
-                .eq('list_id', currentListId)
-                .eq('product_id', productId);
+            if (!isOnlineRef.current) {
+                await enqueueCartOp({ type: 'update_quantity', productId, quantity: newQuantity });
+            } else {
+                try {
+                    const { error } = await supabase
+                        .from('shopping_list_items')
+                        .update({ quantity: newQuantity })
+                        .eq('list_id', currentListId)
+                        .eq('product_id', productId);
+                    if (error) throw error;
+                } catch (err) {
+                    console.error('Erreur mise à jour quantité (mise en attente):', err);
+                    await enqueueCartOp({ type: 'update_quantity', productId, quantity: newQuantity });
+                }
+            }
         }
         setShoppingList(prev =>
             prev.map(i => i.productId === productId ? { ...i, quantity: newQuantity } : i)
@@ -280,10 +348,20 @@ export function useShoppingList(supabase, user) {
         const currentListId = listIdRef.current;
 
         if (currentUser && currentListId) {
-            await supabase
-                .from('shopping_list_items')
-                .delete()
-                .eq('list_id', currentListId);
+            if (!isOnlineRef.current) {
+                await enqueueCartOp({ type: 'clear' });
+            } else {
+                try {
+                    const { error } = await supabase
+                        .from('shopping_list_items')
+                        .delete()
+                        .eq('list_id', currentListId);
+                    if (error) throw error;
+                } catch (err) {
+                    console.error('Erreur vidage panier (mise en attente):', err);
+                    await enqueueCartOp({ type: 'clear' });
+                }
+            }
         }
         setShoppingList([]);
     };
@@ -294,5 +372,7 @@ export function useShoppingList(supabase, user) {
         removeFromShoppingList,
         updateQuantity,
         clearShoppingList,
+        getOrCreatePrimaryList,
+        refreshShoppingList: syncShoppingList,
     };
 }

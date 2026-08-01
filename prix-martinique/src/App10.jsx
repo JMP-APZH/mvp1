@@ -27,6 +27,11 @@ import AdminDashboard from './components/AdminDashboard';
 import PriceDuel from './components/PriceDuel';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { useOfflineSync } from './hooks/useOfflineSync';
+import OfflineBanner from './components/OfflineBanner';
+import { performPriceSubmission } from './utils/priceSubmission';
+import { enqueuePriceSubmission, cacheStores, getCachedStores, cacheCategories, getCachedCategories } from './utils/offlineDb';
 
 const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     const [loaded, setLoaded] = useState(false);
@@ -137,8 +142,28 @@ const App10 = () => {
         }
     }, [passwordRecoveryMode]);
 
+    // Connectivity — single shared instance; useShoppingList and useOfflineSync both
+    // need it, and useOfflineSync also needs useShoppingList's getOrCreatePrimaryList,
+    // so this one call breaks what would otherwise be a circular hook dependency.
+    const { isOnline, checkNow: checkOnlineNow } = useOnlineStatus();
+
     // Shopping list — Supabase-backed for authenticated users, localStorage for anonymous
-    const { shoppingList, addToShoppingList, removeFromShoppingList, updateQuantity, clearShoppingList } = useShoppingList(supabase, user);
+    const {
+        shoppingList, addToShoppingList, removeFromShoppingList, updateQuantity, clearShoppingList,
+        getOrCreatePrimaryList, refreshShoppingList,
+    } = useShoppingList(supabase, user, isOnline);
+
+    // Offline queue sync — drains queued price submissions + cart ops on reconnect.
+    const { pendingCount, isSyncing, syncNow } = useOfflineSync({
+        isOnline,
+        checkNow: checkOnlineNow,
+        supabase,
+        awardPoints,
+        user,
+        userProfile,
+        getOrCreatePrimaryList,
+        onCartSynced: refreshShoppingList,
+    });
 
     // Detect iOS device
     const isIOS = () => {
@@ -205,17 +230,30 @@ const App10 = () => {
 
     const loadStores = useCallback(async () => {
         try {
+            // select('*') (was `id, name, chain`) so this write-through and
+            // StoreSelectionWizard's own cacheStores() call cache the same full-row
+            // shape -- keyed together by id in the same offline store, an offline
+            // put from whichever loader runs second must not clobber fields (e.g.
+            // `city`) the other one's cached read depends on.
             const { data, error } = await supabase
                 .from('stores')
-                .select('id, name, chain')
+                .select('*')
                 .order('name', { ascending: true });
 
             if (error) throw error;
             setStores(data || []);
+            cacheStores(data || []); // write-through so the picker still works offline later
         } catch (err) {
             console.error('Error loading stores:', err);
             posthog.captureException(err, { context: 'load_stores' });
-            toast.error('Impossible de charger les magasins. Vérifiez votre connexion.');
+            // Offline (or otherwise unreachable): fall back to the last cached list
+            // instead of leaving the store picker empty.
+            const cached = await getCachedStores();
+            if (cached.length > 0) {
+                setStores([...cached].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr')));
+            } else {
+                toast.error('Impossible de charger les magasins. Vérifiez votre connexion.');
+            }
         }
     }, [toast]);
 
@@ -229,7 +267,13 @@ const App10 = () => {
                 .select('*')
                 .order('display_order', { ascending: true });
 
-            if (categoriesData) setCategories(categoriesData);
+            if (categoriesData) {
+                setCategories(categoriesData);
+                cacheCategories(categoriesData); // write-through so the picker still works offline later
+            } else {
+                const cachedCategories = await getCachedCategories();
+                if (cachedCategories.length > 0) setCategories(cachedCategories);
+            }
 
             // Join prices with products and stores to get all info
             const { data, error } = await supabase
@@ -380,6 +424,15 @@ const App10 = () => {
         }
 
         setManualEntry(prev => ({ ...prev, barcode: code }));
+
+        // Offline: skip the lookups entirely rather than attempting them -- Supabase
+        // has no default request timeout, so a dead connection would otherwise hang
+        // here indefinitely. The manual-entry form below still works fully offline
+        // (submitPrice queues the submission); only this verification step is skipped.
+        if (!isOnline) {
+            setBqpCheckResult({ status: 'offline', barcode: code });
+            return;
+        }
 
         // Start BQP Check
         setBqpCheckResult({ status: 'loading' });
@@ -677,6 +730,11 @@ const App10 = () => {
         }
     };
 
+    // Thin wrapper: validate → build payload → either submit live (online) or queue
+    // it (offline / connection lost mid-request). The actual find-or-create-product /
+    // photo-upload / price-insert / award-points work lives in performPriceSubmission
+    // (src/utils/priceSubmission.js), called identically here and from the offline
+    // sync drainer (syncQueue.js) so the two paths can't drift apart.
     const submitPrice = async () => {
         const hasLocation = manualEntry.isMainland ? manualEntry.mainlandChain : manualEntry.storeId;
         if (!manualEntry.productName || !manualEntry.price || !hasLocation) {
@@ -684,215 +742,24 @@ const App10 = () => {
             return;
         }
 
-        if (!manualEntry.categoryId && !manualEntry.barcode) {
-            // Optional: Force category for new non-barcoded items?
-            // For now, let's make it optional but recommended in UI
-        }
+        const payload = {
+            productName: manualEntry.productName,
+            barcode: manualEntry.barcode,
+            price: manualEntry.price,
+            storeId: manualEntry.storeId,
+            isMainland: manualEntry.isMainland,
+            mainlandChain: manualEntry.mainlandChain,
+            userName: manualEntry.userName,
+            productPhoto: manualEntry.productPhoto,
+            priceTagPhoto: manualEntry.priceTagPhoto,
+            isDeclaredBqp: manualEntry.isDeclaredBqp,
+            categoryId: manualEntry.categoryId,
+            isLocal: manualEntry.isLocal,
+            isMdd: manualEntry.isMdd,
+            submissionMethod: 'manual_entry',
+        };
 
-        try {
-            setLoading(true);
-            setError(null);
-
-            // Step 1: Check if product exists or create it
-            let productId;
-
-            if (manualEntry.barcode) {
-                // Try to find by barcode first
-                const { data: existingProduct } = await supabase
-                    .from('products')
-                    .select('id')
-                    .eq('barcode', manualEntry.barcode)
-                    .single();
-
-                productId = existingProduct?.id;
-            }
-
-            if (!productId) {
-                // Try to find by name
-                const { data: existingProduct } = await supabase
-                    .from('products')
-                    .select('id')
-                    .ilike('name', manualEntry.productName)
-                    .single();
-
-                productId = existingProduct?.id;
-            }
-
-            if (!productId) {
-                // Create new product
-                const { data: newProduct, error: productError } = await supabase
-                    .from('products')
-                    .insert([{
-                        name: manualEntry.productName,
-                        barcode: manualEntry.barcode || null,
-                        category: null, // Legacy field
-                        category_id: manualEntry.categoryId || null,
-                        is_local_production: manualEntry.isLocal || false,
-                        is_declared_bqp: manualEntry.isDeclaredBqp || false,
-                        is_mdd: manualEntry.isMdd || false
-                    }])
-                    .select()
-                    .single();
-
-                if (productError) throw productError;
-                productId = newProduct.id;
-            }
-
-            // Step 2: Upload photos if they exist
-            let productPhotoUrl = null;
-            let priceTagPhotoUrl = null;
-
-            if (manualEntry.productPhoto) {
-                const fileName = `${Date.now()}_${productId}_product.jpg`;
-                const base64Data = manualEntry.productPhoto.split(',')[1];
-                const byteCharacters = atob(base64Data);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-                const { error: uploadError } = await supabase.storage
-                    .from('product-photos')
-                    .upload(fileName, blob);
-
-                if (uploadError) {
-                    console.error('Product photo upload error:', uploadError);
-                    posthog.captureException(uploadError, { context: 'product_photo_upload' });
-                } else {
-                    const { data: urlData } = supabase.storage
-                        .from('product-photos')
-                        .getPublicUrl(fileName);
-                    productPhotoUrl = urlData.publicUrl;
-                }
-            }
-
-            if (manualEntry.priceTagPhoto) {
-                const fileName = `${Date.now()}_${productId}_pricetag.jpg`;
-                const base64Data = manualEntry.priceTagPhoto.split(',')[1];
-                const byteCharacters = atob(base64Data);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-                const { error: uploadError } = await supabase.storage
-                    .from('price-tag-photos')
-                    .upload(fileName, blob);
-
-                if (uploadError) {
-                    console.error('Price tag photo upload error:', uploadError);
-                    posthog.captureException(uploadError, { context: 'price_tag_photo_upload' });
-                } else {
-                    const { data: urlData } = supabase.storage
-                        .from('price-tag-photos')
-                        .getPublicUrl(fileName);
-                    priceTagPhotoUrl = urlData.publicUrl;
-                }
-            }
-
-            // Step 3: Insert price with photo URLs and user_id if authenticated
-            const priceData = {
-                product_id: productId,
-                store_id: manualEntry.isMainland ? null : manualEntry.storeId,
-                price: parseFloat(manualEntry.price),
-                user_name: manualEntry.userName || 'Anonyme',
-                product_photo_url: productPhotoUrl,
-                price_tag_photo_url: priceTagPhotoUrl
-            };
-
-            if (manualEntry.isMainland) {
-                // Community scan from France Hexagonale -- same shape ProductDetailModal's
-                // "communauté" comparison slot and the scan-flow "Duel des Prix" already expect.
-                priceData.origin_region_code = 'Hexagone';
-                priceData.mainland_chain = manualEntry.mainlandChain;
-                priceData.source_type = 'scan';
-            }
-
-            // Add user_id if authenticated and tag origin
-            if (user) {
-                priceData.user_id = user.id;
-                // Add geographical origin for backend analysis (skip if already set above for a mainland scan)
-                if (userProfile && !manualEntry.isMainland) {
-                    priceData.origin_region_code = userProfile.region_code;
-                    priceData.origin_city = userProfile.city;
-                }
-            }
-
-            const { error: priceError } = await supabase
-                .from('prices')
-                .insert([priceData]);
-
-            if (priceError) throw priceError;
-
-            posthog.capture('price_submitted', {
-                submission_method: 'manual_entry',
-                product_id: productId,
-                price: priceData.price,
-                store_id: priceData.store_id,
-                is_mainland: !!manualEntry.isMainland,
-                has_product_photo: !!productPhotoUrl,
-                has_price_tag_photo: !!priceTagPhotoUrl,
-                authenticated: !!user,
-            });
-
-            if (!localStorage.getItem('ph_first_contribution_done')) {
-                localStorage.setItem('ph_first_contribution_done', '1');
-                posthog.capture('first_contribution_completed');
-            }
-
-            // Step 4: Award points if user is authenticated
-            let pointsAwarded = 0;
-            if (user) {
-                const { error: pointsError } = await awardPoints(
-                    'price_submission',
-                    10,
-                    `Prix soumis: ${manualEntry.productName}`
-                );
-
-                if (!pointsError) {
-                    pointsAwarded = 10;
-                }
-            }
-
-            // Success message
-            // Success message
-            const successMessage = user
-                ? `Prix enregistré avec succès! +${pointsAwarded} points`
-                : 'Prix enregistré avec succès! Merci pour votre contribution.';
-
-            // Check BQP status before alerting/resetting to decide flow
-            let showBqpPrompt = false;
-            let productForBqp = null;
-
-            // Check if product is already BQP linked
-            const { data: existingAssoc } = await supabase
-                .from('product_bqp_associations')
-                .select('id')
-                .eq('product_id', productId)
-                .single();
-
-            if (!existingAssoc) {
-                // Not linked? We should prompt!
-                showBqpPrompt = true;
-                // Fetch full product for the prompt state if needed
-                if (manualEntry.barcode) {
-                    const { data: p } = await supabase.from('products').select('*').eq('id', productId).single();
-                    productForBqp = p;
-                } else {
-                    // If created by name, we might not have a barcode, but we have the ID and Name
-                    const { data: p } = await supabase.from('products').select('*').eq('id', productId).single();
-                    productForBqp = p;
-                }
-            }
-
-            toast.success(successMessage);
-            setScanCelebration({ points: pointsAwarded, productName: manualEntry.productName });
-
-            // Reset form but conditionally set BQP prompt
+        const resetForm = () => {
             setManualEntry(prev => ({
                 productName: '',
                 barcode: '',
@@ -907,22 +774,73 @@ const App10 = () => {
                 categoryId: null,
                 isLocal: false
             }));
+        };
 
-            if (showBqpPrompt && productForBqp) {
+        const queueOffline = async (infoMessage) => {
+            await enqueuePriceSubmission(payload);
+            toast.info(infoMessage);
+            // No points shown -- they aren't awarded until this syncs for real.
+            setScanCelebration({ queued: true, productName: manualEntry.productName });
+            resetForm();
+            setBqpCheckResult(null);
+        };
+
+        if (!isOnline) {
+            setLoading(true);
+            try {
+                await queueOffline('Hors ligne — prix enregistré, il sera envoyé automatiquement dès que vous serez en ligne.');
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            const { pointsAwarded, bqpPrompt } = await performPriceSubmission({
+                supabase, awardPoints, user, userProfile, payload,
+            });
+
+            const successMessage = user
+                ? `Prix enregistré avec succès! +${pointsAwarded} points`
+                : 'Prix enregistré avec succès! Merci pour votre contribution.';
+
+            toast.success(successMessage);
+            setScanCelebration({ points: pointsAwarded, productName: manualEntry.productName });
+            resetForm();
+
+            if (bqpPrompt) {
                 setBqpCheckResult({
                     status: 'new_product', // Use 'new_product' to trigger the specific prompt text
-                    product: productForBqp
+                    product: bqpPrompt
                 });
-                setScannedProduct(productForBqp); // Important for the selector to work
+                setScannedProduct(bqpPrompt); // Important for the selector to work
             } else {
                 setBqpCheckResult(null);
             }
 
-            // Reload prices
             loadRecentPrices();
             setLoading(false);
-
         } catch (err) {
+            // A connection drop mid-request surfaces as a generic thrown error from the
+            // Supabase client (fetch failing outright) rather than a structured Postgrest
+            // error -- rather than losing the submission behind the red error banner,
+            // queue it for retry the same way an upfront offline check would have.
+            const looksLikeNetworkFailure = err instanceof TypeError
+                || /fetch|network/i.test(err?.message || '');
+
+            if (looksLikeNetworkFailure) {
+                try {
+                    await queueOffline('Connexion perdue — votre prix a été mis en attente et sera envoyé automatiquement.');
+                    setLoading(false);
+                    return;
+                } catch (queueErr) {
+                    console.error('Failed to queue price submission after network error:', queueErr);
+                }
+            }
+
             console.error('Error submitting price:', err);
             posthog.captureException(err, { context: 'submit_price' });
             setError('Erreur lors de l\'enregistrement du prix. Veuillez réessayer.');
@@ -971,6 +889,13 @@ const App10 = () => {
     // Calculate Community Basket (Standard essential items)
     return (
         <div className="max-w-2xl mx-auto bg-white min-h-screen">
+            <OfflineBanner
+                isOnline={isOnline}
+                pendingCount={pendingCount}
+                isSyncing={isSyncing}
+                onSyncNow={syncNow}
+            />
+
             {/* ZXingBarcodeScanner - Full screen overlay when active */}
             {showScanner && (
                 <ZXingBarcodeScanner
@@ -1422,6 +1347,18 @@ const App10 = () => {
                                             </div>
                                             <p className="text-xs text-orange-700">
                                                 Ce code-barres n'existe pas encore. Complétez le prix ci-dessous pour l'ajouter — vous pourrez ensuite le lier à une catégorie BQP.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {bqpCheckResult && bqpCheckResult.status === 'offline' && (
+                                        <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 animate-in slide-in-from-top-4 duration-300">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Info className="w-5 h-5 text-gray-600" />
+                                                <h3 className="font-bold text-gray-800 text-sm">Hors ligne</h3>
+                                            </div>
+                                            <p className="text-xs text-gray-700">
+                                                Impossible de vérifier ce produit sans connexion. Complétez le formulaire ci-dessous : il sera enregistré et synchronisé automatiquement dès que vous serez de nouveau en ligne.
                                             </p>
                                         </div>
                                     )}
@@ -2212,9 +2149,13 @@ const App10 = () => {
                         <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-3 animate-in zoom-in duration-500">
                             <PartyPopper className="w-8 h-8 text-green-600" />
                         </div>
-                        <h3 className="font-bold text-gray-900 text-lg">Prix enregistré !</h3>
+                        <h3 className="font-bold text-gray-900 text-lg">
+                            {scanCelebration.queued ? 'Prix enregistré (hors ligne) !' : 'Prix enregistré !'}
+                        </h3>
                         <p className="text-sm text-gray-500 mt-1 truncate">{scanCelebration.productName}</p>
-                        {scanCelebration.points > 0 ? (
+                        {scanCelebration.queued ? (
+                            <p className="text-sm text-gray-500 mt-2">Sera envoyé automatiquement dès que vous serez en ligne. Les points seront attribués à ce moment-là.</p>
+                        ) : scanCelebration.points > 0 ? (
                             <p className="text-sm font-bold text-green-600 mt-2">+{scanCelebration.points} points 🎉</p>
                         ) : (
                             <p className="text-sm text-gray-500 mt-2">Merci pour votre contribution !</p>

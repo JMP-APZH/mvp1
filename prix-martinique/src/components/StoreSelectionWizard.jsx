@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { detectUserLocation, getCityList, getPostalCode, getStoresSortedByDistance } from '../utils/geocoding';
 import { posthog } from '../posthogClient';
+import { cacheStores, getCachedStores } from '../utils/offlineDb';
 
 const STEP_NAMES = { 1: 'city', 2: 'chain', 3: 'store' };
 
@@ -114,16 +115,33 @@ export default function StoreSelectionWizard({
 
             if (error) throw error;
             setStores(data || []);
+            cacheStores(data || []); // write-through so this wizard still works offline later
             setLoading(false);
         } catch (err) {
             console.error('Error loading stores:', err);
+            // Offline (or otherwise unreachable): fall back to the last cached list
+            // rather than stranding the user on an empty store picker -- this wizard
+            // is the gate before any submission, online or queued-offline.
+            const cached = await getCachedStores();
+            setStores([...cached].sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0)));
             setLoading(false);
         }
     }, [supabase]);
 
     const loadCities = useCallback(async () => {
         const cityList = await getCityList(supabase);
-        setCities(cityList);
+        if (cityList.length > 0) {
+            setCities(cityList);
+            return;
+        }
+        // getCityList swallows its own errors and returns [] -- indistinguishable
+        // here from "genuinely no cities," so fall back to deriving the list from
+        // whatever store data is available (freshly loaded or cached) instead of
+        // leaving city selection empty when offline.
+        const cached = await getCachedStores();
+        const fallbackCities = [...new Set(cached.map(s => s.city).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b, 'fr'));
+        setCities(fallbackCities);
     }, [supabase]);
 
     const attemptGPSDetection = useCallback(async () => {
