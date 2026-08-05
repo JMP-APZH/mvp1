@@ -730,6 +730,24 @@ const App10 = () => {
         }
     };
 
+    // Deep-link from the Panier's "Prix à confirmer" quick-action: pre-fills the
+    // manual-entry form with the item's name (submitPrice's find-or-create step
+    // matches on it via `ilike`, same as any other manual submission -- no new
+    // productId plumbing needed) and switches to the Scanner tab. Store/mainland
+    // selection is left untouched, matching the existing "same shop persists
+    // across submissions" behavior.
+    const prefillPriceSubmission = (item) => {
+        setManualEntry(prev => ({
+            ...prev,
+            productName: item.name,
+            barcode: '',
+            price: '',
+            productPhoto: null,
+            priceTagPhoto: null,
+        }));
+        setActiveTab('scan');
+    };
+
     // Thin wrapper: validate → build payload → either submit live (online) or queue
     // it (offline / connection lost mid-request). The actual find-or-create-product /
     // photo-upload / price-insert / award-points work lives in performPriceSubmission
@@ -2033,6 +2051,7 @@ const App10 = () => {
                                 onClearList={clearShoppingList}
                                 onAddItem={addToShoppingList}
                                 onSelectRecipe={setSelectedRecipeId}
+                                onRequestPriceUpdate={prefillPriceSubmission}
                                 supabase={supabase}
                                 user={user}
                             />
