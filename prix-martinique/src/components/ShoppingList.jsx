@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Bookmark, Wallet, TrendingDown, Pencil, ChefHat, ChevronRight, ClipboardCheck, Tag, Clock, PieChart } from 'lucide-react';
+import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Bookmark, Wallet, TrendingDown, Pencil, ChefHat, ChevronRight, ChevronDown, ClipboardCheck, Tag, Clock, PieChart, ClipboardList } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import { posthog } from '../posthogClient';
 import UnmatchedItemsModal from './UnmatchedItemsModal';
+import RecipesHubModal from './RecipesHubModal';
 import FlagFrance from './flags/FlagFrance';
 
 // How recent a price needs to be to count as "up to date" for the basket
@@ -13,7 +14,7 @@ import FlagFrance from './flags/FlagFrance';
 // was picked as a conventional, easily-explained value inside that gap.
 const FRESHNESS_WINDOW_DAYS = 30;
 
-const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, onSelectRecipe, onRequestPriceUpdate, supabase }) => {
+const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, onSelectRecipe, onRequestPriceUpdate, onRequireAuth, supabase, user }) => {
     const { userProfile, userFavorites, updateProfile, toggleFavorite } = useAuth();
     const [comparison, setComparison] = useState(null);
     const [loadingComparison, setLoadingComparison] = useState(false);
@@ -25,93 +26,14 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
     const [loadingFavorites, setLoadingFavorites] = useState(false);
     const [editingBudget, setEditingBudget] = useState(false);
     const [budgetInput, setBudgetInput] = useState('');
-    const [recipes, setRecipes] = useState([]);
-    const [loadingRecipes, setLoadingRecipes] = useState(false);
-    const [ingredientsByRecipe, setIngredientsByRecipe] = useState({});
-    const [recipePriceInfo, setRecipePriceInfo] = useState({});
+    const [showRecipesHub, setShowRecipesHub] = useState(false);
+    const [showBasketDetail, setShowBasketDetail] = useState(false);
     const [categoriesList, setCategoriesList] = useState([]);
     const [completenessItems, setCompletenessItems] = useState([]);
     const [categoryBreakdown, setCategoryBreakdown] = useState([]);
     const [categorizingProductId, setCategorizingProductId] = useState(null);
     const [categorizeErrorProductId, setCategorizeErrorProductId] = useState(null);
     const completenessViewedRef = useRef(false);
-
-    // Idées recettes -- loaded once on mount, independent of the items list
-    // (unlike the price comparator below, which only makes sense once the
-    // panier has items in it).
-    useEffect(() => {
-        const loadRecipes = async () => {
-            setLoadingRecipes(true);
-            try {
-                const { data: recipeRows, error: recipesError } = await supabase
-                    .from('recipes')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('name', { ascending: true });
-                if (recipesError) throw recipesError;
-                setRecipes(recipeRows || []);
-
-                const recipeIds = (recipeRows || []).map(r => r.id);
-                if (recipeIds.length === 0) {
-                    setIngredientsByRecipe({});
-                    setRecipePriceInfo({});
-                    return;
-                }
-
-                const { data: ingredientRows, error: ingredientsError } = await supabase
-                    .from('recipe_ingredients')
-                    .select('*')
-                    .in('recipe_id', recipeIds)
-                    .order('display_order', { ascending: true });
-                if (ingredientsError) throw ingredientsError;
-
-                const byRecipe = {};
-                (ingredientRows || []).forEach(i => {
-                    if (!byRecipe[i.recipe_id]) byRecipe[i.recipe_id] = [];
-                    byRecipe[i.recipe_id].push(i);
-                });
-                setIngredientsByRecipe(byRecipe);
-
-                const productIds = [...new Set((ingredientRows || []).filter(i => i.product_id).map(i => i.product_id))];
-                let cheapestByProduct = {};
-                if (productIds.length > 0) {
-                    const { data: priceRows } = await supabase
-                        .from('prices')
-                        .select('product_id, price, created_at, origin_region_code')
-                        .in('product_id', productIds)
-                        .order('created_at', { ascending: false });
-                    // Never .neq('origin_region_code', 'Hexagone') server-side -- NULL rows
-                    // (the normal case for Martinique scans) get dropped by three-valued logic.
-                    const byProduct = {};
-                    (priceRows || []).forEach(r => {
-                        if (r.origin_region_code === 'Hexagone') return;
-                        if (!byProduct[r.product_id]) byProduct[r.product_id] = [];
-                        byProduct[r.product_id].push(r.price);
-                    });
-                    Object.entries(byProduct).forEach(([pid, prices]) => {
-                        cheapestByProduct[pid] = Math.min(...prices);
-                    });
-                }
-
-                const priceInfo = {};
-                (recipeRows || []).forEach(r => {
-                    const ingredients = byRecipe[r.id] || [];
-                    const matched = ingredients.filter(i => i.product_id && cheapestByProduct[i.product_id] != null);
-                    priceInfo[r.id] = {
-                        estimatedTotal: matched.reduce((sum, i) => sum + cheapestByProduct[i.product_id], 0),
-                        matchedCount: matched.length,
-                        totalCount: ingredients.length,
-                    };
-                });
-                setRecipePriceInfo(priceInfo);
-            } catch (err) {
-                console.error('Error loading recipes:', err);
-            } finally {
-                setLoadingRecipes(false);
-            }
-        };
-        loadRecipes();
-    }, [supabase]);
 
     // All categories -- needed for the "Catégoriser" quick-action, which must
     // offer every category, not just ones already used by a scanned product
@@ -132,16 +54,6 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
         };
         loadCategories();
     }, [supabase]);
-
-    const addAllIngredients = (recipe, ingredients) => {
-        const toAdd = ingredients.filter(i => i.product_id && !items.some(it => it.productId === i.product_id));
-        toAdd.forEach(i => onAddItem?.({ id: i.product_id, name: i.ingredient_name, productPhotoUrl: null }));
-        posthog.capture('recipe_ingredients_added_to_list', {
-            recipe_id: recipe.id,
-            ingredient_count: toAdd.length,
-            source: 'card',
-        });
-    };
 
     // Favorites watchlist -- build the panier from your favorites
     useEffect(() => {
@@ -725,56 +637,18 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                     )}
                 </div>
 
-                {/* Idées recettes -- browse a curated recipe, add its ingredients in one tap */}
-                <div>
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-2 text-sm">
+                {/* Idées recettes -- moved to its own full-screen hub (browse, submit,
+                    like, favorite) so Panier itself stays focused on favorites/basket
+                    info; this is just the entry point. */}
+                <button
+                    onClick={() => setShowRecipesHub(true)}
+                    className="w-full bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                    <span className="font-bold text-gray-800 flex items-center gap-2 text-sm">
                         <ChefHat className="w-4 h-4 text-orange-600" /> Idées recettes
-                    </h3>
-                    {loadingRecipes ? (
-                        <div className="p-4 text-center text-gray-400 text-xs bg-white rounded-lg border">Chargement...</div>
-                    ) : recipes.length === 0 ? (
-                        <div className="p-4 text-center text-gray-400 text-xs bg-white rounded-lg border border-dashed">
-                            Aucune recette disponible pour le moment.
-                        </div>
-                    ) : (
-                        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                            {recipes.map(recipe => {
-                                const ingredients = ingredientsByRecipe[recipe.id] || [];
-                                const priceInfo = recipePriceInfo[recipe.id];
-                                const matchedIngredients = ingredients.filter(i => i.product_id);
-                                const allAdded = matchedIngredients.length > 0 &&
-                                    matchedIngredients.every(i => items.some(it => it.productId === i.product_id));
-                                return (
-                                    <div key={recipe.id} className="flex-shrink-0 w-32 bg-white border border-gray-200 rounded-lg p-2">
-                                        <button onClick={() => onSelectRecipe?.(recipe.id)} className="block w-full text-left">
-                                            <div className="w-full h-16 rounded bg-gray-100 flex items-center justify-center overflow-hidden mb-1.5">
-                                                {recipe.photo_url ? (
-                                                    <img src={recipe.photo_url} alt={recipe.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <ChefHat className="w-6 h-6 text-gray-300" />
-                                                )}
-                                            </div>
-                                            <p className="text-[11px] font-medium text-gray-900 leading-tight line-clamp-2 h-8">{recipe.name}</p>
-                                            <p className="text-xs font-bold text-gray-700 mt-0.5">
-                                                {priceInfo?.matchedCount ? `~${priceInfo.estimatedTotal.toFixed(2)}€` : '—'}
-                                            </p>
-                                            <p className="text-[9px] text-gray-400">
-                                                {priceInfo ? `${priceInfo.matchedCount} sur ${priceInfo.totalCount} prix connu${priceInfo.matchedCount > 1 ? 's' : ''}` : ''}
-                                            </p>
-                                        </button>
-                                        <button
-                                            onClick={() => addAllIngredients(recipe, ingredients)}
-                                            disabled={allAdded || matchedIngredients.length === 0}
-                                            className={`w-full mt-1.5 text-[10px] font-bold py-1.5 rounded transition-colors ${allAdded ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
-                                        >
-                                            {allAdded ? 'Ajoutés ✓' : '+ Tout'}
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
 
                 {items.length === 0 ? (
                     <div className="text-center py-10 text-gray-500">
@@ -786,48 +660,68 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                     </div>
                 ) : (
                     <>
-                        {/* List Items */}
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y">
-                            {items.map(item => (
-                                <div key={item.productId} className="p-3 flex items-center gap-3">
-                                    {item.photo ? (
-                                        <img src={item.photo} alt={item.name} className="w-12 h-12 rounded object-cover bg-gray-100" />
-                                    ) : (
-                                        <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400">
-                                            <Package className="w-6 h-6" />
+                        {/* Basket detail -- collapsed by default so the item list doesn't
+                            dominate the tab; the link expands it in place. */}
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                            <button
+                                onClick={() => {
+                                    const next = !showBasketDetail;
+                                    setShowBasketDetail(next);
+                                    if (next) posthog.capture('panier_basket_detail_expanded', { item_count: items.length });
+                                }}
+                                className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                            >
+                                <span className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                                    <ClipboardList className="w-4 h-4 text-orange-600" />
+                                    Consulter le détail de mon panier ({totalItems})
+                                </span>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showBasketDetail ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {showBasketDetail && (
+                                <div className="border-t border-gray-100 divide-y animate-in fade-in slide-in-from-top-2">
+                                    {items.map(item => (
+                                        <div key={item.productId} className="p-3 flex items-center gap-3">
+                                            {item.photo ? (
+                                                <img src={item.photo} alt={item.name} className="w-12 h-12 rounded object-cover bg-gray-100" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400">
+                                                    <Package className="w-6 h-6" />
+                                                </div>
+                                            )}
+
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-medium text-gray-900 truncate">{item.name}</h4>
+                                                <p className="text-xs text-gray-500">{item.brand || 'Marque inconnue'}</p>
+                                            </div>
+
+                                            <div className="flex items-center border rounded-lg bg-gray-50">
+                                                <button
+                                                    onClick={() => onUpdateQuantity(item.productId, Math.max(0, item.quantity - 1))}
+                                                    className="p-2 hover:bg-gray-200 rounded-l-lg text-gray-600"
+                                                    disabled={item.quantity <= 1}
+                                                >
+                                                    <Minus className="w-3 h-3" />
+                                                </button>
+                                                <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
+                                                <button
+                                                    onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                                                    className="p-2 hover:bg-gray-200 rounded-r-lg text-gray-600"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                onClick={() => onRemoveItem(item.productId)}
+                                                className="p-2 text-gray-400 hover:text-red-500"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
                                         </div>
-                                    )}
-
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-gray-900 truncate">{item.name}</h4>
-                                        <p className="text-xs text-gray-500">{item.brand || 'Marque inconnue'}</p>
-                                    </div>
-
-                                    <div className="flex items-center border rounded-lg bg-gray-50">
-                                        <button
-                                            onClick={() => onUpdateQuantity(item.productId, Math.max(0, item.quantity - 1))}
-                                            className="p-2 hover:bg-gray-200 rounded-l-lg text-gray-600"
-                                            disabled={item.quantity <= 1}
-                                        >
-                                            <Minus className="w-3 h-3" />
-                                        </button>
-                                        <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
-                                        <button
-                                            onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
-                                            className="p-2 hover:bg-gray-200 rounded-r-lg text-gray-600"
-                                        >
-                                            <Plus className="w-3 h-3" />
-                                        </button>
-                                    </div>
-
-                                    <button
-                                        onClick={() => onRemoveItem(item.productId)}
-                                        className="p-2 text-gray-400 hover:text-red-500"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
+                                    ))}
                                 </div>
-                            ))}
+                            )}
                         </div>
 
                         {/* Category budget breakdown -- purely descriptive, valued at each
@@ -1041,6 +935,18 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                     storeName={mainlandComparison.bestStoreName}
                     totalAmount={mainlandComparison.unmatchedAmount}
                     onClose={() => setShowUnmatchedModal(false)}
+                />
+            )}
+
+            {showRecipesHub && (
+                <RecipesHubModal
+                    items={items}
+                    onAddItem={onAddItem}
+                    onSelectRecipe={onSelectRecipe}
+                    onRequireAuth={onRequireAuth}
+                    onClose={() => setShowRecipesHub(false)}
+                    supabase={supabase}
+                    user={user}
                 />
             )}
         </div>
