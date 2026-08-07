@@ -2066,6 +2066,7 @@ const App10 = () => {
                                 onAddItem={addToShoppingList}
                                 onSelectRecipe={setSelectedRecipeId}
                                 onRequestPriceUpdate={prefillPriceSubmission}
+                                onRequireAuth={() => setShowAuthModal(true)}
                                 supabase={supabase}
                                 user={user}
                             />

@@ -110,7 +110,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200] p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[400] p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 p-6 text-white relative">
