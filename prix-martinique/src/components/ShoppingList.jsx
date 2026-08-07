@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Bookmark, Wallet, TrendingDown, Pencil, ChefHat, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Trash2, ShoppingBasket, AlertCircle, Plus, Minus, Calculator, Store, Check, X, Package, Bookmark, Wallet, TrendingDown, Pencil, ChefHat, ChevronRight, ClipboardCheck, Tag, Clock, PieChart } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import { posthog } from '../posthogClient';
 import UnmatchedItemsModal from './UnmatchedItemsModal';
 import FlagFrance from './flags/FlagFrance';
 
-const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, onSelectRecipe, supabase }) => {
+// How recent a price needs to be to count as "up to date" for the basket
+// completeness tracker. Chosen from real production data, not guessed: the
+// most-recent price per product currently splits cleanly into two clusters
+// (9-15 days old vs. 181-206 days old, nothing in between) -- any threshold
+// between ~16 and ~180 days produces the identical result today, so 30 days
+// was picked as a conventional, easily-explained value inside that gap.
+const FRESHNESS_WINDOW_DAYS = 30;
+
+const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAddItem, onSelectRecipe, onRequestPriceUpdate, supabase }) => {
     const { userProfile, userFavorites, updateProfile, toggleFavorite } = useAuth();
     const [comparison, setComparison] = useState(null);
     const [loadingComparison, setLoadingComparison] = useState(false);
@@ -21,6 +29,12 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
     const [loadingRecipes, setLoadingRecipes] = useState(false);
     const [ingredientsByRecipe, setIngredientsByRecipe] = useState({});
     const [recipePriceInfo, setRecipePriceInfo] = useState({});
+    const [categoriesList, setCategoriesList] = useState([]);
+    const [completenessItems, setCompletenessItems] = useState([]);
+    const [categoryBreakdown, setCategoryBreakdown] = useState([]);
+    const [categorizingProductId, setCategorizingProductId] = useState(null);
+    const [categorizeErrorProductId, setCategorizeErrorProductId] = useState(null);
+    const completenessViewedRef = useRef(false);
 
     // Idées recettes -- loaded once on mount, independent of the items list
     // (unlike the price comparator below, which only makes sense once the
@@ -99,6 +113,26 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
         loadRecipes();
     }, [supabase]);
 
+    // All categories -- needed for the "Catégoriser" quick-action, which must
+    // offer every category, not just ones already used by a scanned product
+    // (unlike the Comparer tab's filter picker, which intentionally narrows
+    // to `pickerCategories`).
+    useEffect(() => {
+        const loadCategories = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .order('display_order', { ascending: true });
+                if (error) throw error;
+                setCategoriesList(data || []);
+            } catch (err) {
+                console.error('Error loading categories in Panier:', err);
+            }
+        };
+        loadCategories();
+    }, [supabase]);
+
     const addAllIngredients = (recipe, ingredients) => {
         const toAdd = ingredients.filter(i => i.product_id && !items.some(it => it.productId === i.product_id));
         toAdd.forEach(i => onAddItem?.({ id: i.product_id, name: i.ingredient_name, productPhotoUrl: null }));
@@ -162,6 +196,8 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                 setComparison(null);
                 setSavingsOpportunities([]);
                 setMainlandComparison(null);
+                setCompletenessItems([]);
+                setCategoryBreakdown([]);
                 return;
             }
             setLoadingComparison(true);
@@ -190,6 +226,88 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                 // would otherwise show up as a phantom "undefined" store).
                 const prices = (allRows || []).filter(p => p.origin_region_code !== 'Hexagone');
                 const mainlandRows = (allRows || []).filter(p => p.origin_region_code === 'Hexagone');
+
+                // category_id isn't part of a `prices` row -- a small, separate
+                // products fetch (not price data, so this doesn't duplicate the
+                // price-resolution logic above).
+                const { data: productRows } = await supabase
+                    .from('products')
+                    .select('id, category_id')
+                    .in('id', productIds);
+                const categoryByProduct = {};
+                (productRows || []).forEach(p => { categoryByProduct[p.id] = p.category_id ?? null; });
+
+                // One pass over `prices` builds both the cheapest-known-price-per-product
+                // map (used below for savings opportunities and the category budget
+                // breakdown) and the most-recent-price-date-per-product map (used for the
+                // completeness tracker's freshness check) -- avoids scanning `prices` twice
+                // for what is fundamentally the same price-resolution pass.
+                const priceInfoByProduct = {};
+                prices.forEach(p => {
+                    const info = priceInfoByProduct[p.product_id] || {
+                        cheapestPrice: null, cheapestStoreId: null, cheapestStoreName: null, mostRecentDate: null,
+                    };
+                    if (info.cheapestPrice == null || p.price < info.cheapestPrice) {
+                        info.cheapestPrice = p.price;
+                        info.cheapestStoreId = p.store_id;
+                        info.cheapestStoreName = p.stores?.name;
+                    }
+                    if (info.mostRecentDate == null || new Date(p.created_at) > new Date(info.mostRecentDate)) {
+                        info.mostRecentDate = p.created_at;
+                    }
+                    priceInfoByProduct[p.product_id] = info;
+                });
+
+                // Basket completeness: an item is "up to date" once it has a category
+                // AND its most recently recorded Martinique price is within the freshness
+                // window. Missing pieces are surfaced individually so the UI can offer the
+                // right quick-action per item.
+                const now = Date.now();
+                const completeness = items.map(item => {
+                    const categoryId = categoryByProduct[item.productId] ?? null;
+                    const info = priceInfoByProduct[item.productId];
+                    const daysSincePrice = info?.mostRecentDate
+                        ? Math.floor((now - new Date(info.mostRecentDate).getTime()) / 86400000)
+                        : null;
+                    const isFresh = daysSincePrice != null && daysSincePrice <= FRESHNESS_WINDOW_DAYS;
+                    const hasCategory = categoryId != null;
+                    return {
+                        productId: item.productId,
+                        name: item.name,
+                        categoryId,
+                        hasCategory,
+                        isFresh,
+                        daysSincePrice,
+                        isComplete: hasCategory && isFresh,
+                    };
+                });
+                setCompletenessItems(completeness);
+
+                // Category budget breakdown -- purely descriptive: groups the panier by
+                // category_id (an explicit "Non catégorisé" bucket for nulls, never hidden),
+                // valuing each item at its cheapest known Martinique price (the same
+                // priceInfoByProduct resolution used everywhere else in this effect, not a
+                // second price-lookup implementation). No cross-store savings claim here --
+                // that's the separate "Économies possibles" section below.
+                const breakdownMap = {};
+                items.forEach(item => {
+                    const categoryId = categoryByProduct[item.productId] ?? null;
+                    const key = categoryId || 'uncategorized';
+                    if (!breakdownMap[key]) {
+                        breakdownMap[key] = { categoryId, subtotal: 0, itemCount: 0, knownCount: 0 };
+                    }
+                    breakdownMap[key].itemCount += 1;
+                    const knownPrice = priceInfoByProduct[item.productId]?.cheapestPrice;
+                    if (knownPrice != null) {
+                        breakdownMap[key].subtotal += knownPrice * item.quantity;
+                        breakdownMap[key].knownCount += 1;
+                    }
+                });
+                const grandTotal = Object.values(breakdownMap).reduce((sum, b) => sum + b.subtotal, 0);
+                const breakdown = Object.values(breakdownMap)
+                    .map(b => ({ ...b, pctOfTotal: grandTotal > 0 ? (b.subtotal / grandTotal) * 100 : 0 }))
+                    .sort((a, b) => b.subtotal - a.subtotal);
+                setCategoryBreakdown(breakdown);
 
                 // Process prices to find latest per (store, product)
                 const storeBaskets = {};
@@ -250,26 +368,19 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                 // item have a strictly cheaper price at a different Martinique store?
                 const best = results[0];
                 if (best) {
-                    const cheapestByProduct = {};
-                    prices.forEach(p => {
-                        if (!cheapestByProduct[p.product_id] || p.price < cheapestByProduct[p.product_id].price) {
-                            cheapestByProduct[p.product_id] = { price: p.price, storeName: p.stores?.name, storeId: p.store_id };
-                        }
-                    });
-
                     const opportunities = best.foundItems
                         .map(item => {
-                            const cheapest = cheapestByProduct[item.productId];
-                            if (!cheapest || cheapest.storeId === best.storeId || cheapest.price >= item.price) return null;
+                            const cheapest = priceInfoByProduct[item.productId];
+                            if (!cheapest || cheapest.cheapestStoreId === best.storeId || cheapest.cheapestPrice >= item.price) return null;
                             const itemInfo = items.find(i => i.productId === item.productId);
                             return {
                                 productId: item.productId,
                                 name: itemInfo?.name,
                                 currentPrice: item.price,
                                 quantity: item.quantity,
-                                cheaperPrice: cheapest.price,
-                                cheaperStore: cheapest.storeName,
-                                savings: (item.price - cheapest.price) * item.quantity,
+                                cheaperPrice: cheapest.cheapestPrice,
+                                cheaperStore: cheapest.cheapestStoreName,
+                                savings: (item.price - cheapest.cheapestPrice) * item.quantity,
                             };
                         })
                         .filter(Boolean)
@@ -351,6 +462,52 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
         setEditingBudget(false);
     };
 
+    const completeCount = completenessItems.filter(s => s.isComplete).length;
+    const incompleteItems = completenessItems.filter(s => !s.isComplete);
+
+    // Fires once per Panier visit that has items -- not on every render/recompute,
+    // matching the "meaningful action, not every click" instrumentation convention.
+    useEffect(() => {
+        if (items.length > 0 && !completenessViewedRef.current) {
+            completenessViewedRef.current = true;
+            posthog.capture('panier_completeness_viewed', { item_count: items.length });
+        }
+    }, [items.length]);
+
+    // Writes directly to products.category_id, same correction pattern as
+    // ProductCompletion.jsx's admin tool -- but user-facing here. Whether the
+    // `products` authenticated-write RLS policy already covers any logged-in
+    // user (as it does for `prices`/`products` elsewhere in this codebase --
+    // see the Jul 21, 2026 mainland_price_migration.sql entry in CLAUDE.md) or
+    // is actually admin-gated wasn't independently re-verified against a real
+    // non-admin authenticated session this pass (see CLAUDE.md for what was
+    // checked). Optimistic update + rollback so a denied write fails visibly
+    // and gracefully instead of showing a category that didn't actually save.
+    const submitCategory = async (productId, categoryId) => {
+        const previous = completenessItems.find(s => s.productId === productId)?.categoryId ?? null;
+        setCategorizeErrorProductId(null);
+        setCategorizingProductId(null);
+        setCompletenessItems(prev => prev.map(s => s.productId === productId
+            ? { ...s, categoryId, hasCategory: true, isComplete: s.isFresh }
+            : s));
+        try {
+            const { error } = await supabase.from('products').update({ category_id: categoryId }).eq('id', productId);
+            if (error) throw error;
+            posthog.capture('panier_categorize_completed', { product_id: productId, category_id: categoryId });
+        } catch (err) {
+            console.error('Erreur mise à jour catégorie depuis le Panier:', err);
+            setCompletenessItems(prev => prev.map(s => s.productId === productId
+                ? { ...s, categoryId: previous, hasCategory: previous != null, isComplete: previous != null && s.isFresh }
+                : s));
+            setCategorizeErrorProductId(productId);
+        }
+    };
+
+    const requestPriceUpdate = (item) => {
+        posthog.capture('panier_stale_price_clicked', { product_id: item.productId, days_since_price: item.daysSincePrice });
+        onRequestPriceUpdate?.(item);
+    };
+
     return (
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
@@ -373,6 +530,85 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
+
+                {/* Complétude du panier -- headline freshness/category stat + inline fixes */}
+                {items.length > 0 && (
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-2 text-sm">
+                            <ClipboardCheck className="w-4 h-4 text-orange-600" /> Complétude du panier
+                        </h3>
+                        <div className="flex justify-between items-baseline mb-1">
+                            <span className="text-lg font-black text-gray-900 tabular-nums">
+                                {completeCount}/{items.length} article{items.length > 1 ? 's' : ''} à jour
+                            </span>
+                        </div>
+                        <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-orange-500 transition-all duration-500"
+                                style={{ width: `${items.length > 0 ? (completeCount / items.length) * 100 : 0}%` }}
+                            />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1.5">
+                            À jour = catégorie renseignée et prix relevé il y a moins de {FRESHNESS_WINDOW_DAYS} jours.
+                        </p>
+
+                        {incompleteItems.length > 0 && (
+                            <div className="space-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                                {incompleteItems.map(s => (
+                                    <div key={s.productId}>
+                                        <div className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-2.5 py-2">
+                                            <span className="text-gray-700 truncate min-w-0">{s.name}</span>
+                                            <div className="flex gap-1.5 flex-shrink-0">
+                                                {!s.hasCategory && (
+                                                    <button
+                                                        onClick={() => setCategorizingProductId(categorizingProductId === s.productId ? null : s.productId)}
+                                                        className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors"
+                                                    >
+                                                        <Tag className="w-3 h-3" /> Catégoriser
+                                                    </button>
+                                                )}
+                                                {!s.isFresh && (
+                                                    <button
+                                                        onClick={() => requestPriceUpdate(s)}
+                                                        className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                                                    >
+                                                        <Clock className="w-3 h-3" /> Prix à confirmer
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {categorizingProductId === s.productId && (
+                                            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mt-1 animate-in fade-in slide-in-from-top-2">
+                                                {categoriesList.length === 0 ? (
+                                                    <p className="text-xs text-gray-400 text-center py-2">Chargement des catégories...</p>
+                                                ) : (
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {categoriesList.map(cat => (
+                                                            <button
+                                                                key={cat.id}
+                                                                onClick={() => submitCategory(s.productId, cat.id)}
+                                                                className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-orange-50 transition-colors"
+                                                            >
+                                                                <span className="text-xl">{cat.icon}</span>
+                                                                <span className="text-[9px] text-gray-600 font-medium text-center leading-tight">{cat.name}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {categorizeErrorProductId === s.productId && (
+                                            <p className="text-[10px] text-red-500 mt-1 px-1">
+                                                Impossible d'enregistrer la catégorie pour le moment. Réessayez plus tard.
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Budget bar -- always visible so it's there "while you keep adding items" */}
                 <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -593,6 +829,46 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                                 </div>
                             ))}
                         </div>
+
+                        {/* Category budget breakdown -- purely descriptive, valued at each
+                            item's cheapest known Martinique price across all stores (not
+                            tied to any single recommended store). */}
+                        {categoryBreakdown.length > 0 && (
+                            <div className="space-y-2">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <PieChart className="w-5 h-5 text-orange-600" />
+                                    Répartition par catégorie
+                                </h3>
+                                <div className="bg-white border border-gray-200 rounded-lg divide-y">
+                                    {categoryBreakdown.map(b => {
+                                        const cat = categoriesList.find(c => c.id === b.categoryId);
+                                        return (
+                                            <div key={b.categoryId || 'uncategorized'} className="p-3 flex items-center gap-3">
+                                                <span className="text-xl flex-shrink-0">{cat?.icon || '📦'}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-sm font-medium text-gray-900 truncate">
+                                                            {cat?.name || 'Non catégorisé'}
+                                                        </span>
+                                                        <span className="text-sm font-bold text-gray-900 tabular-nums flex-shrink-0">
+                                                            {b.subtotal.toFixed(2)}€
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-2 mt-1">
+                                                        <div className="h-1.5 flex-1 bg-gray-100 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-orange-400 rounded-full" style={{ width: `${b.pctOfTotal}%` }} />
+                                                        </div>
+                                                        <span className="text-[10px] text-gray-400 flex-shrink-0">
+                                                            {b.pctOfTotal.toFixed(0)}% · {b.knownCount}/{b.itemCount} article{b.itemCount > 1 ? 's' : ''} avec prix connu
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Comparator Result */}
                         <div className="space-y-3">

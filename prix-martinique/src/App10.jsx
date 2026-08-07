@@ -700,6 +700,20 @@ const App10 = () => {
         }
     };
 
+    // Comparer tab's "Ajouter au panier" card action: gated the same way as
+    // handleToggleFavorite above -- a logged-out user gets the sign-in modal
+    // instead of silently starting an anonymous localStorage cart from this
+    // entry point. (Anonymous carts are still supported elsewhere in the app,
+    // e.g. building a Panier from Favoris/Recettes -- this gate is scoped to
+    // the Comparer feed card only, per request.)
+    const handleAddToShoppingListFromComparer = (product) => {
+        if (!user) {
+            setShowAuthModal(true);
+            return;
+        }
+        addToShoppingList(product);
+    };
+
     const handleToggleLike = async (priceId, isLiked) => {
         if (!user) {
             setShowAuthModal(true);
@@ -728,6 +742,24 @@ const App10 = () => {
             console.error('Error toggling like:', err);
             posthog.captureException(err, { context: 'toggle_like' });
         }
+    };
+
+    // Deep-link from the Panier's "Prix à confirmer" quick-action: pre-fills the
+    // manual-entry form with the item's name (submitPrice's find-or-create step
+    // matches on it via `ilike`, same as any other manual submission -- no new
+    // productId plumbing needed) and switches to the Scanner tab. Store/mainland
+    // selection is left untouched, matching the existing "same shop persists
+    // across submissions" behavior.
+    const prefillPriceSubmission = (item) => {
+        setManualEntry(prev => ({
+            ...prev,
+            productName: item.name,
+            barcode: '',
+            price: '',
+            productPhoto: null,
+            priceTagPhoto: null,
+        }));
+        setActiveTab('scan');
     };
 
     // Thin wrapper: validate → build payload → either submit live (online) or queue
@@ -1963,7 +1995,7 @@ const App10 = () => {
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        addToShoppingList({
+                                                                        handleAddToShoppingListFromComparer({
                                                                             id: price.productId,
                                                                             name: price.product,
                                                                             productPhotoUrl: price.productPhotoUrl
@@ -2033,6 +2065,7 @@ const App10 = () => {
                                 onClearList={clearShoppingList}
                                 onAddItem={addToShoppingList}
                                 onSelectRecipe={setSelectedRecipeId}
+                                onRequestPriceUpdate={prefillPriceSubmission}
                                 supabase={supabase}
                                 user={user}
                             />
