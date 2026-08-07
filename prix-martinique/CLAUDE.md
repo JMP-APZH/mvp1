@@ -457,6 +457,14 @@ Built on top of the existing cross-store comparator (`ShoppingList.jsx`'s `compa
 - **Not independently re-verified**: whether a non-test, ordinary authenticated user (vs. `JMP2_972`) also succeeds — the RLS conclusion above should hold generally since it's a project-wide policy, not an account-specific grant, but this pass only exercised one account.
 - Real category coverage is now **6/23** non-test products (was 5/23 as of the Jul 21, 2026 bug-sweep entry above), from the live test above — see that entry's note for context on why coverage is low to begin with; this new tracker is now a second, ongoing avenue (alongside `ProductCompletion.jsx`) for closing that gap over time.
 
+### Aug 7, 2026 — Comparer Tab: "Ajouter au panier" Now Gated Behind Sign-In
+Requested: a logged-out user clicking the basket icon on a Comparer feed card should hit the sign-in modal, the same as the adjacent favorite (bookmark) icon already does — not silently start an anonymous localStorage cart from that entry point.
+
+- **`App10.jsx`**: new `handleAddToShoppingListFromComparer(product)`, mirroring the existing `handleToggleFavorite` guard (`if (!user) { setShowAuthModal(true); return; }`) exactly. Wired only to the Comparer feed card's basket button (previously called `addToShoppingList` directly). Scoped deliberately narrow, per the request — anonymous cart-building elsewhere in the app (Panier's "Mes Favoris" watchlist, "Idées recettes" add-all, the post-scan BQP quick-add) is untouched and still works anonymously; that's a separate, intentional feature (`useShoppingList.js`'s documented localStorage fallback), not something this request asked to change.
+- **Verified live, logged out**: clicked the basket icon on a real Comparer card — sign-in modal opened, matching the favorite icon's behavior exactly; closed the modal and confirmed the item was not added (no Panier badge, icon state unchanged).
+- **Caught mid-test, not a code bug**: the first live-test attempt appeared to fail (item got added despite being logged out) — traced to a stale service worker still serving a pre-edit JS bundle in the test browser tab, not a problem with the guard itself. Unregistering the stale worker and reloading fixed it immediately. Same root-cause class as the Jul 28, 2026 "Feature Request Comments" entry's stale-SW note above — worth remembering as a recurring false-negative source when live-testing this app via an already-open dev-server tab.
+- `npm run lint` / `npm run build` clean.
+
 ## Accepted Risks & Frozen Dependencies
 
 ### Quagga CVEs — Do Not Auto-Fix
@@ -535,6 +543,6 @@ Required in `.env.local`:
 3. **Next Milestone** — offline mode (Aug 1, 2026) shipped ahead of the Aug 15 RPPRAC follow-up; Panier completeness/category-budget (Aug 5, 2026) built same week. Next priority TBD.
 
 ---
-**Last Updated**: 2026-08-05
+**Last Updated**: 2026-08-07
 **Current Version**: MVP v1.5 (App10)
 **Status**: Launched — Production
