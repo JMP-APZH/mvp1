@@ -6,7 +6,7 @@ import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 import RecipeDetailModal from './components/RecipeDetailModal';
 
-import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy, PartyPopper } from 'lucide-react';
+import { Camera, Search, TrendingDown, Users, Package, AlertCircle, Image as ImageIcon, X, Share, Star, Info, ShieldCheck, ThumbsUp, ThumbsDown, Heart, ShoppingBasket, Bookmark, Leaf, ScanLine, MapPin, Store, ChevronLeft, ChevronRight, Tag, Euro, BarChart3, Trophy, PartyPopper, Clock } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { posthog } from './posthogClient';
 import { useAuth } from './contexts/useAuth';
@@ -1174,6 +1174,19 @@ const App10 = () => {
                                 >
                                     Se connecter
                                 </button>
+                            </div>
+                        )}
+
+                        {/* Pending price-confirmation deep-link (Panier's "Prix à confirmer"):
+                            manualEntry.productName is pre-filled but a store must still be
+                            chosen first -- without this, that pre-fill is invisible and the
+                            store-selection step looks like an unrelated "back to home" jump. */}
+                        {!manualEntry.storeId && !manualEntry.mainlandChain && manualEntry.productName && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex items-start gap-2">
+                                <Clock className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-sm text-blue-800">
+                                    Mise à jour du prix de <strong>{manualEntry.productName}</strong> — choisissez d'abord votre magasin pour continuer.
+                                </p>
                             </div>
                         )}
 

@@ -31,6 +31,10 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
     const [showRecipesHub, setShowRecipesHub] = useState(false);
     const [showBasketDetail, setShowBasketDetail] = useState(false);
     const [showCompletenessDetail, setShowCompletenessDetail] = useState(false);
+    const [showCategoryBreakdown, setShowCategoryBreakdown] = useState(false);
+    // Set, same independent-toggle pattern as expandedStores -- expanding one
+    // category's item list never force-closes another.
+    const [expandedCategories, setExpandedCategories] = useState(() => new Set());
     const [categoriesList, setCategoriesList] = useState([]);
     const [completenessItems, setCompletenessItems] = useState([]);
     const [categoryBreakdown, setCategoryBreakdown] = useState([]);
@@ -209,7 +213,7 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                     const categoryId = categoryByProduct[item.productId] ?? null;
                     const key = categoryId || 'uncategorized';
                     if (!breakdownMap[key]) {
-                        breakdownMap[key] = { categoryId, subtotal: 0, itemCount: 0, knownCount: 0 };
+                        breakdownMap[key] = { categoryId, subtotal: 0, itemCount: 0, knownCount: 0, items: [] };
                     }
                     breakdownMap[key].itemCount += 1;
                     const knownPrice = priceInfoByProduct[item.productId]?.cheapestPrice;
@@ -217,6 +221,12 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                         breakdownMap[key].subtotal += knownPrice * item.quantity;
                         breakdownMap[key].knownCount += 1;
                     }
+                    breakdownMap[key].items.push({
+                        productId: item.productId,
+                        name: item.name,
+                        quantity: item.quantity,
+                        knownPrice: knownPrice ?? null,
+                    });
                 });
                 const grandTotal = Object.values(breakdownMap).reduce((sum, b) => sum + b.subtotal, 0);
                 const breakdown = Object.values(breakdownMap)
@@ -431,6 +441,14 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
         });
     };
 
+    const toggleCategoryExpanded = (key) => {
+        setExpandedCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    };
+
     return (
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
@@ -522,41 +540,74 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                         {/* Category budget breakdown -- purely descriptive, valued at each
                             item's cheapest known Martinique price across all stores (not
                             tied to any single recommended store). Right after basket detail,
-                            per request. */}
+                            per request. Collapsed by default like the basket detail above;
+                            each category row further expands to show its own items. */}
                         {categoryBreakdown.length > 0 && (
-                            <div className="space-y-2">
-                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                    <PieChart className="w-5 h-5 text-orange-600" />
-                                    Répartition par catégorie
-                                </h3>
-                                <div className="bg-white border border-gray-200 rounded-lg divide-y">
-                                    {categoryBreakdown.map(b => {
-                                        const cat = categoriesList.find(c => c.id === b.categoryId);
-                                        return (
-                                            <div key={b.categoryId || 'uncategorized'} className="p-3 flex items-center gap-3">
-                                                <span className="text-xl flex-shrink-0">{cat?.icon || '📦'}</span>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <span className="text-sm font-medium text-gray-900 truncate">
-                                                            {cat?.name || 'Non catégorisé'}
-                                                        </span>
-                                                        <span className="text-sm font-bold text-gray-900 tabular-nums flex-shrink-0">
-                                                            {b.subtotal.toFixed(2)}€
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between gap-2 mt-1">
-                                                        <div className="h-1.5 flex-1 bg-gray-100 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-orange-400 rounded-full" style={{ width: `${b.pctOfTotal}%` }} />
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                <button
+                                    onClick={() => setShowCategoryBreakdown(v => !v)}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                                >
+                                    <span className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                                        <PieChart className="w-4 h-4 text-orange-600" />
+                                        Répartition par catégorie ({categoryBreakdown.length})
+                                    </span>
+                                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showCategoryBreakdown ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {showCategoryBreakdown && (
+                                    <div className="border-t border-gray-100 divide-y animate-in fade-in slide-in-from-top-2">
+                                        {categoryBreakdown.map(b => {
+                                            const key = b.categoryId || 'uncategorized';
+                                            const cat = categoriesList.find(c => c.id === b.categoryId);
+                                            const isOpen = expandedCategories.has(key);
+                                            return (
+                                                <div key={key}>
+                                                    <button
+                                                        onClick={() => toggleCategoryExpanded(key)}
+                                                        className="w-full p-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
+                                                    >
+                                                        <span className="text-xl flex-shrink-0">{cat?.icon || '📦'}</span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-sm font-medium text-gray-900 truncate">
+                                                                    {cat?.name || 'Non catégorisé'}
+                                                                </span>
+                                                                <span className="text-sm font-bold text-gray-900 tabular-nums flex-shrink-0">
+                                                                    {b.subtotal.toFixed(2)}€
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between gap-2 mt-1">
+                                                                <div className="h-1.5 flex-1 bg-gray-100 rounded-full overflow-hidden">
+                                                                    <div className="h-full bg-orange-400 rounded-full" style={{ width: `${b.pctOfTotal}%` }} />
+                                                                </div>
+                                                                <span className="text-[10px] text-gray-400 flex-shrink-0">
+                                                                    {b.pctOfTotal.toFixed(0)}% · {b.knownCount}/{b.itemCount} article{b.itemCount > 1 ? 's' : ''} avec prix connu
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                        <span className="text-[10px] text-gray-400 flex-shrink-0">
-                                                            {b.pctOfTotal.toFixed(0)}% · {b.knownCount}/{b.itemCount} article{b.itemCount > 1 ? 's' : ''} avec prix connu
-                                                        </span>
-                                                    </div>
+                                                        <ChevronDown className={`w-3.5 h-3.5 text-gray-300 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                                    </button>
+
+                                                    {isOpen && (
+                                                        <div className="bg-gray-50 px-3 pb-3 space-y-1.5 animate-in fade-in slide-in-from-top-2">
+                                                            {b.items.map(it => (
+                                                                <div key={it.productId} className="flex items-center justify-between text-xs bg-white rounded-lg px-2.5 py-2 border border-gray-100">
+                                                                    <span className="text-gray-700 truncate min-w-0 pr-2">
+                                                                        {it.name}{it.quantity > 1 ? ` × ${it.quantity}` : ''}
+                                                                    </span>
+                                                                    <span className="font-medium text-gray-900 tabular-nums flex-shrink-0">
+                                                                        {it.knownPrice != null ? `${(it.knownPrice * it.quantity).toFixed(2)}€` : 'Prix inconnu'}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         )}
 
