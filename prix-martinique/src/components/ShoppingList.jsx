@@ -18,7 +18,9 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
     const { userProfile, userFavorites, updateProfile, toggleFavorite } = useAuth();
     const [comparison, setComparison] = useState(null);
     const [loadingComparison, setLoadingComparison] = useState(false);
-    const [expandedStore, setExpandedStore] = useState(null);
+    // Set (not a single value) so expanding one store's details never force-closes
+    // another -- each store's row independently toggles its own detail panel.
+    const [expandedStores, setExpandedStores] = useState(() => new Set());
     const [savingsOpportunities, setSavingsOpportunities] = useState([]);
     const [mainlandComparison, setMainlandComparison] = useState(null);
     const [showUnmatchedModal, setShowUnmatchedModal] = useState(false);
@@ -28,6 +30,7 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
     const [budgetInput, setBudgetInput] = useState('');
     const [showRecipesHub, setShowRecipesHub] = useState(false);
     const [showBasketDetail, setShowBasketDetail] = useState(false);
+    const [showCompletenessDetail, setShowCompletenessDetail] = useState(false);
     const [categoriesList, setCategoriesList] = useState([]);
     const [completenessItems, setCompletenessItems] = useState([]);
     const [categoryBreakdown, setCategoryBreakdown] = useState([]);
@@ -420,6 +423,14 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
         onRequestPriceUpdate?.(item);
     };
 
+    const toggleStoreExpanded = (storeId) => {
+        setExpandedStores(prev => {
+            const next = new Set(prev);
+            if (next.has(storeId)) next.delete(storeId); else next.add(storeId);
+            return next;
+        });
+    };
+
     return (
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
@@ -443,83 +454,203 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
 
-                {/* Complétude du panier -- headline freshness/category stat + inline fixes */}
                 {items.length > 0 && (
-                    <div className="bg-white rounded-lg border border-gray-200 p-4">
-                        <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-2 text-sm">
-                            <ClipboardCheck className="w-4 h-4 text-orange-600" /> Complétude du panier
-                        </h3>
-                        <div className="flex justify-between items-baseline mb-1">
-                            <span className="text-lg font-black text-gray-900 tabular-nums">
-                                {completeCount}/{items.length} article{items.length > 1 ? 's' : ''} à jour
-                            </span>
-                        </div>
-                        <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                                className="h-full rounded-full bg-orange-500 transition-all duration-500"
-                                style={{ width: `${items.length > 0 ? (completeCount / items.length) * 100 : 0}%` }}
-                            />
-                        </div>
-                        <p className="text-[10px] text-gray-400 mt-1.5">
-                            À jour = catégorie renseignée et prix relevé il y a moins de {FRESHNESS_WINDOW_DAYS} jours.
-                        </p>
+                    <>
+                        {/* Basket detail -- collapsed by default, right under the header/Vider row. */}
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                            <button
+                                onClick={() => {
+                                    const next = !showBasketDetail;
+                                    setShowBasketDetail(next);
+                                    if (next) posthog.capture('panier_basket_detail_expanded', { item_count: items.length });
+                                }}
+                                className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                            >
+                                <span className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                                    <ClipboardList className="w-4 h-4 text-orange-600" />
+                                    Consulter le détail de mon panier ({totalItems})
+                                </span>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showBasketDetail ? 'rotate-180' : ''}`} />
+                            </button>
 
-                        {incompleteItems.length > 0 && (
-                            <div className="space-y-1.5 mt-3 pt-3 border-t border-gray-100">
-                                {incompleteItems.map(s => (
-                                    <div key={s.productId}>
-                                        <div className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-2.5 py-2">
-                                            <span className="text-gray-700 truncate min-w-0">{s.name}</span>
-                                            <div className="flex gap-1.5 flex-shrink-0">
-                                                {!s.hasCategory && (
-                                                    <button
-                                                        onClick={() => setCategorizingProductId(categorizingProductId === s.productId ? null : s.productId)}
-                                                        className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors"
-                                                    >
-                                                        <Tag className="w-3 h-3" /> Catégoriser
-                                                    </button>
-                                                )}
-                                                {!s.isFresh && (
-                                                    <button
-                                                        onClick={() => requestPriceUpdate(s)}
-                                                        className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
-                                                    >
-                                                        <Clock className="w-3 h-3" /> Prix à confirmer
-                                                    </button>
-                                                )}
+                            {showBasketDetail && (
+                                <div className="border-t border-gray-100 divide-y animate-in fade-in slide-in-from-top-2">
+                                    {items.map(item => (
+                                        <div key={item.productId} className="p-3 flex items-center gap-3">
+                                            {item.photo ? (
+                                                <img src={item.photo} alt={item.name} className="w-12 h-12 rounded object-cover bg-gray-100" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400">
+                                                    <Package className="w-6 h-6" />
+                                                </div>
+                                            )}
+
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-medium text-gray-900 truncate">{item.name}</h4>
+                                                <p className="text-xs text-gray-500">{item.brand || 'Marque inconnue'}</p>
                                             </div>
+
+                                            <div className="flex items-center border rounded-lg bg-gray-50">
+                                                <button
+                                                    onClick={() => onUpdateQuantity(item.productId, Math.max(0, item.quantity - 1))}
+                                                    className="p-2 hover:bg-gray-200 rounded-l-lg text-gray-600"
+                                                    disabled={item.quantity <= 1}
+                                                >
+                                                    <Minus className="w-3 h-3" />
+                                                </button>
+                                                <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
+                                                <button
+                                                    onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                                                    className="p-2 hover:bg-gray-200 rounded-r-lg text-gray-600"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                onClick={() => onRemoveItem(item.productId)}
+                                                className="p-2 text-gray-400 hover:text-red-500"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
                                         </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
-                                        {categorizingProductId === s.productId && (
-                                            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mt-1 animate-in fade-in slide-in-from-top-2">
-                                                {categoriesList.length === 0 ? (
-                                                    <p className="text-xs text-gray-400 text-center py-2">Chargement des catégories...</p>
-                                                ) : (
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {categoriesList.map(cat => (
-                                                            <button
-                                                                key={cat.id}
-                                                                onClick={() => submitCategory(s.productId, cat.id)}
-                                                                className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-orange-50 transition-colors"
-                                                            >
-                                                                <span className="text-xl">{cat.icon}</span>
-                                                                <span className="text-[9px] text-gray-600 font-medium text-center leading-tight">{cat.name}</span>
-                                                            </button>
-                                                        ))}
+                        {/* Category budget breakdown -- purely descriptive, valued at each
+                            item's cheapest known Martinique price across all stores (not
+                            tied to any single recommended store). Right after basket detail,
+                            per request. */}
+                        {categoryBreakdown.length > 0 && (
+                            <div className="space-y-2">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <PieChart className="w-5 h-5 text-orange-600" />
+                                    Répartition par catégorie
+                                </h3>
+                                <div className="bg-white border border-gray-200 rounded-lg divide-y">
+                                    {categoryBreakdown.map(b => {
+                                        const cat = categoriesList.find(c => c.id === b.categoryId);
+                                        return (
+                                            <div key={b.categoryId || 'uncategorized'} className="p-3 flex items-center gap-3">
+                                                <span className="text-xl flex-shrink-0">{cat?.icon || '📦'}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-sm font-medium text-gray-900 truncate">
+                                                            {cat?.name || 'Non catégorisé'}
+                                                        </span>
+                                                        <span className="text-sm font-bold text-gray-900 tabular-nums flex-shrink-0">
+                                                            {b.subtotal.toFixed(2)}€
+                                                        </span>
                                                     </div>
-                                                )}
+                                                    <div className="flex items-center justify-between gap-2 mt-1">
+                                                        <div className="h-1.5 flex-1 bg-gray-100 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-orange-400 rounded-full" style={{ width: `${b.pctOfTotal}%` }} />
+                                                        </div>
+                                                        <span className="text-[10px] text-gray-400 flex-shrink-0">
+                                                            {b.pctOfTotal.toFixed(0)}% · {b.knownCount}/{b.itemCount} article{b.itemCount > 1 ? 's' : ''} avec prix connu
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        )}
-                                        {categorizeErrorProductId === s.productId && (
-                                            <p className="text-[10px] text-red-500 mt-1 px-1">
-                                                Impossible d'enregistrer la catégorie pour le moment. Réessayez plus tard.
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
-                    </div>
+
+                        {/* Complétude du panier -- headline stays visible as the toggle; the
+                            explanatory caption + per-item fix list collapse under it. */}
+                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <button
+                                onClick={() => setShowCompletenessDetail(v => !v)}
+                                className="w-full p-4 text-left hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                                        <ClipboardCheck className="w-4 h-4 text-orange-600" /> Complétude du panier
+                                    </h3>
+                                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${showCompletenessDetail ? 'rotate-180' : ''}`} />
+                                </div>
+                                <div className="flex justify-between items-baseline mb-1">
+                                    <span className="text-lg font-black text-gray-900 tabular-nums">
+                                        {completeCount}/{items.length} article{items.length > 1 ? 's' : ''} à jour
+                                    </span>
+                                </div>
+                                <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full bg-orange-500 transition-all duration-500"
+                                        style={{ width: `${items.length > 0 ? (completeCount / items.length) * 100 : 0}%` }}
+                                    />
+                                </div>
+                            </button>
+
+                            {showCompletenessDetail && (
+                                <div className="px-4 pb-4 animate-in fade-in slide-in-from-top-2">
+                                    <p className="text-[10px] text-gray-400 mb-2">
+                                        À jour = catégorie renseignée et prix relevé il y a moins de {FRESHNESS_WINDOW_DAYS} jours.
+                                    </p>
+
+                                    {incompleteItems.length > 0 && (
+                                        <div className="space-y-1.5 pt-3 border-t border-gray-100">
+                                            {incompleteItems.map(s => (
+                                                <div key={s.productId}>
+                                                    <div className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-2.5 py-2">
+                                                        <span className="text-gray-700 truncate min-w-0">{s.name}</span>
+                                                        <div className="flex gap-1.5 flex-shrink-0">
+                                                            {!s.hasCategory && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); setCategorizingProductId(categorizingProductId === s.productId ? null : s.productId); }}
+                                                                    className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors"
+                                                                >
+                                                                    <Tag className="w-3 h-3" /> Catégoriser
+                                                                </button>
+                                                            )}
+                                                            {!s.isFresh && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); requestPriceUpdate(s); }}
+                                                                    className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                                                                >
+                                                                    <Clock className="w-3 h-3" /> Prix à confirmer
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {categorizingProductId === s.productId && (
+                                                        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3 mt-1 animate-in fade-in slide-in-from-top-2">
+                                                            {categoriesList.length === 0 ? (
+                                                                <p className="text-xs text-gray-400 text-center py-2">Chargement des catégories...</p>
+                                                            ) : (
+                                                                <div className="grid grid-cols-4 gap-2">
+                                                                    {categoriesList.map(cat => (
+                                                                        <button
+                                                                            key={cat.id}
+                                                                            onClick={(e) => { e.stopPropagation(); submitCategory(s.productId, cat.id); }}
+                                                                            className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-orange-50 transition-colors"
+                                                                        >
+                                                                            <span className="text-xl">{cat.icon}</span>
+                                                                            <span className="text-[9px] text-gray-600 font-medium text-center leading-tight">{cat.name}</span>
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {categorizeErrorProductId === s.productId && (
+                                                        <p className="text-[10px] text-red-500 mt-1 px-1">
+                                                            Impossible d'enregistrer la catégorie pour le moment. Réessayez plus tard.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </>
                 )}
 
                 {/* Budget bar -- always visible so it's there "while you keep adding items" */}
@@ -660,110 +791,6 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                     </div>
                 ) : (
                     <>
-                        {/* Basket detail -- collapsed by default so the item list doesn't
-                            dominate the tab; the link expands it in place. */}
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                            <button
-                                onClick={() => {
-                                    const next = !showBasketDetail;
-                                    setShowBasketDetail(next);
-                                    if (next) posthog.capture('panier_basket_detail_expanded', { item_count: items.length });
-                                }}
-                                className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                            >
-                                <span className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                                    <ClipboardList className="w-4 h-4 text-orange-600" />
-                                    Consulter le détail de mon panier ({totalItems})
-                                </span>
-                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showBasketDetail ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {showBasketDetail && (
-                                <div className="border-t border-gray-100 divide-y animate-in fade-in slide-in-from-top-2">
-                                    {items.map(item => (
-                                        <div key={item.productId} className="p-3 flex items-center gap-3">
-                                            {item.photo ? (
-                                                <img src={item.photo} alt={item.name} className="w-12 h-12 rounded object-cover bg-gray-100" />
-                                            ) : (
-                                                <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400">
-                                                    <Package className="w-6 h-6" />
-                                                </div>
-                                            )}
-
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-medium text-gray-900 truncate">{item.name}</h4>
-                                                <p className="text-xs text-gray-500">{item.brand || 'Marque inconnue'}</p>
-                                            </div>
-
-                                            <div className="flex items-center border rounded-lg bg-gray-50">
-                                                <button
-                                                    onClick={() => onUpdateQuantity(item.productId, Math.max(0, item.quantity - 1))}
-                                                    className="p-2 hover:bg-gray-200 rounded-l-lg text-gray-600"
-                                                    disabled={item.quantity <= 1}
-                                                >
-                                                    <Minus className="w-3 h-3" />
-                                                </button>
-                                                <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
-                                                <button
-                                                    onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
-                                                    className="p-2 hover:bg-gray-200 rounded-r-lg text-gray-600"
-                                                >
-                                                    <Plus className="w-3 h-3" />
-                                                </button>
-                                            </div>
-
-                                            <button
-                                                onClick={() => onRemoveItem(item.productId)}
-                                                className="p-2 text-gray-400 hover:text-red-500"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Category budget breakdown -- purely descriptive, valued at each
-                            item's cheapest known Martinique price across all stores (not
-                            tied to any single recommended store). */}
-                        {categoryBreakdown.length > 0 && (
-                            <div className="space-y-2">
-                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                    <PieChart className="w-5 h-5 text-orange-600" />
-                                    Répartition par catégorie
-                                </h3>
-                                <div className="bg-white border border-gray-200 rounded-lg divide-y">
-                                    {categoryBreakdown.map(b => {
-                                        const cat = categoriesList.find(c => c.id === b.categoryId);
-                                        return (
-                                            <div key={b.categoryId || 'uncategorized'} className="p-3 flex items-center gap-3">
-                                                <span className="text-xl flex-shrink-0">{cat?.icon || '📦'}</span>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <span className="text-sm font-medium text-gray-900 truncate">
-                                                            {cat?.name || 'Non catégorisé'}
-                                                        </span>
-                                                        <span className="text-sm font-bold text-gray-900 tabular-nums flex-shrink-0">
-                                                            {b.subtotal.toFixed(2)}€
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between gap-2 mt-1">
-                                                        <div className="h-1.5 flex-1 bg-gray-100 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-orange-400 rounded-full" style={{ width: `${b.pctOfTotal}%` }} />
-                                                        </div>
-                                                        <span className="text-[10px] text-gray-400 flex-shrink-0">
-                                                            {b.pctOfTotal.toFixed(0)}% · {b.knownCount}/{b.itemCount} article{b.itemCount > 1 ? 's' : ''} avec prix connu
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
                         {/* Comparator Result */}
                         <div className="space-y-3">
                             <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -785,7 +812,7 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                                         >
                                             <div
                                                 className="p-4 cursor-pointer"
-                                                onClick={() => setExpandedStore(expandedStore === result.storeId ? null : result.storeId)}
+                                                onClick={() => toggleStoreExpanded(result.storeId)}
                                             >
                                                 <div className="flex justify-between items-center mb-1">
                                                     <div className="flex items-center gap-2">
@@ -816,7 +843,7 @@ const ShoppingList = ({ items, onUpdateQuantity, onRemoveItem, onClearList, onAd
                                             </div>
 
                                             {/* Detailed Breakdown */}
-                                            {expandedStore === result.storeId && (
+                                            {expandedStores.has(result.storeId) && (
                                                 <div className="border-t bg-gray-50 p-3 text-xs space-y-2">
                                                     <p className="font-semibold text-gray-600 mb-2">Détail des prix :</p>
                                                     {result.foundItems.map(item => {
