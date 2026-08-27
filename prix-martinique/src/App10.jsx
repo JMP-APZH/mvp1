@@ -804,7 +804,8 @@ const App10 = () => {
                 priceTagPhoto: null,
                 isDeclaredBqp: false,
                 categoryId: null,
-                isLocal: false
+                isLocal: false,
+                isMdd: false
             }));
         };
 
