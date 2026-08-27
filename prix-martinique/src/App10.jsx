@@ -804,7 +804,8 @@ const App10 = () => {
                 priceTagPhoto: null,
                 isDeclaredBqp: false,
                 categoryId: null,
-                isLocal: false
+                isLocal: false,
+                isMdd: false
             }));
         };
 
@@ -939,7 +940,7 @@ const App10 = () => {
             {/* Header with UserMenu */}
             <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white p-4 shadow-lg">
                 <div className="flex items-center justify-between mb-2">
-                    <h1 className="text-xl font-bold">Vie chère en Martinique</h1>
+                    <h1 className="text-xl font-bold">Prix Martinique</h1>
                     <UserMenu
                         onSignInClick={() => setShowAuthModal(true)}
                         onOpenStats={() => setShowPersoStats(true)}
@@ -949,7 +950,7 @@ const App10 = () => {
                         stores={stores}
                     />
                 </div>
-                <p className="text-orange-100 text-sm">Quid de votre pouvoir d'achat</p>
+                <p className="text-orange-100 text-sm">Scanner · Comprendre · Résoudre</p>
 
                 {/* Admin Dashboard View */}
                 {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
@@ -970,18 +971,24 @@ const App10 = () => {
                 {/* Wanted Scans View */}
                 {showWantedScans && <WantedScansModal onClose={() => setShowWantedScans(false)} />}
 
-                {/* Points indicator for logged in users */}
-                {user && userProfile && (
-                    <div className="mt-3 flex items-center gap-2 text-sm">
-                        <div className="bg-white/20 rounded-full px-3 py-1 flex items-center gap-1">
-                            <Star className="w-4 h-4 text-yellow-300" />
-                            <span>{userProfile.points || 0} points</span>
-                        </div>
-                        <div className="bg-white/20 rounded-full px-3 py-1">
-                            Niveau {userProfile.level || 1}
-                        </div>
+                {/* Points / Level (logged-in users) + community contribution count (everyone) */}
+                <div className="mt-3 flex items-center gap-2 text-sm flex-wrap">
+                    {user && userProfile && (
+                        <>
+                            <div className="bg-white/20 rounded-full px-3 py-1 flex items-center gap-1">
+                                <Star className="w-4 h-4 text-yellow-300" />
+                                <span>{userProfile.points || 0} points</span>
+                            </div>
+                            <div className="bg-white/20 rounded-full px-3 py-1">
+                                Niveau {userProfile.level || 1}
+                            </div>
+                        </>
+                    )}
+                    <div className="bg-white/20 rounded-full px-3 py-1 flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        <span>{recentPrices.length} prix partagés</span>
                     </div>
-                )}
+                </div>
             </div>
 
             {/* Auth Modal */}
@@ -1044,7 +1051,7 @@ const App10 = () => {
                                 Installer l'application
                             </p>
                             <p className="text-xs text-amber-700 mb-3">
-                                Ajoutez Vie chère en Martinique à votre écran d'accueil pour un accès rapide !
+                                Ajoutez Prix Martinique à votre écran d'accueil pour un accès rapide !
                             </p>
                             <div className="flex gap-2">
                                 <button
@@ -1154,13 +1161,6 @@ const App10 = () => {
                 {/* Scan Tab */}
                 {activeTab === 'scan' && (
                     <div className="space-y-4">
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <p className="text-sm text-amber-800">
-                                <Users className="inline w-4 h-4 mr-1" />
-                                <strong>{recentPrices.length}</strong> prix partagés par la communauté
-                            </p>
-                        </div>
-
                         {/* Sign in prompt for anonymous users */}
                         {!user && (
                             <div className="bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg p-4">
@@ -1531,6 +1531,10 @@ const App10 = () => {
                                         />
                                     </div>
 
+                                    {/* Essentiel: barcode, prix, photos, catégorie */}
+                                    <div className="space-y-3">
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Essentiel</p>
+
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Code-barres (optionnel)
@@ -1540,6 +1544,20 @@ const App10 = () => {
                                             value={manualEntry.barcode}
                                             onChange={(e) => setManualEntry({ ...manualEntry, barcode: e.target.value })}
                                             placeholder="Ex: 3254567890123"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Prix (EUR) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={manualEntry.price}
+                                            onChange={(e) => setManualEntry({ ...manualEntry, price: e.target.value })}
+                                            placeholder="Ex: 2.45"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                         />
                                     </div>
@@ -1625,25 +1643,6 @@ const App10 = () => {
                                         </div>
                                     </div>
 
-
-
-                                    {/* Prix -- moved right after the photos: it's the one thing the user
-                                        already has in front of them (on the shelf / price tag they just
-                                        photographed), before the slower classification fields below. */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Prix (EUR) *
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={manualEntry.price}
-                                            onChange={(e) => setManualEntry({ ...manualEntry, price: e.target.value })}
-                                            placeholder="Ex: 2.45"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                        />
-                                    </div>
-
                                     {/* Category Selector */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1667,6 +1666,11 @@ const App10 = () => {
                                             ))}
                                         </div>
                                     </div>
+                                    </div>
+
+                                    {/* Optionnel: local/importé, MDD, BQP */}
+                                    <div className="space-y-3 border border-dashed border-gray-300 rounded-lg p-3">
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Optionnel</p>
 
                                     {/* Local Production Toggle */}
                                     <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
@@ -1731,13 +1735,7 @@ const App10 = () => {
                                             </div>
                                         )}
                                     </div>
-
-
-
-
-
-
-
+                                    </div>
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2114,7 +2112,7 @@ const App10 = () => {
                     <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in slide-in-from-bottom-8 duration-400">
                         <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 p-6 text-white">
                             <div className="text-4xl mb-2">🛒</div>
-                            <h2 className="text-2xl font-bold">Vie chère en Martinique</h2>
+                            <h2 className="text-2xl font-bold">Prix Martinique</h2>
                             <p className="text-orange-100 text-sm mt-1">Ensemble, rendons les prix transparents</p>
                         </div>
                         <div className="p-6 space-y-4">
