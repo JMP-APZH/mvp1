@@ -1002,8 +1002,10 @@ const App10 = () => {
 
             {/* Header with UserMenu */}
             <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white p-4 shadow-lg">
-                <div className="flex items-center justify-between mb-2">
-                    <h1 className="text-xl font-bold">Prix Martinique</h1>
+                <div className="flex items-start justify-between mb-2">
+                    <h1 className="font-stamp uppercase leading-[0.92] tracking-wide text-3xl sm:text-4xl">
+                        Prix<br />Martinique
+                    </h1>
                     <UserMenu
                         onSignInClick={() => setShowAuthModal(true)}
                         onOpenStats={() => setShowPersoStats(true)}
@@ -1014,6 +1016,7 @@ const App10 = () => {
                     />
                 </div>
                 <p className="text-orange-100 text-sm">Scanner · Comprendre · Résoudre</p>
+                <p className="text-orange-50/80 text-[0.7rem] font-mono uppercase tracking-[0.14em] mt-0.5">Actions par la transparence</p>
 
                 {/* Admin Dashboard View */}
                 {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
