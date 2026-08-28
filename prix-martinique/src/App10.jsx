@@ -992,14 +992,6 @@ const App10 = () => {
                 onSyncNow={syncNow}
             />
 
-            {/* ZXingBarcodeScanner - Full screen overlay when active */}
-            {showScanner && (
-                <ZXingBarcodeScanner
-                    onDetected={handleBarcodeDetected}
-                    onClose={() => setShowScanner(false)}
-                />
-            )}
-
             {/* Header with UserMenu */}
             <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white p-4 shadow-lg">
                 <div className="flex items-start justify-between mb-2">
