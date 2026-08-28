@@ -35,6 +35,7 @@ import {
     enqueuePriceSubmission, cacheStores, getCachedStores, cacheCategories, getCachedCategories,
     savePendingAuthSubmission, getPendingAuthSubmission, clearPendingAuthSubmission
 } from './utils/offlineDb';
+import { logAppSessionOnce } from './utils/sessionTracking';
 
 const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     const [loaded, setLoaded] = useState(false);
@@ -149,6 +150,15 @@ const App10 = () => {
             setShowAuthModal(true);
         }
     }, [passwordRecoveryMode]);
+
+    // Log one row per browser-tab session for the admin dashboard's
+    // iOS-vs-Android and installed-app-vs-browser breakdowns. AuthProvider
+    // only renders App10 once its own loading resolves, so `user` here is
+    // already the settled value, not an in-progress auth check.
+    useEffect(() => {
+        logAppSessionOnce(user?.id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Connectivity — single shared instance; useShoppingList and useOfflineSync both
     // need it, and useOfflineSync also needs useShoppingList's getOrCreatePrimaryList,

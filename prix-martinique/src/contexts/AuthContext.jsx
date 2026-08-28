@@ -11,6 +11,27 @@ const isLikelyNewOAuthSignup = (authUser) => {
   return Math.abs(new Date(authUser.last_sign_in_at) - new Date(authUser.created_at)) < 15000;
 };
 
+// Both the SIGNED_IN listener and the initial getSession() check below fire
+// for the exact same login (see the currentLoadedUserId guard) -- this both
+// distinguishes "a sign-in just happened" from "a page reload restored an
+// existing session" (last_sign_in_at would be old in that case) and is what
+// the admin dashboard's email-vs-Google login breakdown is built from.
+const isFreshSignIn = (authUser) => {
+  if (!authUser?.last_sign_in_at) return false;
+  return Math.abs(Date.now() - new Date(authUser.last_sign_in_at).getTime()) < 15000;
+};
+
+const logAuthEvent = async (authUser) => {
+  if (!isFreshSignIn(authUser)) return;
+  const provider = authUser.app_metadata?.provider === 'google' ? 'google' : 'email';
+  try {
+    const { error } = await supabase.from('auth_events').insert([{ user_id: authUser.id, provider }]);
+    if (error) throw error;
+  } catch (err) {
+    console.error('Failed to log auth event:', err);
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -183,6 +204,7 @@ export const AuthProvider = ({ children }) => {
           if (isLikelyNewOAuthSignup(session.user)) {
             posthog.capture('anon_to_signup_converted', { signup_method: 'google' });
           }
+          logAuthEvent(session.user);
 
           const { profile, badges, roles, favorites, favoriteStores } = await loadUserData(session.user.id);
           if (isMounted) {
@@ -230,6 +252,7 @@ export const AuthProvider = ({ children }) => {
           if (isLikelyNewOAuthSignup(session.user)) {
             posthog.capture('anon_to_signup_converted', { signup_method: 'google' });
           }
+          logAuthEvent(session.user);
 
           const { profile, badges, roles, favorites, favoriteStores } = await loadUserData(session.user.id);
           if (isMounted) {
