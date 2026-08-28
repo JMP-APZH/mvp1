@@ -92,11 +92,24 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
     }
 
     // Step 3: insert the price row
+    // user_name must never read "Anonyme" for a row that actually has a real
+    // user_id attached -- that mismatch is exactly what undermines being able
+    // to trace a submission back to a real account (confirmed live, Aug 28,
+    // 2026: a signed-in user's row had a correct user_id but user_name fell
+    // through to the literal 'Anonyme' because the free-text field happened to
+    // be empty at submit time). Prefer the free-text field if the user typed
+    // something custom, otherwise fall back to their real profile/account
+    // identity before ever reaching the generic anonymous label.
+    const resolvedUserName = payload.userName
+        || userProfile?.display_name
+        || user?.email
+        || 'Anonyme';
+
     const priceData = {
         product_id: productId,
         store_id: payload.isMainland ? null : payload.storeId,
         price: parseFloat(payload.price),
-        user_name: payload.userName || 'Anonyme',
+        user_name: resolvedUserName,
         product_photo_url: productPhotoUrl,
         price_tag_photo_url: priceTagPhotoUrl,
     };
