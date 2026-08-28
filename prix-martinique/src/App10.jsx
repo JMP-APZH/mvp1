@@ -33,6 +33,14 @@ import OfflineBanner from './components/OfflineBanner';
 import { performPriceSubmission } from './utils/priceSubmission';
 import { enqueuePriceSubmission, cacheStores, getCachedStores, cacheCategories, getCachedCategories } from './utils/offlineDb';
 
+// Google sign-in on Supabase is a full-page redirect to accounts.google.com and
+// back, not an in-app popup -- the whole app (and all its React state) reloads
+// from scratch when it returns. Used to snapshot an in-progress price
+// submission across that reload so it can finish automatically once signed in,
+// instead of silently vanishing (confirmed live, Aug 28, 2026: a real test
+// user's first attempt was lost this way and had to be redone from scratch).
+const PENDING_SUBMISSION_KEY = 'pm_pending_price_submission';
+
 const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     const [loaded, setLoaded] = useState(false);
     return (
@@ -85,6 +93,11 @@ const App10 = () => {
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [authModalMode, setAuthModalMode] = useState('signin');
+    // Set once a restored pending submission (see PENDING_SUBMISSION_KEY above)
+    // has been loaded back into manualEntry, so the auto-resume effect knows to
+    // finish the submission -- separate from manualEntry itself so it can't be
+    // confused with a user who happens to have the exact same fields filled in.
+    const [pendingAutoSubmit, setPendingAutoSubmit] = useState(false);
     const [manualEntry, setManualEntry] = useState({
         productName: '',
         barcode: '',
@@ -774,6 +787,19 @@ const App10 = () => {
         // handleToggleFavorite/handleAddToShoppingListFromComparer above rather
         // than opening up a new anonymous-insert RLS policy, ahead of public launch.
         if (!user) {
+            try {
+                sessionStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(manualEntry));
+            } catch (err) {
+                // Quota exceeded (large photos are the likely culprit) -- fall back
+                // to a lighter snapshot without them rather than losing the whole
+                // thing; the user can just re-attach photos after resuming.
+                try {
+                    const { productPhoto: _productPhoto, priceTagPhoto: _priceTagPhoto, ...lightweight } = manualEntry;
+                    sessionStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(lightweight));
+                } catch (err2) {
+                    console.error('Could not persist pending price submission:', err, err2);
+                }
+            }
             setShowAuthModal(true);
             return;
         }
@@ -886,6 +912,39 @@ const App10 = () => {
             setLoading(false);
         }
     };
+
+    // Restores a submission snapshot left by submitPrice's auth guard once the
+    // user is back and signed in (see PENDING_SUBMISSION_KEY above). Runs
+    // whenever `user` changes rather than only on mount, since the whole app
+    // reloading is exactly the case this needs to handle -- this effect firing
+    // on that fresh mount, once the post-redirect SIGNED_IN event resolves, is
+    // the intended path, not an edge case.
+    useEffect(() => {
+        if (!user) return;
+        const saved = sessionStorage.getItem(PENDING_SUBMISSION_KEY);
+        if (!saved) return;
+        sessionStorage.removeItem(PENDING_SUBMISSION_KEY);
+        try {
+            const restored = JSON.parse(saved);
+            setManualEntry(prev => ({ ...prev, ...restored }));
+            setActiveTab('scan');
+            setPendingAutoSubmit(true);
+        } catch (err) {
+            console.error('Failed to restore pending price submission:', err);
+        }
+    }, [user]);
+
+    // Fires once manualEntry has actually re-rendered with the restored values
+    // above -- submitPrice reads manualEntry via closure, so this must wait for
+    // that state update to land rather than calling it directly from the effect
+    // above (which would still see the pre-restore, empty form).
+    useEffect(() => {
+        if (!pendingAutoSubmit || !user) return;
+        if (!manualEntry.productName || !manualEntry.price) return;
+        setPendingAutoSubmit(false);
+        submitPrice();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingAutoSubmit, manualEntry, user]);
 
     const filteredPrices = recentPrices.filter(p => {
         const matchesQuery = p.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1167,12 +1226,19 @@ const App10 = () => {
                 {/* Scan Tab */}
                 {activeTab === 'scan' && (
                     <div className="space-y-4">
-                        {/* Sign in prompt for anonymous users */}
+                        {/* Sign in prompt for anonymous users -- shown upfront, before the
+                            user invests effort in photos/typing, since submitPrice actually
+                            requires an account (RLS-enforced): anonymous scans can't be traced
+                            back to an account, which matters for catching fake/manipulated
+                            data. If they scan anyway while logged out, the in-progress
+                            submission is preserved and completes automatically once they sign
+                            in (see PENDING_SUBMISSION_KEY above) -- this banner is about
+                            setting expectations early, not blocking the flow outright. */}
                         {!user && (
                             <div className="bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg p-4">
                                 <p className="text-sm text-orange-800 mb-2">
                                     <Star className="inline w-4 h-4 mr-1 text-orange-500" />
-                                    Connectez-vous pour gagner des points et badges!
+                                    Connexion requise pour enregistrer un prix — cela garantit la fiabilité des données de la communauté. Gagnez aussi des points et badges !
                                 </p>
                                 <button
                                     onClick={() => setShowAuthModal(true)}
@@ -1439,7 +1505,7 @@ const App10 = () => {
                                                                 product_id: bqpCheckResult.latestPrice.product_id,
                                                                 store_id: bqpCheckResult.latestPrice.store_id,
                                                                 price: bqpCheckResult.latestPrice.price,
-                                                                user_name: userProfile?.display_name || 'Anonyme',
+                                                                user_name: userProfile?.display_name || user.email || 'Anonyme',
                                                                 user_id: user.id,
                                                                 is_verified: true
                                                             }]);
