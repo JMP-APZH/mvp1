@@ -62,8 +62,17 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
     }
 
     // Step 2: upload photos if present
+    // Upload failures here were previously silent -- caught, logged to
+    // PostHog, but never surfaced to the caller, so a user could get a normal
+    // "Prix enregistré !" success with a photo they'd just taken quietly
+    // missing (confirmed live, Aug 28, 2026: a real submission ended up with
+    // both photo URLs null and nothing ever told the user). photosDropped
+    // tracks which ones failed so submitPrice can warn instead of staying
+    // silent, without changing the fact that a failed upload still shouldn't
+    // block the price itself from saving.
     let productPhotoUrl = null;
     let priceTagPhotoUrl = null;
+    const photosDropped = [];
 
     if (payload.productPhoto) {
         const fileName = `${Date.now()}_${productId}_product.jpg`;
@@ -72,6 +81,7 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         if (uploadError) {
             console.error('Product photo upload error:', uploadError);
             posthog.captureException(uploadError, { context: 'product_photo_upload' });
+            photosDropped.push('product');
         } else {
             const { data: urlData } = supabase.storage.from('product-photos').getPublicUrl(fileName);
             productPhotoUrl = urlData.publicUrl;
@@ -85,6 +95,7 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         if (uploadError) {
             console.error('Price tag photo upload error:', uploadError);
             posthog.captureException(uploadError, { context: 'price_tag_photo_upload' });
+            photosDropped.push('price_tag');
         } else {
             const { data: urlData } = supabase.storage.from('price-tag-photos').getPublicUrl(fileName);
             priceTagPhotoUrl = urlData.publicUrl;
@@ -172,5 +183,5 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         bqpPrompt = p || null;
     }
 
-    return { productId, pointsAwarded, bqpPrompt };
+    return { productId, pointsAwarded, bqpPrompt, photosDropped };
 }

@@ -53,10 +53,22 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
         if (!displayName.trim()) {
           throw new Error('Veuillez entrer votre nom');
         }
-        const { error } = await signUp(email, password, displayName, regionCode, city);
+        const { data, error } = await signUp(email, password, displayName, regionCode, city);
         if (error) throw error;
-        setSuccessMessage('Compte créé ! Vérifiez votre email pour confirmer votre inscription.');
-        setTimeout(() => handleClose(), 3000);
+        // Supabase deliberately does not throw an error when the email already
+        // has an account (any provider, e.g. Google) -- to avoid leaking which
+        // emails are registered, signUp() instead returns a fake user with an
+        // empty identities array and sends no email at all. Without this check
+        // the form showed "Compte créé !" regardless, leaving a real user who
+        // already had a Google account stuck with no account and no error
+        // (confirmed live, Aug 2026 iOS test session).
+        if (data?.user?.identities?.length === 0) {
+            setSuccessMessage('Aucun email n\'a été envoyé : un compte existe déjà avec cette adresse. Essayez de vous connecter directement, ou réinitialisez votre mot de passe si besoin.');
+            setTimeout(() => handleClose(), 6000);
+        } else {
+            setSuccessMessage('Compte créé ! Vérifiez votre email pour confirmer votre inscription.');
+            setTimeout(() => handleClose(), 3000);
+        }
       } else if (mode === 'signin') {
         const { error } = await signIn(email, password);
         if (error) throw error;

@@ -31,15 +31,10 @@ import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import OfflineBanner from './components/OfflineBanner';
 import { performPriceSubmission } from './utils/priceSubmission';
-import { enqueuePriceSubmission, cacheStores, getCachedStores, cacheCategories, getCachedCategories } from './utils/offlineDb';
-
-// Google sign-in on Supabase is a full-page redirect to accounts.google.com and
-// back, not an in-app popup -- the whole app (and all its React state) reloads
-// from scratch when it returns. Used to snapshot an in-progress price
-// submission across that reload so it can finish automatically once signed in,
-// instead of silently vanishing (confirmed live, Aug 28, 2026: a real test
-// user's first attempt was lost this way and had to be redone from scratch).
-const PENDING_SUBMISSION_KEY = 'pm_pending_price_submission';
+import {
+    enqueuePriceSubmission, cacheStores, getCachedStores, cacheCategories, getCachedCategories,
+    savePendingAuthSubmission, getPendingAuthSubmission, clearPendingAuthSubmission
+} from './utils/offlineDb';
 
 const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     const [loaded, setLoaded] = useState(false);
@@ -787,18 +782,13 @@ const App10 = () => {
         // handleToggleFavorite/handleAddToShoppingListFromComparer above rather
         // than opening up a new anonymous-insert RLS policy, ahead of public launch.
         if (!user) {
+            // IndexedDB (not sessionStorage -- see savePendingAuthSubmission's own
+            // comment for why) so the full snapshot, photos included, survives the
+            // page reload Google sign-in causes.
             try {
-                sessionStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(manualEntry));
+                await savePendingAuthSubmission(manualEntry);
             } catch (err) {
-                // Quota exceeded (large photos are the likely culprit) -- fall back
-                // to a lighter snapshot without them rather than losing the whole
-                // thing; the user can just re-attach photos after resuming.
-                try {
-                    const { productPhoto: _productPhoto, priceTagPhoto: _priceTagPhoto, ...lightweight } = manualEntry;
-                    sessionStorage.setItem(PENDING_SUBMISSION_KEY, JSON.stringify(lightweight));
-                } catch (err2) {
-                    console.error('Could not persist pending price submission:', err, err2);
-                }
+                console.error('Could not persist pending price submission:', err);
             }
             setShowAuthModal(true);
             return;
@@ -868,11 +858,18 @@ const App10 = () => {
             setLoading(true);
             setError(null);
 
-            const { pointsAwarded, bqpPrompt } = await performPriceSubmission({
+            const { pointsAwarded, bqpPrompt, photosDropped } = await performPriceSubmission({
                 supabase, awardPoints, user, userProfile, payload,
             });
 
             toast.success(`Prix enregistré avec succès! +${pointsAwarded} points`);
+            // Upload failures don't block the price from saving (by design), but
+            // silently dropping a photo the user just took is exactly the kind of
+            // surprise reported live (Aug 28, 2026: a product ended up with no
+            // photos and nothing ever said why) -- surface it instead.
+            if (photosDropped?.length > 0) {
+                toast.info('Le prix est enregistré, mais une photo n\'a pas pu être envoyée (connexion lente ?). Vous pouvez la rajouter plus tard.');
+            }
             setScanCelebration({ points: pointsAwarded, productName: manualEntry.productName });
             resetForm();
 
@@ -921,17 +918,18 @@ const App10 = () => {
     // the intended path, not an edge case.
     useEffect(() => {
         if (!user) return;
-        const saved = sessionStorage.getItem(PENDING_SUBMISSION_KEY);
-        if (!saved) return;
-        sessionStorage.removeItem(PENDING_SUBMISSION_KEY);
-        try {
-            const restored = JSON.parse(saved);
-            setManualEntry(prev => ({ ...prev, ...restored }));
-            setActiveTab('scan');
-            setPendingAutoSubmit(true);
-        } catch (err) {
-            console.error('Failed to restore pending price submission:', err);
-        }
+        (async () => {
+            try {
+                const restored = await getPendingAuthSubmission();
+                if (!restored) return;
+                await clearPendingAuthSubmission();
+                setManualEntry(prev => ({ ...prev, ...restored }));
+                setActiveTab('scan');
+                setPendingAutoSubmit(true);
+            } catch (err) {
+                console.error('Failed to restore pending price submission:', err);
+            }
+        })();
     }, [user]);
 
     // Fires once manualEntry has actually re-rendered with the restored values

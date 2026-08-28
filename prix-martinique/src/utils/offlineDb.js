@@ -1,12 +1,13 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'prix-martinique-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORE_PENDING_PRICES = 'pending_price_submissions';
 const STORE_PENDING_CART_OPS = 'pending_cart_ops';
 const STORE_CACHED_STORES = 'cached_stores';
 const STORE_CACHED_CATEGORIES = 'cached_categories';
+const STORE_PENDING_AUTH_SUBMISSION = 'pending_auth_submission';
 
 let dbPromise = null;
 
@@ -25,6 +26,9 @@ function getDb() {
                 }
                 if (!db.objectStoreNames.contains(STORE_CACHED_CATEGORIES)) {
                     db.createObjectStore(STORE_CACHED_CATEGORIES, { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains(STORE_PENDING_AUTH_SUBMISSION)) {
+                    db.createObjectStore(STORE_PENDING_AUTH_SUBMISSION, { keyPath: 'key' });
                 }
             },
         });
@@ -132,6 +136,37 @@ export async function cacheCategories(categories) {
 export async function getCachedCategories() {
     const db = await getDb();
     return db.getAll(STORE_CACHED_CATEGORIES);
+}
+
+// ---- Pending submission waiting on sign-in ----
+// Distinct from the offline price-submission queue above: this is for "the
+// user isn't logged in yet", not "there's no network" -- kept in its own store
+// so the offline-sync drainer (which only knows how to retry actual queued
+// *submissions*, not raw form state) never touches it. Uses IndexedDB rather
+// than sessionStorage specifically because a full-size camera photo as base64
+// can exceed sessionStorage's much smaller per-origin quota -- confirmed live,
+// Aug 28, 2026: a real submission on iOS Safari silently lost both its photos
+// this way (sessionStorage.setItem hit its quota, the fallback dropped the
+// photos rather than losing the whole submission, and nothing told the user).
+// IndexedDB has no such practical limit for a single price submission's worth
+// of photos.
+
+const PENDING_AUTH_SUBMISSION_KEY = 'current';
+
+export async function savePendingAuthSubmission(manualEntry) {
+    const db = await getDb();
+    await db.put(STORE_PENDING_AUTH_SUBMISSION, { key: PENDING_AUTH_SUBMISSION_KEY, manualEntry });
+}
+
+export async function getPendingAuthSubmission() {
+    const db = await getDb();
+    const entry = await db.get(STORE_PENDING_AUTH_SUBMISSION, PENDING_AUTH_SUBMISSION_KEY);
+    return entry?.manualEntry || null;
+}
+
+export async function clearPendingAuthSubmission() {
+    const db = await getDb();
+    await db.delete(STORE_PENDING_AUTH_SUBMISSION, PENDING_AUTH_SUBMISSION_KEY);
 }
 
 export async function getPendingCounts() {
