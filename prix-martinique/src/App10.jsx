@@ -768,6 +768,16 @@ const App10 = () => {
     // (src/utils/priceSubmission.js), called identically here and from the offline
     // sync drainer (syncQueue.js) so the two paths can't drift apart.
     const submitPrice = async () => {
+        // products/prices INSERT requires the authenticated role (Feb 28, 2026 RLS
+        // audit) -- anonymous submissions here 401 silently while the UI used to
+        // claim success ("Merci pour votre contribution"). Gated the same way as
+        // handleToggleFavorite/handleAddToShoppingListFromComparer above rather
+        // than opening up a new anonymous-insert RLS policy, ahead of public launch.
+        if (!user) {
+            setShowAuthModal(true);
+            return;
+        }
+
         const hasLocation = manualEntry.isMainland ? manualEntry.mainlandChain : manualEntry.storeId;
         if (!manualEntry.productName || !manualEntry.price || !hasLocation) {
             toast.error('Veuillez remplir tous les champs obligatoires (produit, prix, magasin)');
@@ -836,11 +846,7 @@ const App10 = () => {
                 supabase, awardPoints, user, userProfile, payload,
             });
 
-            const successMessage = user
-                ? `Prix enregistré avec succès! +${pointsAwarded} points`
-                : 'Prix enregistré avec succès! Merci pour votre contribution.';
-
-            toast.success(successMessage);
+            toast.success(`Prix enregistré avec succès! +${pointsAwarded} points`);
             setScanCelebration({ points: pointsAwarded, productName: manualEntry.productName });
             resetForm();
 
@@ -1420,6 +1426,13 @@ const App10 = () => {
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={async () => {
+                                                        // Same RLS-requires-authenticated constraint as submitPrice --
+                                                        // this insert 401s for a logged-out user, so gate it the same way
+                                                        // rather than let it fail silently (no error was ever surfaced here).
+                                                        if (!user) {
+                                                            setShowAuthModal(true);
+                                                            return;
+                                                        }
                                                         setLoading(true);
                                                         try {
                                                             const { error } = await supabase.from('prices').insert([{
@@ -1427,7 +1440,7 @@ const App10 = () => {
                                                                 store_id: bqpCheckResult.latestPrice.store_id,
                                                                 price: bqpCheckResult.latestPrice.price,
                                                                 user_name: userProfile?.display_name || 'Anonyme',
-                                                                user_id: user?.id,
+                                                                user_id: user.id,
                                                                 is_verified: true
                                                             }]);
                                                             if (error) throw error;
@@ -1436,15 +1449,15 @@ const App10 = () => {
                                                                 product_id: bqpCheckResult.latestPrice.product_id,
                                                                 price: bqpCheckResult.latestPrice.price,
                                                                 store_id: bqpCheckResult.latestPrice.store_id,
-                                                                authenticated: !!user,
+                                                                authenticated: true,
                                                             });
                                                             if (!localStorage.getItem('ph_first_contribution_done')) {
                                                                 localStorage.setItem('ph_first_contribution_done', '1');
                                                                 posthog.capture('first_contribution_completed');
                                                             }
-                                                            if (user) await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
+                                                            await awardPoints('price_submission', 5, `Prix vérifié: ${bqpCheckResult.product.name}`);
                                                             toast.success('Prix confirmé ! +5 points');
-                                                            setScanCelebration({ points: user ? 5 : 0, productName: bqpCheckResult.product.name });
+                                                            setScanCelebration({ points: 5, productName: bqpCheckResult.product.name });
                                                             setBqpCheckResult(null);
                                                             loadRecentPrices();
                                                         } catch (err) {
