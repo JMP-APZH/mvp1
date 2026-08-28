@@ -7,7 +7,12 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        // Matches the "Prix Martinique — Mode d'emploi" instruction manual's wordmark treatment.
+        stamp: ['Anton', 'Arial Narrow', 'sans-serif'],
+      },
+    },
   },
   // Registers animate-in/fade-in/zoom-in-*/slide-in-from-*/duration-* utilities.
   // Without this, every animate-in usage across the app (modals, cards, pickers)
