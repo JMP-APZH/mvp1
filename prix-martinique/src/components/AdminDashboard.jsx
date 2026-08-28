@@ -16,7 +16,8 @@ import {
     MessageSquare,
     FlaskConical,
     LineChart,
-    ExternalLink
+    ExternalLink,
+    Smartphone
 } from 'lucide-react';
 
 // PostHog project dashboard -- kept as an external link rather than embedded,
@@ -32,6 +33,38 @@ import FeatureRequestAdmin from './FeatureRequestAdmin';
 import TestDataAdmin from './TestDataAdmin';
 import FlagFrance from './flags/FlagFrance';
 
+// Simple stacked-percentage breakdown card -- shared shape for the three
+// device/auth-method admin stats (platform, display mode, sign-in method).
+const BreakdownBar = ({ title, segments }) => {
+    const total = segments.reduce((sum, s) => sum + s.count, 0);
+    return (
+        <div className="bg-white border border-gray-100 rounded-3xl p-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">{title}</p>
+            {total === 0 ? (
+                <p className="text-sm text-gray-400">Pas encore de données</p>
+            ) : (
+                <div className="space-y-2">
+                    <div className="flex w-full h-2.5 rounded-full overflow-hidden bg-gray-100">
+                        {segments.filter(s => s.count > 0).map((s, i) => (
+                            <div key={i} className={s.color} style={{ width: `${(s.count / total) * 100}%` }} />
+                        ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {segments.map((s, i) => (
+                            <div key={i} className="flex items-center gap-1.5 text-xs">
+                                <span className={`w-2 h-2 rounded-full ${s.color}`} />
+                                <span className="text-gray-600">{s.label}</span>
+                                <span className="font-bold text-gray-900">{s.count}</span>
+                                <span className="text-gray-400">({Math.round((s.count / total) * 100)}%)</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const AdminDashboard = ({ onClose }) => {
     const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes' | 'suggestions' | 'testdata'
     const [stats, setStats] = useState({
@@ -44,7 +77,10 @@ const AdminDashboard = ({ onClose }) => {
         activeUsersThisWeek: 0,
         topStores: [],
         diasporaRegions: [],
-        recentActivity: []
+        recentActivity: [],
+        platformCounts: {},
+        displayModeCounts: {},
+        authMethodCounts: {}
     });
     const [, setLoading] = useState(true);
 
@@ -112,6 +148,30 @@ const AdminDashboard = ({ onClose }) => {
                 .order('created_at', { ascending: false })
                 .limit(5);
 
+            // 8. Device platform + PWA-install breakdown (one row per browser-tab
+            // session, logged by utils/sessionTracking.js on every app load)
+            const { data: sessionData } = await supabase
+                .from('app_sessions')
+                .select('device_platform, display_mode');
+            const platformCounts = (sessionData || []).reduce((acc, s) => {
+                acc[s.device_platform] = (acc[s.device_platform] || 0) + 1;
+                return acc;
+            }, {});
+            const displayModeCounts = (sessionData || []).reduce((acc, s) => {
+                acc[s.display_mode] = (acc[s.display_mode] || 0) + 1;
+                return acc;
+            }, {});
+
+            // 9. Sign-in method breakdown (one row per genuine sign-in, logged by
+            // logAuthEvent() in AuthContext.jsx)
+            const { data: authEventData } = await supabase
+                .from('auth_events')
+                .select('provider');
+            const authMethodCounts = (authEventData || []).reduce((acc, a) => {
+                acc[a.provider] = (acc[a.provider] || 0) + 1;
+                return acc;
+            }, {});
+
             setStats({
                 totalScans: totalScans || 0,
                 uniqueUsers: uniqueUsers || 0,
@@ -122,7 +182,10 @@ const AdminDashboard = ({ onClose }) => {
                 activeUsersThisWeek,
                 topStores: [],
                 diasporaRegions: Object.entries(regionCounts).map(([code, count]) => ({ code, count })),
-                recentActivity: activity || []
+                recentActivity: activity || [],
+                platformCounts,
+                displayModeCounts,
+                authMethodCounts
             });
         } catch (err) {
             console.error('Error fetching admin stats:', err);
@@ -295,6 +358,37 @@ const AdminDashboard = ({ onClose }) => {
                     </div>
                     {/* Decorative Map Pattern could go here */}
                     <Activity className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 rotate-12" />
+                </section>
+
+                {/* Devices & Sign-in */}
+                <section>
+                    <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <Smartphone className="w-5 h-5 text-red-600" /> Appareils & Connexion
+                    </h3>
+                    <div className="space-y-3">
+                        <BreakdownBar
+                            title="Plateforme (sessions)"
+                            segments={[
+                                { label: 'iOS', count: stats.platformCounts.ios || 0, color: 'bg-gray-900' },
+                                { label: 'Android', count: stats.platformCounts.android || 0, color: 'bg-green-600' },
+                                { label: 'Autre', count: stats.platformCounts.other || 0, color: 'bg-gray-300' },
+                            ]}
+                        />
+                        <BreakdownBar
+                            title="Application installée vs navigateur"
+                            segments={[
+                                { label: 'App installée (PWA)', count: stats.displayModeCounts.standalone || 0, color: 'bg-orange-500' },
+                                { label: 'Navigateur', count: stats.displayModeCounts.browser || 0, color: 'bg-blue-400' },
+                            ]}
+                        />
+                        <BreakdownBar
+                            title="Méthode de connexion"
+                            segments={[
+                                { label: 'Email + mot de passe', count: stats.authMethodCounts.email || 0, color: 'bg-pink-500' },
+                                { label: 'Google', count: stats.authMethodCounts.google || 0, color: 'bg-blue-500' },
+                            ]}
+                        />
+                    </div>
                 </section>
 
                 {/* System Health */}
