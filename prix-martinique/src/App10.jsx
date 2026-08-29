@@ -30,6 +30,7 @@ import { useToast } from './hooks/useToast';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import OfflineBanner from './components/OfflineBanner';
+import CookieConsentBanner from './components/CookieConsentBanner';
 import { performPriceSubmission } from './utils/priceSubmission';
 import {
     enqueuePriceSubmission, cacheStores, getCachedStores, cacheCategories, getCachedCategories,
@@ -1001,6 +1002,7 @@ const App10 = () => {
                 isSyncing={isSyncing}
                 onSyncNow={syncNow}
             />
+            <CookieConsentBanner />
 
             {/* Header with UserMenu */}
             <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white p-4 shadow-lg">
