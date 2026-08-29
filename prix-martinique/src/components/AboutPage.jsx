@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megaphone, ChevronLeft, ArrowRight, Star, Bookmark, ShoppingBasket, Leaf, TrendingDown } from 'lucide-react';
+import { Heart, Users, Lightbulb, Target, Share2, BookOpen, ShieldCheck, Megaphone, ChevronLeft, ArrowRight, Star, Bookmark, ShoppingBasket, Leaf, TrendingDown, Mail } from 'lucide-react';
 import FlagMartinique from './flags/FlagMartinique';
+import LegalModal, { ContactLink } from './LegalModal';
 
 const SubHeader = ({ title, onBack }) => (
   <div
@@ -16,7 +17,11 @@ const SubHeader = ({ title, onBack }) => (
 
 const AboutPage = () => {
   const [view, setView] = useState('landing'); // 'landing', 'philosophy', 'rules'
+  const [legalModal, setLegalModal] = useState(null); // null | 'privacy' | 'legal'
 
+  const legalModalNode = legalModal && (
+    <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />
+  );
 
   if (view === 'landing') {
     return (
@@ -80,6 +85,23 @@ const AboutPage = () => {
               </div>
             </div>
           </button>
+
+          <div className="group relative bg-white border-2 border-gray-100 hover:border-orange-300 p-6 rounded-2xl shadow-sm hover:shadow-xl transition-all overflow-hidden">
+            <div className="absolute right-0 top-0 opacity-5 -mr-4 -mt-4 group-hover:scale-110 transition-transform">
+              <Mail className="w-32 h-32" />
+            </div>
+            <div className="relative z-10">
+              <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <Mail className="w-7 h-7 text-gray-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Nous contacter</h3>
+              <p className="text-gray-600 mb-4 text-sm leading-relaxed">
+                Questions, remarques, suggestions d'amélioration ou envie de collaborer :
+                écrivez-nous directement.
+              </p>
+              <ContactLink className="inline-flex items-center gap-2 text-orange-600 font-bold text-sm hover:underline" />
+            </div>
+          </div>
         </div>
 
         <div className="pt-12 border-t border-gray-100 text-center">
@@ -88,10 +110,20 @@ const AboutPage = () => {
             <div className="w-8 h-8 bg-green-600 rounded-full"></div>
             <div className="w-8 h-8 bg-black rounded-full"></div>
           </div>
-          <p className="text-xs text-gray-400 uppercase tracking-widest font-bold">
+          <p className="text-xs text-gray-400 uppercase tracking-widest font-bold mb-4">
             Martinique Consciente • 2026
           </p>
+          <div className="flex justify-center gap-4 text-xs text-gray-400">
+            <button onClick={() => setLegalModal('privacy')} className="hover:text-gray-600 hover:underline">
+              Politique de confidentialité
+            </button>
+            <span>·</span>
+            <button onClick={() => setLegalModal('legal')} className="hover:text-gray-600 hover:underline">
+              Mentions légales
+            </button>
+          </div>
         </div>
+        {legalModalNode}
       </div>
     );
   }

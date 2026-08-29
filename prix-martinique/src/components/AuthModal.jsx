@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
+import LegalModal from './LegalModal';
 
 const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
   const [mode, setMode] = useState(initialMode); // 'signin' | 'signup' | 'forgot_password' | 'set_password'
@@ -14,6 +15,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [legalModal, setLegalModal] = useState(null); // null | 'privacy' | 'legal'
 
   const { signIn, signUp, signInWithGoogle, resetPasswordForEmail, updatePassword } = useAuth();
 
@@ -357,6 +359,19 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
                 : mode === 'forgot_password' ? 'Envoyer le lien'
                 : 'Enregistrer le nouveau mot de passe'}
             </button>
+
+            {mode === 'signup' && (
+              <p className="text-xs text-gray-500 text-center -mt-2">
+                En créant un compte, vous acceptez notre{' '}
+                <button type="button" onClick={() => setLegalModal('privacy')} className="text-orange-600 hover:underline">
+                  Politique de confidentialité
+                </button>{' '}
+                et nos{' '}
+                <button type="button" onClick={() => setLegalModal('legal')} className="text-orange-600 hover:underline">
+                  Mentions légales
+                </button>.
+              </p>
+            )}
           </form>
 
           {/* Switch mode */}
@@ -405,6 +420,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
           </div>
         </div>
       </div>
+      {legalModal && <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />}
     </div>
   );
 };
