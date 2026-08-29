@@ -31,6 +31,7 @@ import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import OfflineBanner from './components/OfflineBanner';
 import CookieConsentBanner from './components/CookieConsentBanner';
+import NewDomainBanner from './components/NewDomainBanner';
 import { performPriceSubmission } from './utils/priceSubmission';
 import {
     enqueuePriceSubmission, cacheStores, getCachedStores, cacheCategories, getCachedCategories,
@@ -996,6 +997,7 @@ const App10 = () => {
     // Calculate Community Basket (Standard essential items)
     return (
         <div className="max-w-2xl mx-auto bg-white min-h-screen">
+            <NewDomainBanner />
             <OfflineBanner
                 isOnline={isOnline}
                 pendingCount={pendingCount}
