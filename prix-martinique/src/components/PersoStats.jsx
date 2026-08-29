@@ -10,11 +10,16 @@ import {
     ArrowBigUp,
     Store,
     Calendar,
-    Wallet
+    Wallet,
+    Download,
+    ShieldAlert,
+    Clock
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/useAuth';
 import { calculateSavings } from '../utils/userStats';
+import { exportUserData, downloadUserDataAsJson } from '../utils/dataExport';
+import { requestAccountDeletion, getMyDeletionRequest } from '../utils/accountDeletion';
 
 const PersoStats = ({ onClose }) => {
     const { user, userProfile, userBadges } = useAuth();
@@ -25,6 +30,42 @@ const PersoStats = ({ onClose }) => {
         bestOffers: []
     });
     const [, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
+    const [deletionRequest, setDeletionRequest] = useState(null);
+    const [confirmingDeletion, setConfirmingDeletion] = useState(false);
+    const [requestingDeletion, setRequestingDeletion] = useState(false);
+
+    useEffect(() => {
+        if (!user) return;
+        getMyDeletionRequest(user.id).then(setDeletionRequest);
+    }, [user]);
+
+    const handleExport = async () => {
+        if (!user) return;
+        setExporting(true);
+        try {
+            const data = await exportUserData(user, userProfile);
+            downloadUserDataAsJson(data);
+        } catch (err) {
+            console.error('Failed to export user data:', err);
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const handleRequestDeletion = async () => {
+        if (!user) return;
+        setRequestingDeletion(true);
+        try {
+            await requestAccountDeletion(user);
+            setDeletionRequest({ status: 'pending', requested_at: new Date().toISOString() });
+            setConfirmingDeletion(false);
+        } catch (err) {
+            console.error('Failed to request account deletion:', err);
+        } finally {
+            setRequestingDeletion(false);
+        }
+    };
 
     useEffect(() => {
         const fetchPersonalData = async () => {
@@ -210,6 +251,67 @@ const PersoStats = ({ onClose }) => {
                         ) : (
                             <div className="bg-gray-100 rounded-2xl p-8 text-center border-2 border-dashed border-gray-200">
                                 <p className="text-gray-500 text-sm">Configurez vos magasins favoris dans votre profil pour voir les meilleures offres locales.</p>
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Confidentialité & mon compte -- GDPR export/deletion */}
+                    <section className="bg-white border border-gray-100 rounded-3xl p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Confidentialité & mon compte</h3>
+
+                        <button
+                            onClick={handleExport}
+                            disabled={exporting}
+                            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors disabled:opacity-50 mb-3"
+                        >
+                            <div className="flex items-center gap-3 text-left">
+                                <Download className="w-5 h-5 text-gray-600" />
+                                <div>
+                                    <p className="font-bold text-gray-900 text-sm">Télécharger mes données</p>
+                                    <p className="text-xs text-gray-500">Export JSON de vos contributions, favoris et badges</p>
+                                </div>
+                            </div>
+                            {exporting && <span className="text-xs text-gray-400">Préparation...</span>}
+                        </button>
+
+                        {deletionRequest?.status === 'pending' ? (
+                            <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                                <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                <p className="text-sm text-amber-800">
+                                    Demande de suppression envoyée le {formatDate(deletionRequest.requested_at)}.
+                                    Elle sera traitée sous peu et vous recevrez une confirmation par email.
+                                </p>
+                            </div>
+                        ) : !confirmingDeletion ? (
+                            <button
+                                onClick={() => setConfirmingDeletion(true)}
+                                className="w-full flex items-center gap-3 p-4 bg-gray-50 hover:bg-red-50 rounded-2xl transition-colors text-left"
+                            >
+                                <ShieldAlert className="w-5 h-5 text-red-500" />
+                                <p className="font-bold text-gray-900 text-sm">Supprimer mon compte</p>
+                            </button>
+                        ) : (
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl space-y-3">
+                                <p className="text-sm text-red-800">
+                                    Votre compte et vos données privées (favoris, listes) seront supprimés.
+                                    Vos prix soumis resteront visibles, mais anonymisés. Cette action est
+                                    traitée manuellement sous 30 jours maximum, conformément au RGPD.
+                                </p>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setConfirmingDeletion(false)}
+                                        className="flex-1 bg-white border border-gray-200 text-gray-700 py-2 rounded-lg font-medium text-sm hover:bg-gray-50"
+                                    >
+                                        Annuler
+                                    </button>
+                                    <button
+                                        onClick={handleRequestDeletion}
+                                        disabled={requestingDeletion}
+                                        className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold text-sm hover:bg-red-700 disabled:opacity-50"
+                                    >
+                                        {requestingDeletion ? 'Envoi...' : 'Confirmer la suppression'}
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </section>

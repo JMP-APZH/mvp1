@@ -17,7 +17,8 @@ import {
     FlaskConical,
     LineChart,
     ExternalLink,
-    Smartphone
+    Smartphone,
+    UserX
 } from 'lucide-react';
 
 // PostHog project dashboard -- kept as an external link rather than embedded,
@@ -31,6 +32,7 @@ import MainlandPriceAdmin from './MainlandPriceAdmin';
 import RecipeAdmin from './RecipeAdmin';
 import FeatureRequestAdmin from './FeatureRequestAdmin';
 import TestDataAdmin from './TestDataAdmin';
+import DeletionRequestsAdmin from './DeletionRequestsAdmin';
 import FlagFrance from './flags/FlagFrance';
 
 // Simple stacked-percentage breakdown card -- shared shape for the three
@@ -260,6 +262,13 @@ const AdminDashboard = ({ onClose }) => {
                         <FlaskConical className="w-3.5 h-3.5" /> Données test
                     </button>
                     <button
+                        onClick={() => setSubTab('deletions')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'deletions' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <UserX className="w-3.5 h-3.5" /> Suppressions
+                    </button>
+                    <button
                         onClick={() => window.open(POSTHOG_DASHBOARD_URL, '_blank', 'noopener,noreferrer')}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap bg-white/10 text-white"
                     >
@@ -287,6 +296,10 @@ const AdminDashboard = ({ onClose }) => {
             ) : subTab === 'testdata' ? (
                 <div className="flex-1 overflow-y-auto p-6">
                     <TestDataAdmin />
+                </div>
+            ) : subTab === 'deletions' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                    <DeletionRequestsAdmin />
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
