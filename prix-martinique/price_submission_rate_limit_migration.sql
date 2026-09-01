@@ -1,5 +1,5 @@
 -- Migration: per-user rate limiting on price submissions
--- Status: NOT YET APPLIED (written 2026-09-01, launch-hardening pass)
+-- Status: APPLIED 2026-09-01 (launch-hardening pass) via Supabase SQL Editor.
 --
 -- Why: anonymous inserts into `prices` are already RLS-blocked (Aug 28, 2026),
 -- but a single authenticated account could still script thousands of junk
