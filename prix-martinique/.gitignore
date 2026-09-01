@@ -10,3 +10,10 @@ dist
 
 # logs
 *.log
+
+# Award / grant / application material — kept locally, not app assets.
+# (If a PDF ever needs to ship with the app, whitelist it, e.g. !public/foo.pdf)
+*.pdf
+
+# Windows "> nul" redirect artifact
+nul
