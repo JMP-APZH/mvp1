@@ -715,45 +715,46 @@ Ran the cutover milestone (Open Item #1) end to end via the Vercel / Supabase / 
 - **Google Cloud OAuth — no change needed, verified.** Started the Google sign-in flow from `https://prix-martinique.org` and it reached Google's "Choose an account" screen ("to continue to euqqxictzvyszjzeejsz.supabase.co") with **no `redirect_uri_mismatch`**. The OAuth `redirect_uri` is the Supabase callback (`https://euqqxictzvyszjzeejsz.supabase.co/auth/v1/callback`), which is domain-stable — the app talks to Supabase, not Google directly — so the app-domain switch never touched it. The Open Item's worry about "Google authorized redirect URIs" was a false alarm for this Supabase-brokered setup. The app-side `redirect_to=https://prix-martinique.org` param is validated by Supabase against its allow-list (already covered, above).
 - **Still yours to do** (a real login can't be automated from here): one real end-to-end pass on `prix-martinique.org` — a Google sign-in, an email/password sign-in, and a password-reset email — confirming the reset link lands on `prix-martinique.org`, not the vercel.app origin.
 
+### Sept 1, 2026 — Launch day: QA cleanup rows applied
+- **`qa_cleanup_2026-08-07.sql`** and **`qa_cleanup_2026-08-27.sql`** run by Jean-Marie via the Supabase SQL Editor. Both are plain `DELETE`s scoped by `name/title ilike 'TEST QA …%'` — removed the `"TEST QA Jus de fruits de la passion"` `community_recipe_ideas` row (Aug 7 write-path test) and the `"TEST QA Essentiel Optionnel Rebrand"` `products` row + its `prices` + `product_bqp_associations` rows (Aug 27 launch-prep test). Neither reverses the small point awards to `JMP2_972` from those sessions (test account, left as-is). File headers updated with the `Status: APPLIED 2026-09-01` line to match the convention on the three older `qa_cleanup_*.sql` files.
+- Remaining before the launch-week hardening list is clear: the real end-to-end auth pass on `prix-martinique.org` (in progress by Jean-Marie as of this entry).
+
 ---
 
 ## Open Items
 
-_Refreshed 2026-08-31 (2). Ordered roughly by urgency given the Sept 1, 2026 launch._
+_Refreshed 2026-09-01. Ordered roughly by urgency given the Sept 1, 2026 launch._
 
-### Done (2026-08-31)
-- ✅ **Domain cutover to `prix-martinique.org` completed + verified** — see the "Aug 31, 2026 (2)" entry above. Vercel (apex primary, serving; `www` → 308 → apex added this pass; `*.vercel.app` still serves for stranded PWAs), Supabase Auth (Site URL + redirect allow-list already carried the apex), Google OAuth (no change needed — redirect URI is the domain-stable Supabase callback; verified to Google's account picker with no `redirect_uri_mismatch`). **Still yours:** one real end-to-end auth pass on the new origin (Google + email/password sign-in + password-reset link).
+### Done (2026-08-31 → 09-01)
+- ✅ **Domain cutover to `prix-martinique.org` completed + verified** — see the "Aug 31, 2026 (2)" entry above. Vercel (apex primary, serving; `www` → 308 → apex added this pass; `*.vercel.app` still serves for stranded PWAs), Supabase Auth (Site URL + redirect allow-list already carried the apex), Google OAuth (no change needed — redirect URI is the domain-stable Supabase callback; verified to Google's account picker with no `redirect_uri_mismatch`). **Still yours:** one real end-to-end auth pass on the new origin (Google + email/password sign-in + password-reset link) — in progress.
+- ✅ **Both remaining QA cleanup rows applied** (`qa_cleanup_2026-08-07.sql`, `qa_cleanup_2026-08-27.sql`) — run via the Supabase SQL Editor 2026-09-01; see the "Sept 1, 2026 — Launch day" entry above. File headers updated with the `Status: APPLIED` line.
 - ✅ **All three pending migrations applied and verified** via SQL query against production: `recipes_photo_urls_migration.sql` (10/10 recipes now point at `/recipes-pictures/`), `display_name_google_oauth_fix_migration.sql` (0 `user_profiles` rows with NULL `display_name` — backfill ran), `analytics_tracking_migration.sql` (`app_sessions` + `auth_events` tables exist — the admin "Appareils & Connexion" cards will populate as sessions/sign-ins accrue).
 - ✅ **Supabase Pro upgrade** active (org plan badge shows PRO — automated backups now on).
-- ✅ **`dev` → `main` is current.** All Aug 28–29 work merged via PRs #14–#19; `origin/main` at `fb8914b`. Only `dev` ahead is the CLAUDE.md docs commit(s).
-
-### Launch cutover — still open (Sept 1, 2026)
-1. **`qa_cleanup_2026-08-07.sql`** — removes one real `community_recipe_ideas` test row (Aug 7 write-path verification). Run in SQL Editor.
-2. **`qa_cleanup_2026-08-27.sql`** — removes one real test product/price/BQP-association row (Aug 27 launch-prep verification). Run in SQL Editor.
+- ✅ **`dev` → `main` is current.** All Aug 28–29 work merged via PRs #14–#19; the Aug 31 docs work via PR #20. `origin/main` at `fb8914b` + PR #20.
 
 ### Hardening / follow-through (launch week, not hard blockers)
-3. **CSP still `Report-Only`.** Before flipping to enforced: (a) extend `style-src`/`font-src` for Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`) — added by the Anton wordmark, Aug 28 (5); (b) verify no violations against a real iOS Safari device with the barcode scanner (camera + WASM + Quagga workers) actually running.
-4. **Supabase email template subjects** still read "... — Vie chère en Martinique" (Confirm sign up / Reset password) — manual dashboard rename to "Prix Martinique" per the Aug 27 rebrand. The other four templates ("Invite user", "Magic link/OTP", "Change email", "Reauthentication") remain in English; translate if/when those flows get used.
-5. **Storage bucket size / MIME limits** on `price-tag-photos` (also used for mainland evidence photos) — not yet set.
-6. **Basic submission rate-limiting** — none today; abuse surface widens at public launch.
-7. **`delete-user-account` Edge Function** — deployed live Aug 29 (2), but not tracked/reproducible from this repo (no Supabase CLI here). Source lives at `supabase/functions/delete-user-account/index.ts`; keep it in sync if the deletion flow changes.
+1. **CSP still `Report-Only`.** Before flipping to enforced: (a) extend `style-src`/`font-src` for Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`) — added by the Anton wordmark, Aug 28 (5); (b) verify no violations against a real iOS Safari device with the barcode scanner (camera + WASM + Quagga workers) actually running.
+2. **Supabase email template subjects** still read "... — Vie chère en Martinique" (Confirm sign up / Reset password) — manual dashboard rename to "Prix Martinique" per the Aug 27 rebrand. The other four templates ("Invite user", "Magic link/OTP", "Change email", "Reauthentication") remain in English; translate if/when those flows get used.
+3. **Storage bucket size / MIME limits** on `price-tag-photos` (also used for mainland evidence photos) — not yet set.
+4. **Basic submission rate-limiting** — none today; abuse surface widens at public launch.
+5. **`delete-user-account` Edge Function** — deployed live Aug 29 (2), but not tracked/reproducible from this repo (no Supabase CLI here). Source lives at `supabase/functions/delete-user-account/index.ts`; keep it in sync if the deletion flow changes.
 
 ### Known bugs / deferred, no fix in progress
-8. **iOS camera re-prompt on every scan.** The duplicate-mount fix (Aug 28 (6)) needs a real-device re-test to confirm it was the root cause. The larger fix — keeping the camera stream alive *across* scan-close/reopen cycles instead of a full `getUserMedia` teardown per scan — is still not attempted (touches the fragile, hard-won scanner pipeline; also a real UX/privacy tradeoff since the camera indicator would stay lit while filling the price form).
-9. **Second geolocation prompt after the OAuth full-page redirect.** The persist/resume fix (Aug 28 (2)) mitigates the lost-submission symptom but `StoreSelectionWizard` still mounts for one render before restore, so `attemptGPSDetection` likely still fires once. Possibly compounded by an iOS PWA cold-launch re-prompt quirk. Re-check on the next real-device pass.
-10. **Quagga → `@ericblade/quagga2`** — CVE mitigation / potential scanner rework. Requires physical iOS testing. Direction TBD; may be superseded by a broader scanner rework. See "Accepted Risks & Frozen Dependencies" above.
-11. **Panier `products.category_id` write RLS** — resolved empirically as "no new policy needed" (Aug 5), but only ever tested against one authenticated account (`JMP2_972`). Confirm from a second ordinary account if it ever looks flaky.
+6. **iOS camera re-prompt on every scan.** The duplicate-mount fix (Aug 28 (6)) needs a real-device re-test to confirm it was the root cause. The larger fix — keeping the camera stream alive *across* scan-close/reopen cycles instead of a full `getUserMedia` teardown per scan — is still not attempted (touches the fragile, hard-won scanner pipeline; also a real UX/privacy tradeoff since the camera indicator would stay lit while filling the price form).
+7. **Second geolocation prompt after the OAuth full-page redirect.** The persist/resume fix (Aug 28 (2)) mitigates the lost-submission symptom but `StoreSelectionWizard` still mounts for one render before restore, so `attemptGPSDetection` likely still fires once. Possibly compounded by an iOS PWA cold-launch re-prompt quirk. Re-check on the next real-device pass.
+8. **Quagga → `@ericblade/quagga2`** — CVE mitigation / potential scanner rework. Requires physical iOS testing. Direction TBD; may be superseded by a broader scanner rework. See "Accepted Risks & Frozen Dependencies" above.
+9. **Panier `products.category_id` write RLS** — resolved empirically as "no new policy needed" (Aug 5), but only ever tested against one authenticated account (`JMP2_972`). Confirm from a second ordinary account if it ever looks flaky.
 
 ### Migration-header reconciliation (bookkeeping)
-12. Two `.sql` file headers disagree with this changelog's body — reconcile when convenient:
+10. Two `.sql` file headers disagree with this changelog's body — reconcile when convenient:
     - `product_test_flag_migration.sql` header says "NOT YET APPLIED (2026-07-28)"; the Jul 28 entry above documents it applied and verified live the same day. **Body is believed correct (applied).**
     - `product_favorite_counts_migration.sql` header says "APPLIED and verified live 2026-07-28"; the Jul 28 "Prix Recherchés" entry calls it "not yet applied". **Header is believed correct (applied)** — confirm and update the entry's inline note if so.
 
 ### Repo housekeeping
-13. **Stray `nul` file** at repo root (160-byte ASCII text, dated Feb 2026 — a Windows `> nul` redirect artifact). Delete and add to `.gitignore`.
-14. **Untracked PDFs in `prix-martinique/`** (`20250429 - OPMR Martinique.pdf`, `Profile_LinkedIn_Jean-Marie_Philocles.pdf`, `avis_26-A-01_compressed.pdf`) — award/application material, not app assets. Move out of the working tree or gitignore.
+11. **Stray `nul` file** at repo root (160-byte ASCII text, dated Feb 2026 — a Windows `> nul` redirect artifact). Delete and add to `.gitignore`.
+12. **Untracked PDFs in `prix-martinique/`** (`20250429 - OPMR Martinique.pdf`, `Profile_LinkedIn_Jean-Marie_Philocles.pdf`, `avis_26-A-01_compressed.pdf`) — award/application material, not app assets. Move out of the working tree or gitignore.
 
 ---
-**Last Updated**: 2026-08-31
+**Last Updated**: 2026-09-01
 **Current Version**: MVP v1.5 (App10)
-**Status**: Launched (testing) — public launch targeted Sept 1, 2026. Live on the custom domain `https://prix-martinique.org` (cutover done + verified Aug 31; `www` → 308 → apex; `*.vercel.app` still serves for stranded PWA installs). `main` current through PR #19 (Aug 29); `dev` carries docs commits ahead of it.
+**Status**: Public launch day (Sept 1, 2026). Live on the custom domain `https://prix-martinique.org` (cutover done + verified Aug 31; `www` → 308 → apex; `*.vercel.app` still serves for stranded PWA installs). All pending migrations + QA cleanups applied. `main` current through PR #19 (Aug 29) + docs PR #20.

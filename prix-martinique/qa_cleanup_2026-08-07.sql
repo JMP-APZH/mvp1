@@ -9,6 +9,7 @@
 -- product_comments), so this can only be removed via the SQL Editor.
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
+-- Status: APPLIED 2026-09-01 (Jean-Marie, Supabase SQL Editor).
 
 delete from community_recipe_idea_favorites
   where idea_id in (select id from community_recipe_ideas where title ilike 'TEST QA Jus de fruits%');
