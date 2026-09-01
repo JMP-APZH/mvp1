@@ -16,6 +16,8 @@
 -- manually adjust user_profiles.points for that account if wanted.
 --
 -- Apply via Supabase Dashboard -> SQL Editor -> paste -> Run.
+-- Status: APPLIED 2026-09-01 (Jean-Marie, Supabase SQL Editor). Does not
+-- reverse the +10 points awarded to JMP2_972 (test account, left as-is).
 
 delete from product_bqp_associations
   where product_id in (select id from products where name ilike 'TEST QA Essentiel Optionnel Rebrand%');
