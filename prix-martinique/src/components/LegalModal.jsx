@@ -69,10 +69,13 @@ const PrivacyContent = () => (
           <p className="font-medium text-gray-900">d) Données techniques et de mesure d'audience</p>
           <p className="text-sm text-gray-700 leading-relaxed">
             Type d'appareil (iOS/Android), utilisation en tant qu'application installée ou dans un
-            navigateur, pages consultées, événements d'usage (via PostHog, hébergé dans l'Union
-            européenne).
-            <br /><em>Base légale : consentement (mesure d'audience) / intérêt légitime (sécurité,
-            prévention de la fraude, statistiques agrégées).</em>
+            navigateur, pages consultées, événements d'usage. Ces statistiques sont mesurées de
+            façon anonyme et agrégée (via PostHog, hébergé dans l'Union européenne), sans cookie
+            ni identifiant stocké sur votre appareil : les visites sont comptées au moyen d'un
+            calcul temporaire et irréversible, et votre adresse IP n'est jamais conservée.
+            <br /><em>Base légale : intérêt légitime (amélioration du service, sécurité,
+            prévention de la fraude, statistiques agrégées). Aucune donnée de mesure d'audience ne
+            permet de vous identifier.</em>
           </p>
         </div>
       </div>
@@ -92,7 +95,7 @@ const PrivacyContent = () => (
       <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
         <li>Supabase (base de données, authentification) — hébergé dans l'UE (Irlande)</li>
         <li>Vercel Inc. (hébergement de l'application) — États-Unis, encadré par des clauses contractuelles types conformes au RGPD</li>
-        <li>PostHog (mesure d'audience) — hébergé dans l'UE</li>
+        <li>PostHog (mesure d'audience anonyme, sans cookie) — hébergé dans l'UE</li>
         <li>Google (uniquement si vous choisissez la connexion via Google)</li>
       </ul>
       <p className="text-sm text-gray-700 leading-relaxed">
@@ -129,10 +132,12 @@ const PrivacyContent = () => (
     <section className="space-y-3 mb-6">
       <h3 className="font-bold text-lg text-gray-900">6. Cookies et traceurs</h3>
       <p className="text-gray-700 leading-relaxed text-sm">
-        L'application utilise des traceurs strictement nécessaires (maintien de votre session de
-        connexion), qui ne nécessitent pas votre consentement, et des traceurs de mesure
-        d'audience (PostHog), soumis à votre consentement, que vous pouvez donner ou retirer à
-        tout moment.
+        L'application n'utilise que des traceurs strictement nécessaires à son fonctionnement
+        (maintien de votre session de connexion, préférences d'affichage, file d'attente hors
+        ligne), qui ne nécessitent pas votre consentement. La mesure d'audience (PostHog)
+        fonctionne <strong>sans cookie ni identifiant</strong> déposé sur votre appareil, de
+        manière anonyme et agrégée ; elle ne requiert donc pas votre consentement, et aucun
+        bandeau cookies n'est nécessaire.
       </p>
     </section>
 

@@ -6,13 +6,31 @@ const posthogHost = import.meta.env.VITE_POSTHOG_HOST
 if (posthogKey && !posthog.__loaded) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
-    person_profiles: 'always', // anon_to_signup_converted needs a profile before identify() merges it
-    capture_exceptions: true, // autocapture unhandled errors/rejections; catch blocks still need manual captureException
-    // GDPR: nothing is captured (autocapture, identify, exceptions) until the
-    // user explicitly opts in via CookieConsentBanner. posthog-js persists
-    // that choice itself and every posthog.* call below silently no-ops
-    // until then -- no need to gate each call site individually.
-    opt_out_capturing_by_default: true,
+
+    // Cookieless, consent-exempt analytics.
+    //
+    // `cookieless_mode: 'always'` => posthog-js NEVER writes a cookie or touches
+    // local/session storage. Visitors are counted server-side via an irreversible
+    // rotating hash (team + daily salt + IP + user-agent + host); the salt is
+    // discarded after processing and the IP is never stored on the event
+    // (`anonymize_ips` is also enabled project-side). No persistent identifier
+    // is set on the device, so under GDPR/ePrivacy this is aggregate audience
+    // measurement that does not require a prior-consent banner. Disclosed in the
+    // privacy policy (LegalModal.jsx, sections 2d + 6) instead.
+    //
+    // Requires "Cookieless server hash mode" = Stateful on the PostHog project
+    // (Project Settings -> Web analytics). Changing it there without this flag,
+    // or vice-versa, breaks ingestion.
+    cookieless_mode: 'always',
+
+    // No identify() / no person profiles: a stable distinct_id would itself be
+    // personal data and cannot be stored cookielessly anyway. Every event is
+    // anonymous and aggregate. AuthContext no longer calls posthog.identify().
+    person_profiles: 'never',
+
+    // Aggregate, anonymous error monitoring. Keep captureException payloads
+    // PII-free (we only attach a `context` string + component stack).
+    capture_exceptions: true,
   })
 }
 

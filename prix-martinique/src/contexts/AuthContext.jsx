@@ -200,7 +200,6 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           setLoading(true);
 
-          posthog.identify(session.user.id, { email: session.user.email });
           if (isLikelyNewOAuthSignup(session.user)) {
             posthog.capture('anon_to_signup_converted', { signup_method: 'google' });
           }
@@ -248,7 +247,6 @@ export const AuthProvider = ({ children }) => {
         if (session?.user && isMounted) {
           setUser(session.user);
 
-          posthog.identify(session.user.id, { email: session.user.email });
           if (isLikelyNewOAuthSignup(session.user)) {
             posthog.capture('anon_to_signup_converted', { signup_method: 'google' });
           }
@@ -307,7 +305,6 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error;
 
       if (data?.user) {
-        posthog.identify(data.user.id, { email: data.user.email });
         posthog.capture('anon_to_signup_converted', { signup_method: 'email' });
       }
 
@@ -367,7 +364,6 @@ export const AuthProvider = ({ children }) => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      posthog.reset();
       setUser(null);
       setUserProfile(null);
       setUserBadges([]);
