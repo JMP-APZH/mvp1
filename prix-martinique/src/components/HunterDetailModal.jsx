@@ -23,6 +23,7 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
     const [reportDetails, setReportDetails] = useState('');
     const [reportBusy, setReportBusy] = useState(false);
     const [reportDone, setReportDone] = useState(false);
+    const [reportError, setReportError] = useState(false);
     const [items, setItems] = useState([]);
     const [categories, setCategories] = useState([]);
     const [mainlandByProduct, setMainlandByProduct] = useState({});
@@ -159,6 +160,7 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
     const submitReport = async () => {
         if (!user) { onRequireAuth?.(); return; }
         setReportBusy(true);
+        setReportError(false);
         try {
             const { error } = await supabase.from('profile_reports').insert([{
                 reported_user_id: userId,
@@ -172,6 +174,8 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
             setTimeout(() => { setShowReport(false); setReportDone(false); setReportDetails(''); }, 1500);
         } catch (err) {
             console.error('Error submitting profile report:', err);
+            posthog.captureException(err, { context: 'profile_report_submit' });
+            setReportError(true);
         } finally {
             setReportBusy(false);
         }
@@ -252,6 +256,9 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                             ) : (
                                 <>
                                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Signaler ce profil</p>
+                                    {reportError && (
+                                        <p className="text-xs text-red-600">Envoi impossible. Réessayez plus tard.</p>
+                                    )}
                                     <select
                                         value={reportReason}
                                         onChange={(e) => setReportReason(e.target.value)}
