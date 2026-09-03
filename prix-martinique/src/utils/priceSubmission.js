@@ -129,6 +129,9 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         priceData.origin_region_code = 'Hexagone';
         priceData.mainland_chain = payload.mainlandChain;
         priceData.source_type = 'scan';
+        // M4: explicit capture-path attribution (column added by
+        // mainland_match_pipeline_migration.sql).
+        priceData.source_channel = 'diaspora_scan';
     }
 
     if (user) {

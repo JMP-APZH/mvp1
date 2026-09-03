@@ -23,6 +23,11 @@ const MainlandPriceAdmin = () => {
     const [chain, setChain] = useState(CHAINS[0]);
     const [sourceUrl, setSourceUrl] = useState('');
     const [evidencePhoto, setEvidencePhoto] = useState(null); // base64 data URL
+    // M4b: how this reference price was captured.
+    // 'online'   -> found on a chain website (source_channel = 'online_capture')
+    // 'chain_app'-> screenshot from an enseigne's own shopping app (source_channel = 'chain_app_screenshot'),
+    //               evidence photo required, no source_url.
+    const [captureMethod, setCaptureMethod] = useState('online');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState(null);
     const fileInputRef = useRef(null);
@@ -120,6 +125,7 @@ const MainlandPriceAdmin = () => {
         setChain(CHAINS[0]);
         setSourceUrl('');
         setEvidencePhoto(null);
+        setCaptureMethod('online');
         setError(null);
     };
 
@@ -133,6 +139,10 @@ const MainlandPriceAdmin = () => {
 
     const submitMainlandPrice = async (item) => {
         if (!user || !price) return;
+        if (captureMethod === 'chain_app' && !evidencePhoto) {
+            setError("Une capture d'écran de l'app de l'enseigne est requise pour ce mode.");
+            return;
+        }
         setSubmitting(true);
         setError(null);
         try {
@@ -168,8 +178,8 @@ const MainlandPriceAdmin = () => {
                 origin_region_code: 'Hexagone',
                 mainland_chain: chain,
                 source_type: 'admin_reference',
-                source_channel: 'online_capture',   // M4: explicit capture-path attribution
-                source_url: sourceUrl.trim() || null,
+                source_channel: captureMethod === 'chain_app' ? 'chain_app_screenshot' : 'online_capture',
+                source_url: captureMethod === 'chain_app' ? null : (sourceUrl.trim() || null),
                 evidence_photo_url: evidencePhotoUrl,
             }]);
             if (insertError) throw insertError;
@@ -329,9 +339,26 @@ const MainlandPriceAdmin = () => {
                                             </select>
                                         </div>
 
+                                        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCaptureMethod('online')}
+                                                className={`flex-1 text-[11px] font-bold py-1.5 rounded-md transition-colors ${captureMethod === 'online' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                                            >
+                                                Trouvé en ligne
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCaptureMethod('chain_app')}
+                                                className={`flex-1 text-[11px] font-bold py-1.5 rounded-md transition-colors ${captureMethod === 'chain_app' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                                            >
+                                                Capture appli enseigne
+                                            </button>
+                                        </div>
+
                                         <div>
                                             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                                                Capture d'écran (preuve)
+                                                Capture d'écran (preuve){captureMethod === 'chain_app' && <span className="text-red-500"> *</span>}
                                             </label>
                                             <input
                                                 ref={fileInputRef}
@@ -361,16 +388,18 @@ const MainlandPriceAdmin = () => {
                                             )}
                                         </div>
 
-                                        <div className="relative">
-                                            <Link2 className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                                            <input
-                                                type="url"
-                                                value={sourceUrl}
-                                                onChange={(e) => setSourceUrl(e.target.value)}
-                                                placeholder="Lien source (optionnel)"
-                                                className="w-full pl-9 pr-3 py-2 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                            />
-                                        </div>
+                                        {captureMethod === 'online' && (
+                                            <div className="relative">
+                                                <Link2 className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                                                <input
+                                                    type="url"
+                                                    value={sourceUrl}
+                                                    onChange={(e) => setSourceUrl(e.target.value)}
+                                                    placeholder="Lien source (optionnel)"
+                                                    className="w-full pl-9 pr-3 py-2 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                />
+                                            </div>
+                                        )}
 
                                         {error && <p className="text-xs text-red-600">{error}</p>}
 
