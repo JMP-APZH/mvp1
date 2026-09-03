@@ -105,6 +105,7 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 #### M2b — drill-downs + moderation queue — 🧪 (PR open, migration pending)
 - 🧪 `analytics_admin_m2b_migration.sql` + `analytics_admin_m2b_fix1_migration.sql` (**not yet applied**):
   - **fix1**: `admin_submissions_browse` hit `42702` (column "product_id" ambiguous) — RETURNS TABLE OUT params share names with bare column refs in the `medians` / `filtered` CTEs. Added `#variable_conflict use_column` + qualified those CTEs.
+  - **fix2**: then `42804` — `store_id` declared `uuid` but `prices.store_id` / `stores.id` are `bigint` (unlike `prices.id` / `products.id`). Changed to `bigint`; client doesn't read it.
   - `admin_submissions_browse(p_since, p_exclude_internal, p_channel, p_review_only, p_limit, p_offset)` — paginated, channel-filterable, review-flag-filterable rows from `v_admin_prices`; each row carries `review_reason` (`magasin manquant` · `prix aberrant` [>3× or <0.34× product median, ≥3 real prices] · `compte récent` [account <7 j at submission]), `contributor_is_new`, `product_id`, and `total_count` (window size for pagination). One fn powers the Contributions drill, "Voir tout", **and** the "Modérer Prix" queue (`p_review_only := true`).
   - `admin_contributors(p_exclude_internal, p_limit)` — one row per contributor: first/last contribution, totals, channel mix (MQ/FR/réf/test).
   - `admin_submissions_detail` widened with `product_id` (drop + recreate) so "Activité Récente" rows are click-through.

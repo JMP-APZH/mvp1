@@ -1,21 +1,18 @@
--- Migration: M2b fix1 — admin_submissions_browse column/variable ambiguity
--- Status: NOT YET APPLIED (2026-09-03). Apply after analytics_admin_m2b_migration.sql.
+-- Migration: M2b fix2 — admin_submissions_browse store_id is bigint, not uuid
+-- Status: NOT YET APPLIED (2026-09-03). Apply after analytics_admin_m2b_fix1_migration.sql.
 -- Plan: ANALYTICS_MONITORING_PLAN.md, Milestone 2b.
 --
--- Bug: admin_submissions_browse's RETURNS TABLE names OUT params (product_id,
--- channel, is_test, price, review_reason, ...) that also appear as bare column
--- references inside the function body (notably the `medians` CTE:
--- `select product_id ... where not is_test and channel in (...) and price > 0
--- group by product_id`, and the `filtered` CTE's `channel = p_channel` /
--- `review_reason is not null`). PL/pgSQL then can't tell column from variable ->
--- runtime `42702: column reference "product_id" is ambiguous`, surfaced to the
--- client as a 400 and the "migration pending" notice.
+-- After fix1 cleared the 42702 ambiguity, admin_submissions_browse hit:
+--   42804: Returned type bigint does not match expected type uuid in column 6
+--          (structure of query does not match function result type)
+-- Column 6 is `store_id`. prices.store_id / stores.id are `bigint` (unlike
+-- prices.id and products.id, which are uuid) — the RETURNS TABLE guessed wrong.
 --
--- Fix: `#variable_conflict use_column` — inside the query, an ambiguous name
--- always means the column (which is what every one of these references intends;
--- the OUT params are only ever populated by the final SELECT's position). The
--- p_* parameters don't collide with any column, so they're unaffected.
--- Function signature + return type are unchanged, so plain create-or-replace.
+-- Fix: `store_id bigint`. The client (AdminDrillPanel) never reads store_id
+-- (only store_name + product_id), so no app change. Signature unchanged, but
+-- the return type changes -> DROP + recreate.
+
+drop function if exists public.admin_submissions_browse(timestamptz, boolean, text, boolean, integer, integer);
 
 create or replace function public.admin_submissions_browse(
   p_since             timestamptz default null,
@@ -31,7 +28,7 @@ returns table (
   product_id          uuid,
   product_name        text,
   price               numeric,
-  store_id            bigint,   -- prices.store_id / stores.id are bigint (fix2)
+  store_id            bigint,
   store_name          text,
   contributor_id      uuid,
   contributor_name    text,
@@ -155,7 +152,9 @@ $$;
 
 grant execute on function public.admin_submissions_browse(timestamptz, boolean, text, boolean, integer, integer) to authenticated;
 
--- Sanity: raw preview of the moderation queue (same logic, no guard) --------
+-- Sanity: first page of the moderation queue (guard bypassed here as postgres?
+-- no -- the guard checks auth.uid(); from the SQL Editor it raises 42501, which
+-- is expected. Use the raw preview below instead.)
 with priced as (
   select
     v.id, (v.created_at at time zone 'UTC') as created_ts, v.product_id, v.price,
@@ -182,5 +181,10 @@ select
   ), '') as review_reason
 from priced p
 left join medians m on m.product_id = p.product_id
+where nullif(concat_ws(' ',
+    case when p.channel in ('martinique_scan','diaspora_scan') and p.store_id is null then 'x' end,
+    case when m.n >= 3 and m.med > 0 and (p.price > m.med * 3 or p.price < m.med * 0.34) then 'x' end,
+    case when p.contributor_created_at is not null and p.created_ts - p.contributor_created_at < interval '7 days' then 'x' end
+  ), '') is not null
 order by p.created_ts desc
 limit 15;

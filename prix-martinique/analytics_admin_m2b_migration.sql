@@ -37,7 +37,7 @@ returns table (
   product_id          uuid,
   product_name        text,
   price               numeric,
-  store_id            uuid,
+  store_id            bigint,   -- prices.store_id / stores.id are bigint (fix2)
   store_name          text,
   contributor_id      uuid,
   contributor_name    text,
