@@ -19,6 +19,8 @@ const Community = ({ onRequireAuth }) => {
         localProducts: 0
     });
     const [loadingStats, setLoadingStats] = useState(false);
+    // M5: the "vie chère" MTQ↔Hexagone gap (public aggregate RPC). null = unavailable.
+    const [mainlandGap, setMainlandGap] = useState(null);
     const [selectedCity, setSelectedCity] = useState("");
     const { user } = useAuth();
 
@@ -61,6 +63,17 @@ const Community = ({ onRequireAuth }) => {
             console.error('Error loading community stats:', err);
         } finally {
             setLoadingStats(false);
+        }
+
+        // Isolated: the MTQ↔Hexagone gap RPC (analytics_value_migration.sql) may
+        // not be applied yet -- a failure here must not affect the rest of the tab.
+        try {
+            const { data: gapRows, error: gapErr } = await supabase.rpc('community_mainland_gap');
+            if (gapErr) throw gapErr;
+            const g = Array.isArray(gapRows) ? gapRows[0] : gapRows;
+            if (g && g.matched_products > 0) setMainlandGap(g);
+        } catch (gapErr) {
+            console.error('community_mainland_gap failed (migration pending?):', gapErr);
         }
     };
 
@@ -375,6 +388,24 @@ const Community = ({ onRequireAuth }) => {
                                 </>
                             )}
                         </div>
+
+                        {mainlandGap && (
+                            <div className="bg-gradient-to-br from-red-600 to-rose-700 rounded-3xl p-6 text-white shadow-lg">
+                                <h3 className="text-lg font-bold mb-1">L'écart « vie chère »</h3>
+                                <p className="text-rose-100 text-sm mb-3">Prix Martinique vs France Hexagonale, sur les produits comparés</p>
+                                <div className="flex items-end gap-3">
+                                    <span className="text-4xl font-black tabular-nums">
+                                        {Number(mainlandGap.median_gap_pct) > 0 ? '+' : ''}{mainlandGap.median_gap_pct}%
+                                    </span>
+                                    <span className="text-rose-100 text-xs leading-tight pb-1">
+                                        plus cher ici (médiane)<br />
+                                        <span className="text-rose-200">
+                                            {mainlandGap.mtq_dearer} produits plus chers · {mainlandGap.mtq_cheaper} moins chers · {mainlandGap.matched_products} comparés
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
