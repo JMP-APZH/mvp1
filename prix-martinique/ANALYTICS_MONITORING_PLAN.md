@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b 🧪 (PR open, `analytics_admin_m2b_migration.sql` pending). M3 next.
+**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ (verified live, incl. fix1 + fix2). M3 next.
 
 ---
 
@@ -102,7 +102,10 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 - ✅ "Modérer Prix" button disabled with "Bientôt (M2b)"
 - Diaspora Watch region-list already removed in M1 (was the confusing "972: 23" line) — nothing to fix.
 
-#### M2b — drill-downs + moderation queue — 🧪 (PR open, migration pending)
+#### M2b — drill-downs + moderation queue — ✅ (verified live 2026-09-03)
+
+**Live check (PRs #35, #36, #37, #38):** Contributions drill paginates ("1–25 sur 26" → "26–26 sur 26", prev/next), channel chips (Tous / Martinique / Diaspora / Réf. en ligne) + "à revoir" toggle work; **Modérer Prix** surfaces the review-flagged rows (`compte récent` / `nouveau` / TEST / RÉF / MQ badges); Contributeurs roster loads; Activité Récente rows open `ProductDetailModal`; header pill = 61. Two DB-type surprises found & fixed: fix1 `42702` (OUT-param/column clash), fix2 `42804` (`store_id` is `bigint` not `uuid`).
+
 - 🧪 `analytics_admin_m2b_migration.sql` + `analytics_admin_m2b_fix1_migration.sql` (**not yet applied**):
   - **fix1**: `admin_submissions_browse` hit `42702` (column "product_id" ambiguous) — RETURNS TABLE OUT params share names with bare column refs in the `medians` / `filtered` CTEs. Added `#variable_conflict use_column` + qualified those CTEs.
   - **fix2**: then `42804` — `store_id` declared `uuid` but `prices.store_id` / `stores.id` are `bigint` (unlike `prices.id` / `products.id`). Changed to `bigint`; client doesn't read it.
