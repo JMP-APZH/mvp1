@@ -1,12 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, Store, Package, Loader2, MapPin, Tag } from 'lucide-react';
+import { X, Star, Store, Package, Loader2, MapPin, Tag, Share2, Copy, Check, Flag } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { useAuth } from '../contexts/useAuth';
+import { posthog } from '../posthogClient';
 import ProductDetailModal from './ProductDetailModal';
 import FlagFrance from './flags/FlagFrance';
 
+const REPORT_REASONS = [
+    { value: 'impersonation', label: 'Usurpation d’identité' },
+    { value: 'offensive', label: 'Contenu offensant' },
+    { value: 'spam', label: 'Spam' },
+    { value: 'other', label: 'Autre' },
+];
+
 const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState(null);
+    const [linkCopied, setLinkCopied] = useState(false);
+    const [showReport, setShowReport] = useState(false);
+    const [reportReason, setReportReason] = useState('impersonation');
+    const [reportDetails, setReportDetails] = useState('');
+    const [reportBusy, setReportBusy] = useState(false);
+    const [reportDone, setReportDone] = useState(false);
     const [items, setItems] = useState([]);
     const [categories, setCategories] = useState([]);
     const [mainlandByProduct, setMainlandByProduct] = useState({});
@@ -27,7 +43,27 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                     .select('id, display_name, avatar_url, level, points, city')
                     .eq('id', userId)
                     .single();
-                setProfile(profileData);
+
+                // Profile-card fields (bio/status/visibility) live behind
+                // profile_card_migration.sql -- query them separately and
+                // tolerate their absence so this card keeps working before the
+                // migration is applied (same isolation pattern as the mainland
+                // and test-flag queries elsewhere in this codebase).
+                let cardFields = {};
+                try {
+                    const { data: extra, error: extraErr } = await supabase
+                        .from('user_profiles')
+                        .select('bio, status_text, status_updated_at, is_profile_public')
+                        .eq('id', userId)
+                        .single();
+                    if (extraErr) throw extraErr;
+                    cardFields = extra || {};
+                } catch (cardErr) {
+                    console.warn('Profile card fields unavailable (migration pending?):', cardErr.message);
+                }
+
+                setProfile(profileData ? { ...profileData, ...cardFields } : null);
+                posthog.capture('profile_viewed', { via_share_link: new URLSearchParams(window.location.search).get('user') === userId });
 
                 const { data: rows, error } = await supabase
                     .from('prices')
@@ -101,6 +137,48 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
         return matchesCategory && matchesStore;
     });
 
+    const isPublic = profile?.is_profile_public !== false;
+    const showAvatar = isPublic && profile?.avatar_url;
+    const shareUrl = `${window.location.origin}${window.location.pathname}?user=${userId}`;
+
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        } catch (err) {
+            console.error('Error copying profile link:', err);
+        }
+    };
+
+    const shareWhatsApp = () => {
+        const text = `Découvre les contributions de ${profile?.display_name || 'ce chasseur'} sur Prix Martinique : ${shareUrl}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
+
+    const submitReport = async () => {
+        if (!user) { onRequireAuth?.(); return; }
+        setReportBusy(true);
+        try {
+            const { error } = await supabase.from('profile_reports').insert([{
+                reported_user_id: userId,
+                reporter_id: user.id,
+                reason: reportReason,
+                details: reportDetails.trim() || null,
+            }]);
+            if (error) throw error;
+            posthog.capture('profile_report_submitted', { reason: reportReason });
+            setReportDone(true);
+            setTimeout(() => { setShowReport(false); setReportDone(false); setReportDetails(''); }, 1500);
+        } catch (err) {
+            console.error('Error submitting profile report:', err);
+        } finally {
+            setReportBusy(false);
+        }
+    };
+
+    const isOwnProfile = user?.id === userId;
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div className="bg-white w-full max-w-lg h-full sm:h-auto sm:max-h-[90vh] sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-300">
@@ -114,7 +192,7 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                     </button>
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-2xl bg-white/20 flex-shrink-0 overflow-hidden flex items-center justify-center text-2xl font-bold">
-                            {profile?.avatar_url ? (
+                            {showAvatar ? (
                                 <img src={profile.avatar_url} alt={profile.display_name} className="w-full h-full object-cover" />
                             ) : (
                                 profile?.level || 1
@@ -136,6 +214,78 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                             </div>
                         </div>
                     </div>
+
+                    {isPublic && profile?.status_text && (
+                        <p className="mt-3 text-sm text-white/90 italic">« {profile.status_text} »</p>
+                    )}
+
+                    <div className="mt-3 flex items-center gap-2">
+                        <button
+                            onClick={shareWhatsApp}
+                            className="flex items-center gap-1.5 text-[11px] font-bold bg-white/20 hover:bg-white/30 px-2.5 py-1.5 rounded-full transition-colors"
+                        >
+                            <Share2 className="w-3.5 h-3.5" /> Partager
+                        </button>
+                        <button
+                            onClick={copyLink}
+                            className="flex items-center gap-1.5 text-[11px] font-bold bg-white/20 hover:bg-white/30 px-2.5 py-1.5 rounded-full transition-colors"
+                        >
+                            {linkCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            {linkCopied ? 'Copié' : 'Copier le lien'}
+                        </button>
+                        {!isOwnProfile && (
+                            <button
+                                onClick={() => (user ? setShowReport(v => !v) : onRequireAuth?.())}
+                                className="flex items-center gap-1.5 text-[11px] font-bold bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-full transition-colors ml-auto"
+                            >
+                                <Flag className="w-3.5 h-3.5" /> Signaler
+                            </button>
+                        )}
+                    </div>
+
+                    {showReport && (
+                        <div className="mt-3 bg-white text-gray-800 rounded-xl p-3 space-y-2">
+                            {reportDone ? (
+                                <p className="text-sm font-bold text-green-600 flex items-center gap-1.5">
+                                    <Check className="w-4 h-4" /> Merci, votre signalement a été transmis.
+                                </p>
+                            ) : (
+                                <>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Signaler ce profil</p>
+                                    <select
+                                        value={reportReason}
+                                        onChange={(e) => setReportReason(e.target.value)}
+                                        className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
+                                    >
+                                        {REPORT_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                    </select>
+                                    <textarea
+                                        value={reportDetails}
+                                        maxLength={500}
+                                        rows={2}
+                                        onChange={(e) => setReportDetails(e.target.value)}
+                                        placeholder="Détails (facultatif)"
+                                        className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={submitReport}
+                                            disabled={reportBusy}
+                                            className="flex-1 bg-orange-500 text-white text-xs font-bold py-2 rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                                        >
+                                            {reportBusy ? 'Envoi...' : 'Envoyer'}
+                                        </button>
+                                        <button
+                                            onClick={() => setShowReport(false)}
+                                            className="flex-1 bg-gray-100 text-gray-600 text-xs font-bold py-2 rounded-lg hover:bg-gray-200"
+                                        >
+                                            Annuler
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -146,6 +296,12 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                         </div>
                     ) : (
                         <>
+                            {isPublic && profile?.bio && (
+                                <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-2xl p-3 whitespace-pre-line">
+                                    {profile.bio}
+                                </p>
+                            )}
+
                             {/* Headline stats, at the top as requested -- both clickable filters */}
                             <div className="grid grid-cols-2 gap-3">
                                 <button

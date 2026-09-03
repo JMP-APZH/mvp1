@@ -38,6 +38,10 @@ export async function exportUserData(user, userProfile) {
         profile: {
             email: user.email,
             display_name: userProfile?.display_name || null,
+            bio: userProfile?.bio || null,
+            status_text: userProfile?.status_text || null,
+            avatar_url: userProfile?.avatar_url || null,
+            is_profile_public: userProfile?.is_profile_public !== false,
             region_code: userProfile?.region_code || null,
             city: userProfile?.city || null,
             account_created_at: user.created_at,

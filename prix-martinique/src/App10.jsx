@@ -24,6 +24,8 @@ import PersoStats from './components/PersoStats';
 import MyScansModal from './components/MyScansModal';
 import WantedScansModal from './components/WantedScansModal';
 import AdminDashboard from './components/AdminDashboard';
+import ProfileEditModal from './components/ProfileEditModal';
+import HunterDetailModal from './components/HunterDetailModal';
 import PriceDuel from './components/PriceDuel';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
@@ -85,6 +87,8 @@ const App10 = () => {
     const [showMyScans, setShowMyScans] = useState(false);
     const [myScansFilter, setMyScansFilter] = useState('all');
     const [showWantedScans, setShowWantedScans] = useState(false);
+    const [showProfileEdit, setShowProfileEdit] = useState(false);
+    const [selectedHunterId, setSelectedHunterId] = useState(null);
     const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
     const [priceHistory, setPriceHistory] = useState([]);
     const [showBqpSelector, setShowBqpSelector] = useState(false);
@@ -130,6 +134,13 @@ const App10 = () => {
         const params = new URLSearchParams(window.location.search);
         const sharedRecipeId = params.get('recipe');
         if (sharedRecipeId) setSelectedRecipeId(sharedRecipeId);
+    }, []);
+
+    // Auto-open a contributor's public profile card via a shared link (?user=<id>)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const sharedUserId = params.get('user');
+        if (sharedUserId) setSelectedHunterId(sharedUserId);
     }, []);
     const touchStartXRef = useRef(0);
     const [categoryFilter, setCategoryFilter] = useState(null);
@@ -1032,6 +1043,7 @@ const App10 = () => {
                         onOpenAdmin={() => setShowAdminDashboard(true)}
                         onOpenMyScans={(filter) => { setMyScansFilter(filter || 'all'); setShowMyScans(true); }}
                         onOpenWantedScans={() => setShowWantedScans(true)}
+                        onOpenProfile={() => setShowProfileEdit(true)}
                         stores={stores}
                     />
                 </div>
@@ -1056,6 +1068,9 @@ const App10 = () => {
 
                 {/* Wanted Scans View */}
                 {showWantedScans && <WantedScansModal onClose={() => setShowWantedScans(false)} />}
+
+                {/* Profile editor ("Mon profil") */}
+                {showProfileEdit && <ProfileEditModal onClose={() => setShowProfileEdit(false)} />}
 
                 {/* Points / Level (logged-in users) + community contribution count (everyone) */}
                 <div className="mt-3 flex items-center gap-2 text-sm flex-wrap">
@@ -2278,6 +2293,15 @@ const App10 = () => {
                     onRequireAuth={() => setShowAuthModal(true)}
                     onAddItem={addToShoppingList}
                     shoppingListItems={shoppingList}
+                />
+            )}
+
+            {/* Contributor public profile card (shared via ?user=<id>) */}
+            {selectedHunterId && (
+                <HunterDetailModal
+                    userId={selectedHunterId}
+                    onClose={() => setSelectedHunterId(null)}
+                    onRequireAuth={() => setShowAuthModal(true)}
                 />
             )}
 

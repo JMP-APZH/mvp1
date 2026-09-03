@@ -21,7 +21,7 @@ const CHAIN_ICONS = {
   'Carrefour Express': '🔵',
 };
 
-const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOpenWantedScans, stores }) => {
+const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOpenWantedScans, onOpenProfile, stores }) => {
   const { user, userProfile, userBadges, userRoles, loading, signOut, updateProfile, updatePassword, userFavoriteStores, toggleFavoriteStore } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [savings, setSavings] = useState(null);
@@ -321,6 +321,27 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
             </div>
 
           </div>
+          <div className="p-2 border-b border-gray-100">
+            <button
+              onClick={() => {
+                onOpenProfile();
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-gray-700 p-2 rounded-lg text-white shadow-sm group-hover:scale-110 transition-transform">
+                  <User className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-900">Mon profil</p>
+                  <p className="text-[10px] text-gray-500 font-medium tracking-tight">Pseudo, photo, bio et statut</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-300" />
+            </button>
+          </div>
+
           <div className="p-2 border-b border-gray-100">
             <button
               onClick={() => {
