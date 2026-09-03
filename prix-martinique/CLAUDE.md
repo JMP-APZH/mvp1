@@ -747,6 +747,18 @@ While waiting on RPPRAC to confirm how they'll announce the launch. Branch `chor
 - **Supabase Pro headroom checked** — comfortable for a launch spike: 2 MAU / 100 K, 0.25 GB storage / 100 GB, ~0.5 GB egress / 250 GB. The one soft ceiling is **realtime concurrent connections (500 cap)** — the app opens a realtime channel per visitor for the live price feed; at ~500 simultaneous users new subs are refused and the feed stops live-updating (page still works). Not a hard blocker.
 - **Storage RLS not touched this pass, flagged instead**: both buckets have a `public` INSERT policy (lets *anonymous* clients upload directly, bypassing the app's sign-in gate) and a broad SELECT policy (lets anyone enumerate every file). The app only uploads as an authenticated user and reads by known URL, so tightening INSERT to `authenticated` and removing the list policy is safe — but it's a production-RLS change that wasn't in scope for a hardening pass on launch day. Jean-Marie's call.
 
+### Sept 3, 2026 — PostHog Switched to Cookieless / Consent-Exempt (cookie banner removed)
+Follow-up to the launch-stats review. PostHog had recorded **zero** events since the Sept 1 launch (Open Item #1): the `opt_out_capturing_by_default: true` gate from the Aug 29 RGPD pass meant nothing fired — not even `$pageview` — until a visitor clicked "Accepter" on `CookieConsentBanner`, and essentially nobody did (1 `$opt_in` ever; the owner's own browser sat on `pm_cookie_consent_choice = "declined"`). Meanwhile Supabase `app_sessions` (consent-independent) logged ~670 real sessions in the same window. Decision (Jean-Marie): drop the consent model, run PostHog cookieless. Branch `feat/posthog-cookieless`.
+
+- **`src/posthogClient.js`**: removed `opt_out_capturing_by_default`; added `cookieless_mode: 'always'` + `person_profiles: 'never'`. posthog-js now never writes a cookie or touches local/session storage — visitors are counted server-side via an irreversible rotating hash (team + daily salt + IP + UA + host; salt discarded after processing, IP never stored — project-side `anonymize_ips` was already on). No persistent identifier on the device ⇒ aggregate audience measurement that does not require a prior-consent banner under GDPR/ePrivacy (CNIL "exempted analytics" posture). Disclosed in the privacy policy instead.
+- **PostHog project 232864**: "Cookieless server hash mode" set to **Stateful** (`cookieless_server_hash_mode: 2`) via MCP — keeps a short-lived server-side session map so session counts / duration / within-session funnels stay accurate; still no client identifier. Stateless (1) was rejected — it would inflate unique-visitor counts (daily hash rotation with no session bridging).
+- **`src/components/CookieConsentBanner.jsx` deleted**; import + render removed from `App10.jsx`. Stale `pm_cookie_consent_choice` / `__ph_opt_in_out_` localStorage keys on returning visitors are simply never read again — left in place, harmless.
+- **`src/contexts/AuthContext.jsx`**: removed all `posthog.identify(session.user.id, { email })` (3×) and the `posthog.reset()` on sign-out (1×) — a stable `distinct_id` is itself personal data and can't be persisted cookielessly anyway. `anon_to_signup_converted` and every feature `capture()` still fire, now anonymous/aggregate. Every `posthog.captureException` left untouched (aggregate error monitoring; payloads only carry a `context` string + component stack, no PII).
+- **`src/components/LegalModal.jsx` + `public/privacy.html`** (kept verbatim-in-sync per the Sept 1 (2) note): section 2d + section 6 rewritten — legal basis for audience data is now *intérêt légitime* only (was "consentement / intérêt légitime"), "sans cookie ni identifiant", "aucun bandeau cookies n'est nécessaire".
+- **Tradeoffs accepted**: no per-user analysis in PostHog (that lives in Supabase / Console Admin), no GeoIP enrichment, unique-visitor counts run slightly high vs a cookie'd setup. Session replay / surveys were already unused. No runtime feature-flag reads exist in the app, so the cookieless flag-eval delay is a non-issue.
+- `npm run build` + `node node_modules/eslint/bin/eslint.js .` both clean.
+- **Still to do after merge/deploy**: load `prix-martinique.org`, take an action, and confirm an event lands in the raw `events` table (first real production capture this project will ever have).
+
 ---
 
 ## Open Items
@@ -768,7 +780,7 @@ _Refreshed 2026-09-01. Ordered roughly by urgency given the Sept 1, 2026 launch.
 - ✅ **`dev` → `main` current** through PR #23 (Sept 1). Aug work via PRs #14–#20; this session's via #21, #20, #22, #23.
 
 ### Launch-blocking / do before the announcement
-1. **⚠️ Verify PostHog captures on production.** Zero events from any deployed domain in 90 days — capture is cookie-consent-gated. Load `prix-martinique.org`, accept the cookie banner, take an action, confirm an event lands (query the raw `events` table). Otherwise launch-day product analytics is blind. Fallback for signups/sessions: Supabase `auth_events` / `app_sessions` (Console Admin → "Appareils & Connexion"), which are consent-independent. Launch monitoring dashboard: PostHog project 232864, dashboard **928161**.
+1. **Confirm PostHog captures on production** (was: consent-gated and blind — fixed Sept 3 by switching to cookieless, see that entry). After `feat/posthog-cookieless` merges + deploys: load `prix-martinique.org`, take an action, confirm an event lands in the raw `events` table (first real production capture this project will have). No banner to click now. Consent-independent signup/session data still lives in Supabase `auth_events` / `app_sessions` (Console Admin → "Appareils & Connexion"). Launch monitoring dashboard: PostHog project 232864, dashboard **928161** (its "Product Analytics" companion is **862895**).
 2. **One real end-to-end auth pass on `prix-martinique.org`** — Google sign-in, email/password sign-in, password-reset (confirm the reset link lands on the apex, not `*.vercel.app`).
 
 ### Hardening / follow-through (launch week, not hard blockers)
@@ -789,6 +801,6 @@ _Refreshed 2026-09-01. Ordered roughly by urgency given the Sept 1, 2026 launch.
     - `product_favorite_counts_migration.sql` header says "APPLIED … 2026-07-28"; the Jul 28 "Prix Recherchés" entry calls it "not yet applied". **Header is believed correct (applied)** — confirm and update the entry's inline note.
 
 ---
-**Last Updated**: 2026-09-01
+**Last Updated**: 2026-09-03
 **Current Version**: MVP v1.5 (App10)
-**Status**: Public launch day (Sept 1, 2026). Live on `https://prix-martinique.org`; Google sign-in branded + verified; `/privacy` + `/terms` live; submission rate-limiting + storage limits in place. `main` current through PR #23. Before the RPPRAC announcement: verify PostHog captures on prod + one real end-to-end auth pass (Open Items #1–2).
+**Status**: Launched (Sept 1, 2026). Live on `https://prix-martinique.org`; Google sign-in branded + verified; `/privacy` + `/terms` live; submission rate-limiting + storage limits in place. `main` current through PR #23; `feat/posthog-cookieless` (Sept 3, cookieless analytics) awaiting PR. Before the RPPRAC announcement: confirm PostHog captures on prod once that deploys + one real end-to-end auth pass (Open Items #1–2).
