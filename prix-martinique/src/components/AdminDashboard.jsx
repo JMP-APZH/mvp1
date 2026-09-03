@@ -21,7 +21,8 @@ import {
     ChevronRight,
     ShieldAlert,
     HeartPulse,
-    Target
+    Target,
+    Flag
 } from 'lucide-react';
 
 // --- M2a: date-range control ------------------------------------------------
@@ -117,6 +118,7 @@ import MainlandPriceAdmin from './MainlandPriceAdmin';
 import RecipeAdmin from './RecipeAdmin';
 import FeatureRequestAdmin from './FeatureRequestAdmin';
 import TestDataAdmin from './TestDataAdmin';
+import ProfileReportsAdmin from './ProfileReportsAdmin';
 import DeletionRequestsAdmin from './DeletionRequestsAdmin';
 import AdminDrillPanel from './AdminDrillPanel';
 import ProductDetailModal from './ProductDetailModal';
@@ -155,7 +157,7 @@ const BreakdownBar = ({ title, segments }) => {
 };
 
 const AdminDashboard = ({ onClose }) => {
-    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes' | 'suggestions' | 'testdata'
+    const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes' | 'suggestions' | 'testdata' | 'deletions' | 'profiles'
 
     // M1: founder / test / family accounts are excluded from adoption metrics by
     // default. Persisted per admin so the toggle sticks across sessions.
@@ -428,6 +430,13 @@ const AdminDashboard = ({ onClose }) => {
                         <UserX className="w-3.5 h-3.5" /> Suppressions
                     </button>
                     <button
+                        onClick={() => setSubTab('profiles')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap ${subTab === 'profiles' ? 'bg-white text-red-600' : 'bg-white/10 text-white'
+                            }`}
+                    >
+                        <Flag className="w-3.5 h-3.5" /> Profils signalés
+                    </button>
+                    <button
                         onClick={() => window.open(POSTHOG_DASHBOARD_URL, '_blank', 'noopener,noreferrer')}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex-shrink-0 whitespace-nowrap bg-white/10 text-white"
                     >
@@ -459,6 +468,10 @@ const AdminDashboard = ({ onClose }) => {
             ) : subTab === 'deletions' ? (
                 <div className="flex-1 overflow-y-auto p-6">
                     <DeletionRequestsAdmin />
+                </div>
+            ) : subTab === 'profiles' ? (
+                <div className="flex-1 overflow-y-auto p-6">
+                    <ProfileReportsAdmin />
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
