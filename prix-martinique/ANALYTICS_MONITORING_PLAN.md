@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 ✅ · M4a ✅ · M4b ✅ (verified live) · M5 🧪 (PR open, `analytics_value_migration.sql` pending). M6 next.
+**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 ✅ · M4a ✅ · M4b ✅ · M5 ✅ (verified live) · M6 🧪 (PR open — `METRIC_CATALOG.md` + PostHog gap events). **Overhaul complete once M6 merges + the PostHog dashboard checklist is worked.**
 
 ---
 
@@ -184,7 +184,10 @@ France-scan `price_submitted` where `origin_region_code = 'Hexagone'`.
 
 ---
 
-### M5 — "Valeur livrée" section (mission metrics) — 🧪 (PR open, `analytics_value_migration.sql` pending)
+### M5 — "Valeur livrée" section (mission metrics) — ✅ (verified live 2026-09-03, PR #44)
+
+**Live check:** admin "Valeur livrée" card — **+36% weighted / 45.9% median** gap, 10 appariés, 9 dearer / 1 cheaper / 0 BQP. In-app Community → Impact "L'écart « vie chère »" card renders **+45.9% médiane** · 9 plus chers · 1 moins chers · 10 comparés (above "Score de Souveraineté", `community_mainland_gap()` 200). Community-savings line hidden (0 — no user rows beat the 365d avg yet).
+
 
 **Deliverables**
 - 🧪 `analytics_value_migration.sql`:
@@ -200,20 +203,15 @@ France-scan `price_submitted` where `origin_region_code = 'Hexagone'`.
 
 ---
 
-### M6 — PostHog ↔ Admin cross-check layer — ⬜
+### M6 — PostHog ↔ Admin cross-check layer — 🧪 (PR open)
 
 **Deliverables**
-- ⬜ close PostHog instrumentation gaps: activation funnel (`$pageview`/signup →
-  `first_contribution_completed`), feature-adoption events for Comparer / BQP / Panier / Recettes
-  / Prix-recherchés (audit which already fire), mainland-pipeline events
-- ⬜ **`METRIC_CATALOG.md`** (repo): every metric → definition · Supabase source (authoritative) ·
-  PostHog event (cross-check) · owner · target/threshold
-- ⬜ curate PostHog dashboards **928161** (Launch Monitoring) + **862895** (Product Analytics) so
-  each admin KPI has a PostHog counterpart tile
-- ⬜ document the retention constraint: cohort/retention analysis is **Supabase-only** (cookieless
-  PostHog has no stable identity)
-- ⬜ (stretch) `posthog_metrics_daily` Supabase table fed by a scheduled PostHog export →
-  admin dashboard shows both numbers + variance flag (needs a GitHub Action or PostHog batch export)
+- ✅ **`METRIC_CATALOG.md`** (repo) — every metric → definition · authoritative source (Supabase RPC/field) · PostHog counterpart · target. Covers M1–M5, the division-of-responsibility table, the **cookieless retention constraint** (retention = Supabase-only), the unrecoverable Jul–Sep 3 PostHog gap, the list of events that fire today, and the PostHog-dashboard curation checklist.
+- ✅ close the highest-value instrumentation gaps: `product_detail_viewed` (ProductDetailModal — M4/M5 engagement cross-check), `mainland_match_verified` / `_rejected` (`admin_verify_mainland_match`), `mainland_screenshot_uploaded` / `mainland_online_capture_added` (MainlandPriceAdmin). Audit of existing events is in the catalog §6.
+- ⬜ (manual, PostHog UI) curate dashboards **928161** + **862895** per `METRIC_CATALOG.md` §7 — add `price_submitted` / `store_wizard_completed` / activation-funnel cross-check tiles, annotate the cookieless-unreliable retention tile, header block linking the catalog.
+- ⬜ (stretch) `posthog_metrics_daily` Supabase table fed by a scheduled PostHog export → admin dashboard shows both numbers + variance flag (needs a GitHub Action or PostHog batch export).
+
+**Effort:** catalog + gap events done 2026-09-03; dashboard curation is a manual PostHog-UI pass.
 
 **Effort:** 1–2 sessions.
 

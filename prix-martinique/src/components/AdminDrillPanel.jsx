@@ -10,6 +10,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { posthog } from '../posthogClient';
 
 // M2b -- full-screen drill-down over the Admin Dashboard. One component, three
 // modes, all backed by analytics_admin_m2b_migration.sql:
@@ -405,6 +406,7 @@ const MainlandView = ({ onOpenProduct }) => {
         try {
             const { error: err } = await supabase.rpc('admin_verify_mainland_match', { p_price_id: priceId, p_ok: ok });
             if (err) throw err;
+            posthog.capture(ok ? 'mainland_match_verified' : 'mainland_match_rejected', { price_id: priceId });
             setQueue((q) => q.filter((r) => r.price_id !== priceId));
         } catch (e) {
             console.error('admin_verify_mainland_match failed:', e);

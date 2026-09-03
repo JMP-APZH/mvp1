@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Loader2, Link2, Trash2, ZoomIn, X, Camera, AlertTriangle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import { posthog } from '../posthogClient';
 import { useAuth } from '../contexts/useAuth';
 import { MAINLAND_CHAINS as CHAINS } from '../constants/mainlandChains';
 import FlagFrance from './flags/FlagFrance';
@@ -183,6 +184,11 @@ const MainlandPriceAdmin = () => {
                 evidence_photo_url: evidencePhotoUrl,
             }]);
             if (insertError) throw insertError;
+
+            posthog.capture(
+                captureMethod === 'chain_app' ? 'mainland_screenshot_uploaded' : 'mainland_online_capture_added',
+                { product_id: item.product.id, chain, has_evidence: !!evidencePhotoUrl },
+            );
 
             setExpandedId(null);
             await load();
