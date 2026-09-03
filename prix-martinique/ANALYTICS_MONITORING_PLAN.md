@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ (verified live, incl. fix2). M2b or M3 next.
+**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b 🧪 (PR open, `analytics_admin_m2b_migration.sql` pending). M3 next.
 
 ---
 
@@ -102,10 +102,16 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 - ✅ "Modérer Prix" button disabled with "Bientôt (M2b)"
 - Diaspora Watch region-list already removed in M1 (was the confusing "972: 23" line) — nothing to fix.
 
-#### M2b — drill-downs + moderation queue — ⬜
-- ⬜ tile click-through: Contributions → filterable submission list; Contributeurs → contributor list (first/last contribution, count, channel mix); Produits → into `ProductCompletion` / `TestDataAdmin`
-- ⬜ "Activité Récente" → full list, paginated 25/page, "à revoir" filter, row → `ProductDetailModal`
-- ⬜ **"Modérer Prix"** → outlier queue (price far from product median, null `store_id`, submissions from accounts <7 days old)
+#### M2b — drill-downs + moderation queue — 🧪 (PR open, migration pending)
+- 🧪 `analytics_admin_m2b_migration.sql` (**not yet applied**):
+  - `admin_submissions_browse(p_since, p_exclude_internal, p_channel, p_review_only, p_limit, p_offset)` — paginated, channel-filterable, review-flag-filterable rows from `v_admin_prices`; each row carries `review_reason` (`magasin manquant` · `prix aberrant` [>3× or <0.34× product median, ≥3 real prices] · `compte récent` [account <7 j at submission]), `contributor_is_new`, `product_id`, and `total_count` (window size for pagination). One fn powers the Contributions drill, "Voir tout", **and** the "Modérer Prix" queue (`p_review_only := true`).
+  - `admin_contributors(p_exclude_internal, p_limit)` — one row per contributor: first/last contribution, totals, channel mix (MQ/FR/réf/test).
+  - `admin_submissions_detail` widened with `product_id` (drop + recreate) so "Activité Récente" rows are click-through.
+- ✅ `AdminDrillPanel.jsx` (new) — full-screen overlay, 3 modes (`submissions` / `review` / `contributors`), graceful "migration pending" notice; rows → `ProductDetailModal` (z-[300], above the panel).
+- ✅ `AdminDashboard.jsx` — 4 KPI tiles now buttons (Contributions → submissions drill · Contributeurs → contributors drill · Produits / Produits MDD → "Compléter produit" sub-tab); "Activité Récente" gets a "Voir tout" link + click-through rows; "Modérer Prix" enabled → review queue.
+- ✅ `npm run build` + eslint clean.
+
+**Done when:** migration applied; drill lists load, pagination works, "Modérer Prix" surfaces the flagged rows, row → product card.
 
 **PostHog counterpart:** trend shapes should match PostHog `price_submitted` daily series.
 
