@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ done & verified live (+ fix1). M2 next.
+**Last updated:** 2026-09-03 — M1 ✅ verified live. M2a 🧪 (PR open, migration pending).
 
 ---
 
@@ -88,26 +88,26 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 
 ---
 
-### M2 — Time controls, trends, drill-downs, CSV export — ⬜
+### M2 — Time controls, trends, drill-downs, CSV export
 
-**Deliverables**
-- ⬜ `AdminDateRange` control (Aujourd'hui / 7j / 30j / 90j / Tout / personnalisé) driving all overview RPCs
-- ⬜ `Sparkline` component fed by `admin_price_timeseries` on the Contributions + Contributeurs tiles
-- ⬜ tile click-through:
-  - ⬜ Contributions → filterable submission list (date / store / contributor / channel / real-test)
-  - ⬜ Contributeurs → contributor list w/ first + last contribution date, count, channel mix
-  - ⬜ Produits → link into `ProductCompletion` / `TestDataAdmin`
-- ⬜ wire **"Exporter CSV"** → client-side Blob export (submissions, contributors, or products);
-  built for RPPRAC / grant / partner reporting (`utils/dataExport.js` pattern)
-- ⬜ wire **"Modérer Prix"** → outlier queue (price far from product median, null `store_id`,
-  submissions from accounts <7 days old)
-- ⬜ "Activité Récente" upgrade: timestamp · product · price · contributor · store; row →
-  `ProductDetailModal`; paginate 25/page; "à revoir" filter
-- ⬜ fix Diaspora Watch region-list labels (`972` → "Martinique", etc.)
+#### M2a — date range + trends + CSV + rich Activité Récente — 🧪
+- 🧪 `analytics_admin_export_migration.sql` (**written — NOT YET APPLIED**): `admin_submissions_detail(p_since, p_exclude_internal, p_limit)` — admin-gated joined rows (date, product, price, store, contributor, channel, is_test) from `v_admin_prices`. One fn for both CSV export + Activité Récente.
+- ✅ date-range segmented control (**7 j / 30 j / 90 j / Tout**), persisted (`pm_admin_range`), drives `admin_kpi_overview` `p_since` + the trend
+- ✅ `Sparkline` (dependency-free inline SVG) on Contributions + Contributeurs tiles, gap-filled daily series from `admin_price_timeseries`
+- ✅ badge → "+N · {range}" (hidden for "Tout")
+- ✅ **"Exporter CSV"** wired — client-side Blob of the currently-scoped submissions (range + internal toggle), BOM for Excel, filename `prix-martinique-contributions-{range}-{date}.csv`
+- ✅ "Activité Récente" upgraded — product · price · store · contributor · relative date · TEST/FR/RÉF badges (last 8, all-time)
+- ✅ "Modérer Prix" button disabled with "Bientôt (M2b)"
+- Diaspora Watch region-list already removed in M1 (was the confusing "972: 23" line) — nothing to fix.
+
+#### M2b — drill-downs + moderation queue — ⬜
+- ⬜ tile click-through: Contributions → filterable submission list; Contributeurs → contributor list (first/last contribution, count, channel mix); Produits → into `ProductCompletion` / `TestDataAdmin`
+- ⬜ "Activité Récente" → full list, paginated 25/page, "à revoir" filter, row → `ProductDetailModal`
+- ⬜ **"Modérer Prix"** → outlier queue (price far from product median, null `store_id`, submissions from accounts <7 days old)
 
 **PostHog counterpart:** trend shapes should match PostHog `price_submitted` daily series.
 
-**Effort:** 1–2 sessions (can split M2a controls+trends+CSV / M2b drill-downs+moderation).
+**Effort:** M2a done 2026-09-03; M2b = 1 session.
 
 ---
 
