@@ -129,7 +129,8 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 **Why:** tells you whether the app is *becoming useful*, not just *growing*.
 
 **Deliverables**
-- 🧪 `analytics_data_health_migration.sql` (**not yet applied**), all admin-gated `SECURITY DEFINER`, `#variable_conflict use_column`:
+- 🧪 `analytics_data_health_migration.sql` + `analytics_data_health_fix1_migration.sql` (**not yet applied**), all admin-gated `SECURITY DEFINER`, `#variable_conflict use_column`:
+  - **fix1**: `admin_coverage_gaps` → `42703 column g.weight does not exist` — the `( <union> ) g` derived table had unnamed columns. Fixed with the `g(kind, ref_id, label, sublabel, weight)` alias-list. (`admin_data_health` + `admin_category_coverage` verified 200 on the same pass.)
   - `admin_data_health()` → one row: catalogue size, price freshness (% products whose newest real price is <30 d, median latest-price age d), categorisation % (+ N/total categories used), photo % (real price rows with `product_photo_url`), barcode %, magasins actifs 30 j / total, postes BQP couverts / total, open `barcode_flags` (`flagged` + `recapture_requested`). "Real" = `not is_test_data` and `source_type <> 'admin_reference'`.
   - `admin_category_coverage()` → per-category priced/total/% (+ a "Sans catégorie" row).
   - `admin_coverage_gaps(p_limit)` → flat list `(kind, ref_id, label, sublabel, weight)`: `store_stale` (no real price in 30 d / ever), `demanded_unpriced` (favourited product, `user_favorites`, with no real price anywhere), `uncategorized` (real-priced product, null category). Sorted by weight.

@@ -216,7 +216,8 @@ begin
     from public.user_favorites
     group by product_id
   )
-  select * from (
+  select g.kind, g.ref_id, g.label, g.sublabel, g.weight
+  from (
     -- stores with stale / no coverage
     select
       'store_stale'::text,
@@ -256,7 +257,7 @@ begin
     where p.category_id is null
       and not coalesce(p.is_test_data, false)
       and exists (select 1 from real_prices rp where rp.product_id = p.id)
-  ) g
+  ) g(kind, ref_id, label, sublabel, weight)
   order by g.weight desc
   limit p_limit;
 end;
