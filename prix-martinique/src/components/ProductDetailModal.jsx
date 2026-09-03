@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, ScanLine, Store, Leaf, MapPin, Loader2, MessageSquare, Heart, Share2, Link2, Trophy, Check, Globe2, Users, Camera, HelpCircle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/useAuth';
+import { posthog } from '../posthogClient';
 import PriceHistoryChart from './PriceHistoryChart';
 
 // One row of the 4-source price comparison. Renders a price + source-diff
@@ -257,6 +258,13 @@ const ProductDetailModal = ({ productId, onClose, onRequireAuth }) => {
                 setTopHunterIds(new Set((topHunters || []).map(h => h.id)));
 
                 await loadComments();
+
+                // M6: cross-check event for MTQ↔Hexagone / value-delivered engagement.
+                posthog.capture('product_detail_viewed', {
+                    product_id: productId,
+                    is_mdd: !!productData?.is_mdd,
+                    is_declared_bqp: !!productData?.is_declared_bqp,
+                });
             } catch (err) {
                 console.error('Error loading product detail:', err);
             } finally {
