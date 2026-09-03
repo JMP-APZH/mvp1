@@ -17,7 +17,9 @@ import {
     ExternalLink,
     Smartphone,
     UserX,
-    Download
+    Download,
+    ChevronRight,
+    ShieldAlert
 } from 'lucide-react';
 
 // --- M2a: date-range control ------------------------------------------------
@@ -93,6 +95,8 @@ import RecipeAdmin from './RecipeAdmin';
 import FeatureRequestAdmin from './FeatureRequestAdmin';
 import TestDataAdmin from './TestDataAdmin';
 import DeletionRequestsAdmin from './DeletionRequestsAdmin';
+import AdminDrillPanel from './AdminDrillPanel';
+import ProductDetailModal from './ProductDetailModal';
 import FlagFrance from './flags/FlagFrance';
 
 // Simple stacked-percentage breakdown card -- shared shape for the three
@@ -150,6 +154,10 @@ const AdminDashboard = ({ onClose }) => {
     const [trend, setTrend] = useState({ submissions: [], contributors: [] });
     const [recent, setRecent] = useState([]);   // rich rows from admin_submissions_detail
     const [exportState, setExportState] = useState(''); // '' | 'working' | 'error'
+    // M2b: drill-down overlay ('submissions' | 'review' | 'contributors') + the
+    // product card opened from a drill row.
+    const [drill, setDrill] = useState(null);
+    const [drillProductId, setDrillProductId] = useState(null);
     const [stats, setStats] = useState({
         catalogProducts: 0,     // count(*) products, all -- context for "produits avec prix"
         platformCounts: {},
@@ -428,7 +436,7 @@ const AdminDashboard = ({ onClose }) => {
 
                 {/* Main KPIs -- correctly scoped (real user contributions only) */}
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
+                    <button onClick={() => setDrill('submissions')} className="text-left bg-gray-50 p-4 rounded-3xl border border-gray-100 hover:border-blue-300 transition-colors">
                         <div className="bg-blue-100 w-10 h-10 rounded-2xl flex items-center justify-center text-blue-600 mb-3">
                             <Activity className="w-5 h-5" />
                         </div>
@@ -445,8 +453,8 @@ const AdminDashboard = ({ onClose }) => {
                             </div>
                         )}
                         <Sparkline data={trend.submissions} stroke="#2563eb" />
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
+                    </button>
+                    <button onClick={() => setDrill('contributors')} className="text-left bg-gray-50 p-4 rounded-3xl border border-gray-100 hover:border-purple-300 transition-colors">
                         <div className="bg-purple-100 w-10 h-10 rounded-2xl flex items-center justify-center text-purple-600 mb-3">
                             <Users className="w-5 h-5" />
                         </div>
@@ -459,8 +467,8 @@ const AdminDashboard = ({ onClose }) => {
                             </div>
                         )}
                         <Sparkline data={trend.contributors} stroke="#9333ea" />
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
+                    </button>
+                    <button onClick={() => setSubTab('complete')} className="text-left bg-gray-50 p-4 rounded-3xl border border-gray-100 hover:border-green-300 transition-colors">
                         <div className="bg-green-100 w-10 h-10 rounded-2xl flex items-center justify-center text-green-600 mb-3">
                             <Package className="w-5 h-5" />
                         </div>
@@ -471,15 +479,15 @@ const AdminDashboard = ({ onClose }) => {
                                 {stats.catalogProducts} au catalogue · {kpi.test_products} test
                             </p>
                         )}
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
+                    </button>
+                    <button onClick={() => setSubTab('complete')} className="text-left bg-gray-50 p-4 rounded-3xl border border-gray-100 hover:border-orange-300 transition-colors">
                         <div className="bg-orange-100 w-10 h-10 rounded-2xl flex items-center justify-center text-orange-600 mb-3">
                             <Store className="w-5 h-5" />
                         </div>
                         <div className="text-2xl font-black text-gray-900">{kpi ? kpi.mdd_priced_products : '—'}</div>
                         <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Produits MDD avec prix</p>
                         <p className="text-[10px] text-gray-400 mt-0.5">marques distributeur</p>
-                    </div>
+                    </button>
                 </div>
 
                 {/* Diaspora -- scans from France (community), separate from admin reference prices */}
@@ -540,14 +548,27 @@ const AdminDashboard = ({ onClose }) => {
 
                 {/* Activité Récente -- last 8 real contributions, all-time */}
                 <section>
-                    <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <BarChart3 className="w-5 h-5 text-red-600" /> Activité Récente
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                            <BarChart3 className="w-5 h-5 text-red-600" /> Activité Récente
+                        </h3>
+                        <button
+                            onClick={() => setDrill('submissions')}
+                            className="text-[11px] font-bold text-red-600 flex items-center gap-1 hover:underline"
+                        >
+                            Voir tout <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                     <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden">
                         {recent.length === 0 ? (
                             <p className="p-4 text-sm text-gray-400">Aucune contribution récente.</p>
                         ) : recent.map((r, i) => (
-                            <div key={i} className="flex items-start justify-between gap-3 p-4 border-b border-gray-50 last:border-0">
+                            <button
+                                key={i}
+                                onClick={() => r.product_id && setDrillProductId(r.product_id)}
+                                disabled={!r.product_id}
+                                className="w-full text-left flex items-start justify-between gap-3 p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors disabled:hover:bg-white"
+                            >
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-gray-900 truncate">{r.product_name}</p>
                                     <p className="text-[11px] text-gray-500 truncate">
@@ -563,10 +584,9 @@ const AdminDashboard = ({ onClose }) => {
                                         {r.channel === 'admin_reference' && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">RÉF</span>}
                                     </div>
                                 </div>
-                            </div>
+                            </button>
                         ))}
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-2">Liste complète cliquable + file de modération : M2b.</p>
                 </section>
 
                 {/* Actions Rapides */}
@@ -574,11 +594,10 @@ const AdminDashboard = ({ onClose }) => {
                     <h4 className="font-bold text-red-900 mb-2">Actions Rapides</h4>
                     <div className="grid grid-cols-2 gap-3">
                         <button
-                            disabled
-                            title="Bientôt (M2b)"
-                            className="bg-white p-3 rounded-2xl text-[11px] font-bold text-gray-400 shadow-sm cursor-not-allowed"
+                            onClick={() => setDrill('review')}
+                            className="bg-white p-3 rounded-2xl text-[11px] font-bold text-red-600 shadow-sm flex items-center justify-center gap-1.5"
                         >
-                            Modérer Prix
+                            <ShieldAlert className="w-3.5 h-3.5" /> Modérer Prix
                         </button>
                         <button
                             onClick={exportCsv}
@@ -599,6 +618,25 @@ const AdminDashboard = ({ onClose }) => {
                     </p>
                 </section>
             </div>
+            )}
+
+            {/* M2b: drill-down overlay + product card opened from a drill row */}
+            {drill && (
+                <AdminDrillPanel
+                    mode={drill}
+                    since={boundsFor(rangeKey).sinceIso}
+                    rangeLabel={range.label}
+                    excludeInternal={excludeInternal}
+                    onClose={() => setDrill(null)}
+                    onOpenProduct={setDrillProductId}
+                />
+            )}
+            {drillProductId && (
+                <ProductDetailModal
+                    productId={drillProductId}
+                    onClose={() => setDrillProductId(null)}
+                    onRequireAuth={() => {}}
+                />
             )}
         </div>
     );
