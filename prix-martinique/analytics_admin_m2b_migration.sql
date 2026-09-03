@@ -51,6 +51,10 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+-- OUT params (product_id, channel, is_test, price, review_reason, ...) share
+-- names with columns used bare inside the body -> resolve ambiguity to the
+-- column (see analytics_admin_m2b_fix1_migration.sql).
+#variable_conflict use_column
 begin
   if not exists (
     select 1 from public.user_roles
@@ -71,12 +75,12 @@ begin
     select
       v.id                                      as price_id,
       (v.created_at at time zone 'UTC')         as created_ts,
-      v.product_id,
-      v.price,
-      v.store_id,
-      v.contributor_id,
-      v.channel,
-      v.is_test,
+      v.product_id                              as product_id,
+      v.price                                   as price,
+      v.store_id                                as store_id,
+      v.contributor_id                          as contributor_id,
+      v.channel                                 as channel,
+      v.is_test                                 as is_test,
       coalesce(pr.name, '(produit supprimé)')   as product_name,
       coalesce(
         st.name,
@@ -96,14 +100,14 @@ begin
   ),
   medians as (
     select
-      product_id,
-      percentile_cont(0.5) within group (order by price) as med,
-      count(*)                                           as n
-    from priced
-    where not is_test
-      and channel in ('martinique_scan', 'diaspora_scan')
-      and price > 0
-    group by product_id
+      pp.product_id                                          as product_id,
+      percentile_cont(0.5) within group (order by pp.price)  as med,
+      count(*)                                               as n
+    from priced pp
+    where not pp.is_test
+      and pp.channel in ('martinique_scan', 'diaspora_scan')
+      and pp.price > 0
+    group by pp.product_id
   ),
   flagged as (
     select
@@ -132,10 +136,10 @@ begin
   ),
   filtered as (
     select *
-    from flagged
-    where (p_since is null or created_ts >= p_since)
-      and (p_channel is null or channel = p_channel)
-      and (not p_review_only or review_reason is not null)
+    from flagged f
+    where (p_since is null or f.created_ts >= p_since)
+      and (p_channel is null or f.channel = p_channel)
+      and (not p_review_only or f.review_reason is not null)
   )
   select
     f.price_id,
@@ -151,7 +155,7 @@ begin
     f.channel,
     f.is_test,
     f.review_reason,
-    count(*) over ()::bigint as total_count
+    (count(*) over ())::bigint as total_count
   from filtered f
   order by f.created_ts desc
   limit p_limit offset p_offset;
