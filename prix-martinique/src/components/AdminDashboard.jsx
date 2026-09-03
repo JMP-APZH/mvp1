@@ -19,7 +19,8 @@ import {
     UserX,
     Download,
     ChevronRight,
-    ShieldAlert
+    ShieldAlert,
+    HeartPulse
 } from 'lucide-react';
 
 // --- M2a: date-range control ------------------------------------------------
@@ -80,6 +81,27 @@ const Sparkline = ({ data, stroke = '#2563eb', height = 26 }) => {
         <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="w-full mt-2" style={{ height }} aria-hidden="true">
             <polyline points={pts} fill="none" stroke={stroke} strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
         </svg>
+    );
+};
+
+// M3: labelled coverage meter. `pct` 0-100 (or null). Bar colour by health band.
+const Meter = ({ label, pct, detail }) => {
+    const p = pct == null ? null : Math.max(0, Math.min(100, Number(pct)));
+    const band = p == null ? 'bg-gray-300'
+        : p >= 75 ? 'bg-green-500'
+        : p >= 40 ? 'bg-amber-500'
+        : 'bg-red-500';
+    return (
+        <div>
+            <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-bold text-gray-600">{label}</span>
+                <span className="text-xs font-black text-gray-900 tabular-nums">{p == null ? '—' : `${p}%`}</span>
+            </div>
+            <div className="mt-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div className={`h-full rounded-full ${band}`} style={{ width: `${p ?? 0}%` }} />
+            </div>
+            {detail && <p className="text-[10px] text-gray-400 mt-1">{detail}</p>}
+        </div>
     );
 };
 
@@ -154,8 +176,10 @@ const AdminDashboard = ({ onClose }) => {
     const [trend, setTrend] = useState({ submissions: [], contributors: [] });
     const [recent, setRecent] = useState([]);   // rich rows from admin_submissions_detail
     const [exportState, setExportState] = useState(''); // '' | 'working' | 'error'
-    // M2b: drill-down overlay ('submissions' | 'review' | 'contributors') + the
-    // product card opened from a drill row.
+    // M3: "Santé des données" snapshot from admin_data_health. null until loaded.
+    const [health, setHealth] = useState(null);
+    // M2b: drill-down overlay ('submissions' | 'review' | 'contributors' | 'health')
+    // + the product card opened from a drill row.
     const [drill, setDrill] = useState(null);
     const [drillProductId, setDrillProductId] = useState(null);
     const [stats, setStats] = useState({
@@ -212,6 +236,16 @@ const AdminDashboard = ({ onClose }) => {
             setRecent(recentRows || []);
         } catch {
             setRecent([]);
+        }
+
+        // --- M3: data-health snapshot ---
+        try {
+            const { data: hRows, error: hErr } = await supabase.rpc('admin_data_health');
+            if (hErr) throw hErr;
+            setHealth(Array.isArray(hRows) ? (hRows[0] || null) : hRows);
+        } catch (err) {
+            console.error('admin_data_health failed (migration pending?):', err);
+            setHealth(null);
         }
 
         // --- sessions / auth (M2b will add a time dimension here) ---
@@ -513,6 +547,63 @@ const AdminDashboard = ({ onClose }) => {
                         )}
                     </div>
                     <Activity className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 rotate-12" />
+                </section>
+
+                {/* M3: Santé des données -- is the catalogue becoming *useful*? */}
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                            <HeartPulse className="w-5 h-5 text-red-600" /> Santé des données
+                        </h3>
+                        <button
+                            onClick={() => setDrill('health')}
+                            className="text-[11px] font-bold text-red-600 flex items-center gap-1 hover:underline"
+                        >
+                            Voir les lacunes <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                    {!health ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-[11px] text-amber-800 leading-relaxed">
+                            Indisponible — la migration <code className="font-mono">analytics_data_health_migration.sql</code> n'est pas encore appliquée.
+                        </div>
+                    ) : (
+                        <div className="bg-white border border-gray-100 rounded-3xl p-5 space-y-4">
+                            <Meter
+                                label="Prix récents (< 30 j)"
+                                pct={health.pct_fresh}
+                                detail={`${health.fresh_priced_products}/${health.real_priced_products} produits avec prix · âge médian ${health.median_latest_price_age_days ?? '—'} j`}
+                            />
+                            <Meter
+                                label="Catégorisation"
+                                pct={health.pct_categorized}
+                                detail={`${health.categorized_products}/${health.catalog_products} produits · ${health.categories_with_products}/${health.total_categories} catégories utilisées`}
+                            />
+                            <Meter
+                                label="Photo jointe à la contribution"
+                                pct={health.pct_photo}
+                                detail={`${health.real_price_rows_with_photo}/${health.real_price_rows} contributions de prix`}
+                            />
+                            <Meter
+                                label="Code-barres renseigné"
+                                pct={health.pct_barcode}
+                                detail={`${health.products_with_barcode}/${health.catalog_products} produits`}
+                            />
+                            <div className="grid grid-cols-3 gap-3 pt-1">
+                                <div>
+                                    <div className="text-lg font-black text-gray-900 tabular-nums">{health.stores_priced_30d}<span className="text-gray-300">/{health.stores_total}</span></div>
+                                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Magasins actifs 30 j</p>
+                                </div>
+                                <div>
+                                    <div className="text-lg font-black text-gray-900 tabular-nums">{health.bqp_categories_covered}<span className="text-gray-300">/{health.bqp_categories_total}</span></div>
+                                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Postes BQP couverts</p>
+                                </div>
+                                <div>
+                                    <div className={`text-lg font-black tabular-nums ${health.open_barcode_flags > 0 ? 'text-red-600' : 'text-gray-900'}`}>{health.open_barcode_flags}</div>
+                                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Signalements ouverts</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </section>
 
                 {/* Devices & Sign-in */}
