@@ -358,11 +358,75 @@ const HealthView = () => {
     );
 };
 
+// --- M4: MTQ ↔ Hexagone gap by category -------------------------------------
+const MainlandView = () => {
+    const [rows, setRows] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setLoading(true);
+            try {
+                const { data, error: err } = await supabase.rpc('admin_mainland_gap_by_category');
+                if (err) throw err;
+                if (!cancelled) { setRows(data || []); setError(false); }
+            } catch (e) {
+                console.error('admin_mainland_gap_by_category failed (migration pending?):', e);
+                if (!cancelled) setError(true);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    if (error) return <MigrationNotice />;
+    if (loading) return <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-gray-300" /></div>;
+
+    const maxAbs = Math.max(1, ...rows.map((r) => Math.abs(Number(r.median_gap_pct) || 0)));
+
+    return (
+        <div className="p-4 space-y-4">
+            <p className="text-[10px] text-gray-400">
+                Écart médian MTQ vs France par catégorie · positif = plus cher en Martinique · {rows.length} catégorie{rows.length > 1 ? 's' : ''} appariée{rows.length > 1 ? 's' : ''}
+            </p>
+            <div className="bg-white border border-gray-100 rounded-3xl p-4 space-y-3">
+                {rows.length === 0 ? (
+                    <p className="text-sm text-gray-400">Aucune paire MTQ↔France appariée pour l'instant.</p>
+                ) : rows.map((r) => {
+                    const gap = Number(r.median_gap_pct) || 0;
+                    const w = (Math.abs(gap) / maxAbs) * 50; // half-width bar around centre
+                    return (
+                        <div key={r.category_id || 'none'}>
+                            <div className="flex items-baseline justify-between gap-2">
+                                <span className="text-xs font-bold text-gray-700">{r.icon || '❓'} {r.category_name || 'Sans catégorie'}</span>
+                                <span className={`text-xs font-black tabular-nums ${gap > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                    {gap > 0 ? '+' : ''}{r.median_gap_pct}% · {r.matched_products}
+                                </span>
+                            </div>
+                            <div className="mt-1 h-2 rounded-full bg-gray-100 relative overflow-hidden">
+                                <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gray-300" />
+                                <div
+                                    className={`absolute top-0 bottom-0 ${gap > 0 ? 'bg-red-500 left-1/2' : 'bg-green-500 right-1/2'}`}
+                                    style={{ width: `${w}%` }}
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 const TITLES = {
     submissions: 'Contributions de prix',
     review: 'Modérer les prix',
     contributors: 'Contributeurs',
     health: 'Santé des données — lacunes',
+    mainland: 'Comparaison France Hexagonale',
 };
 
 const AdminDrillPanel = ({ mode, since, rangeLabel, excludeInternal, onClose, onOpenProduct }) => (
@@ -376,6 +440,8 @@ const AdminDrillPanel = ({ mode, since, rangeLabel, excludeInternal, onClose, on
         <div className="flex-1 overflow-y-auto">
             {mode === 'health' ? (
                 <HealthView />
+            ) : mode === 'mainland' ? (
+                <MainlandView />
             ) : mode === 'contributors' ? (
                 <ContributorsView excludeInternal={excludeInternal} />
             ) : (
