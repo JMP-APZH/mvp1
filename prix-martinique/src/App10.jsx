@@ -62,6 +62,9 @@ const App10 = () => {
     const [showScanner, setShowScanner] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [recentPrices, setRecentPrices] = useState([]);
+    // Honest community-contribution total for the header pill. `recentPrices` is
+    // only the capped 50-row feed, so its length under-counts and stays flat.
+    const [communityCount, setCommunityCount] = useState(null);
     const [mainlandByProduct, setMainlandByProduct] = useState({});
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -366,6 +369,19 @@ const App10 = () => {
             }
 
             setRecentPrices(transformedPrices);
+
+            // Honest "prix partagés" total for the header pill -- a single server
+            // count (community_price_count_migration.sql), same scoping as
+            // Console Admin's "Contributions de prix" (all contributors, minus
+            // admin reference prices + test products). Isolated: a missing RPC
+            // must never break the feed, the pill just falls back to the feed size.
+            try {
+                const { data: cCount, error: cErr } = await supabase.rpc('community_price_count');
+                if (cErr) throw cErr;
+                if (typeof cCount === 'number') setCommunityCount(cCount);
+            } catch (cErr) {
+                console.error('community_price_count failed (migration pending?):', cErr);
+            }
 
             // At-a-glance France Hexagonale diff badge on each card: cheapest
             // mainland reference/community price per product. Isolated in its
@@ -1056,7 +1072,7 @@ const App10 = () => {
                     )}
                     <div className="bg-white/20 rounded-full px-3 py-1 flex items-center gap-1">
                         <Users className="w-4 h-4" />
-                        <span>{recentPrices.length} prix partagés</span>
+                        <span>{communityCount ?? recentPrices.length} prix partagés</span>
                     </div>
                 </div>
             </div>
