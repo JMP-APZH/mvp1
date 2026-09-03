@@ -142,20 +142,19 @@ Events that **already fire** (keep): `price_submitted`, `first_contribution_comp
 
 ---
 
-## 7. PostHog dashboard curation — checklist (manual)
+## 7. PostHog dashboard curation — ✅ done 2026-09-03
 
 Two dashboards, project **232864**:
 
-- **928161 — Launch Monitoring** (pinned): traffic-by-`$host`, submissions/day,
-  contributors & onboarding, `$exception`/day, daily visitors, caveats header. ✅ built.
-- **862895 — Product Analytics** (primary): price submissions trend, new contributors,
-  store-selection funnel, repeat contributors *(cookieless-unreliable — annotate)*,
-  community engagement, personal feature usage. ✅ built.
+- **[928161 — Launch Monitoring](https://eu.posthog.com/project/232864/dashboard/928161)** (pinned): traffic-by-`$host`, submissions/day, contributors & onboarding, `$exception`/day, daily visitors + the new distinct-stores tile.
+- **[862895 — Product Analytics](https://eu.posthog.com/project/232864/dashboard/862895)** (primary): price submissions, new contributors, store-selection funnel, repeat contributors, community engagement, personal feature usage + the new activation funnel and M4/M5 cross-check tiles.
 
-**To do for M6 cross-check parity** (do in the PostHog UI):
-- [ ] Add a `price_submitted` daily-count tile to 862895 and annotate "expect ≤ Console Admin *Contributions de prix* — PostHog misses pre-consent + anon".
-- [ ] Add `store_wizard_completed` by `store_id` — cross-check for Console Admin *Magasins actifs 30j*.
-- [ ] Add `first_contribution_completed` vs signup count — activation funnel.
-- [ ] Replace / annotate the "Repeat Contributors" retention tile: cookieless makes it unreliable; point to Console Admin (Supabase) as authoritative.
-- [ ] Once the M6 gap events ship, add `product_detail_viewed` and `mainland_*` tiles.
-- [ ] Header text block on both dashboards linking here (`METRIC_CATALOG.md`) as the source of truth.
+**M6 cross-check pass applied:**
+- [x] Both dashboard **header text blocks rewritten** — removed the stale "consent-gated / zero prod events" note (PostHog is cookieless / consent-exempt since 2026-09-03), added the cookieless retention caveat, the unrecoverable Jul→Sep 3 gap, and a link to this catalog as source of truth.
+- [x] **"Price Submissions (daily)"** insight annotated: "≤ Console Admin *Contributions de prix* — PostHog misses pre-consent + anon".
+- [x] **New tile → 928161: "Store coverage — distinct stores selected (weekly)"** (`uniq(store_id)` on `store_wizard_completed`) — cross-check for *Magasins actifs 30j*.
+- [x] **New tile → 862895: "Activation funnel — store selected → first contribution"** (`store_wizard_completed` → `first_contribution_completed`).
+- [x] **"Repeat Contributors (weekly retention)"** insight renamed `— ⚠ cookieless-unreliable` and its description points to Console Admin / Supabase as authoritative.
+- [x] **New tile → 862895: "M4 / M5 cross-check events"** (`product_detail_viewed`, `mainland_match_verified`/`_rejected`, `mainland_screenshot_uploaded`/`mainland_online_capture_added`) — forward-looking; populates as the app is used.
+
+**Not done (deliberately):** the `anon_to_signup_converted` event still records nothing in PostHog, so a signup→contribution funnel isn't possible there — activation is cross-checked against Supabase (`user_profiles` vs first `prices.submitted_by`) instead. The stretch `posthog_metrics_daily` export table (§ANALYTICS_MONITORING_PLAN M6 stretch) is not built.

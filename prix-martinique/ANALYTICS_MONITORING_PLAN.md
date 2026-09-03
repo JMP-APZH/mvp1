@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 ✅ · M4a ✅ · M4b ✅ · M5 ✅ (verified live) · M6 🧪 (PR open — `METRIC_CATALOG.md` + PostHog gap events). **Overhaul complete once M6 merges + the PostHog dashboard checklist is worked.**
+**Last updated:** 2026-09-03 — **M1–M6 ✅ · Analytics & Monitoring Overhaul COMPLETE.** M5 verified live; M6 catalog + gap events merged (PR #45) and the PostHog dashboards (928161 / 862895) curated per `METRIC_CATALOG.md` §7. Only the stretch `posthog_metrics_daily` export table is unbuilt.
 
 ---
 
@@ -208,10 +208,10 @@ France-scan `price_submitted` where `origin_region_code = 'Hexagone'`.
 **Deliverables**
 - ✅ **`METRIC_CATALOG.md`** (repo) — every metric → definition · authoritative source (Supabase RPC/field) · PostHog counterpart · target. Covers M1–M5, the division-of-responsibility table, the **cookieless retention constraint** (retention = Supabase-only), the unrecoverable Jul–Sep 3 PostHog gap, the list of events that fire today, and the PostHog-dashboard curation checklist.
 - ✅ close the highest-value instrumentation gaps: `product_detail_viewed` (ProductDetailModal — M4/M5 engagement cross-check), `mainland_match_verified` / `_rejected` (`admin_verify_mainland_match`), `mainland_screenshot_uploaded` / `mainland_online_capture_added` (MainlandPriceAdmin). Audit of existing events is in the catalog §6.
-- ⬜ (manual, PostHog UI) curate dashboards **928161** + **862895** per `METRIC_CATALOG.md` §7 — add `price_submitted` / `store_wizard_completed` / activation-funnel cross-check tiles, annotate the cookieless-unreliable retention tile, header block linking the catalog.
-- ⬜ (stretch) `posthog_metrics_daily` Supabase table fed by a scheduled PostHog export → admin dashboard shows both numbers + variance flag (needs a GitHub Action or PostHog batch export).
+- ✅ curated dashboards **928161** + **862895** per `METRIC_CATALOG.md` §7 (2026-09-03, via the PostHog MCP): both headers rewritten (cookieless status + catalog link), "Price Submissions" annotated (≤ Console Admin), new "Store coverage — distinct stores selected (weekly)" tile on 928161, new "Activation funnel — store selected → first contribution" + "M4 / M5 cross-check events" tiles on 862895, "Repeat Contributors" renamed `⚠ cookieless-unreliable`.
+- ⬜ (stretch, not built) `posthog_metrics_daily` Supabase table fed by a scheduled PostHog export → admin dashboard shows both numbers + variance flag (needs a GitHub Action or PostHog batch export). `anon_to_signup_converted` records nothing in PostHog — a signup→contribution funnel there isn't possible; activation is cross-checked against Supabase.
 
-**Effort:** catalog + gap events done 2026-09-03; dashboard curation is a manual PostHog-UI pass.
+**Effort:** all done 2026-09-03.
 
 **Effort:** 1–2 sessions.
 
