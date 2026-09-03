@@ -168,6 +168,7 @@ const MainlandPriceAdmin = () => {
                 origin_region_code: 'Hexagone',
                 mainland_chain: chain,
                 source_type: 'admin_reference',
+                source_channel: 'online_capture',   // M4: explicit capture-path attribution
                 source_url: sourceUrl.trim() || null,
                 evidence_photo_url: evidencePhotoUrl,
             }]);

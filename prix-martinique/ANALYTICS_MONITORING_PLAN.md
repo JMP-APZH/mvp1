@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 🧪 (PR open, `analytics_data_health_migration.sql` pending). M4 next.
+**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 ✅ (verified live, incl. fix1) · M4a 🧪 (PR open, `mainland_match_pipeline_migration.sql` pending). M4b next.
 
 ---
 
@@ -124,7 +124,9 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 
 ---
 
-### M3 — "Santé des données" section (flywheel health) — 🧪 (PR open, migration pending)
+### M3 — "Santé des données" section (flywheel health) — ✅ (verified live 2026-09-03, PRs #40 #41)
+
+**Live check:** meters render (59.6% fresh · 68.4% categorised · 90.2% photo · 94.7% barcode · 5/78 magasins actifs · 1/16 BQP · 0 flags). "Voir les lacunes" drill: per-category coverage bars + 73 stores sans prix récent ("Carrefour C.C. Cluny · il y a 44 j") + 7 uncategorized real-priced products. fix1: `admin_coverage_gaps` unnamed derived-table columns (`42703`) → `g(kind, ref_id, label, sublabel, weight)` alias-list.
 
 **Why:** tells you whether the app is *becoming useful*, not just *growing*.
 
@@ -144,37 +146,34 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 
 ---
 
-### M4 — Martinique ↔ France Hexagonale matching pipeline — ⬜
+### M4 — Martinique ↔ France Hexagonale matching pipeline
 
 **Why:** the flagship "vie chère" comparison only works with real matched pairs. Sources:
 1. **Diaspora users' real scans** in France (`source_type='scan'` + `origin_region_code='Hexagone'`) — flow exists
 2. **Screenshot uploads from chains' own shopping apps** (Carrefour, E.Leclerc, Auchan, Système U) — *new capture path*, distinct from "admin found it on the website"
 3. Admin online capture (`source_type='admin_reference'` + `source_url`) — exists
 
-**Deliverables**
-- ⬜ `mainland_match_pipeline_migration.sql` (**not yet applied**)
-  - ⬜ `prices.source_channel text` check-constrained to
-    `('martinique_scan','diaspora_scan','chain_app_screenshot','online_capture')`; backfill from
-    `source_type` + `origin_region_code` + `evidence_photo_url`
-  - ⬜ `prices.match_verified boolean` + `match_verified_by uuid` + `match_verified_at timestamptz`
-  - ⬜ `admin_mainland_match_coverage()` → # MTQ products with any France price (by channel),
-    median/avg gap %, gap distribution buckets, # France-priced products lacking a MTQ price
-    (inverse gap → prioritise MTQ scans)
-  - ⬜ `admin_mainland_match_queue()` → unverified France entries needing review
-- ⬜ **screenshot-upload capture** in `MainlandPriceAdmin.jsx`: "depuis l'app d'une enseigne"
-  source option → upload screenshot (`evidence_photo_url`, `price-tag-photos` bucket) + chain +
-  `source_channel='chain_app_screenshot'`
-- ⬜ diaspora-scan attribution: ensure the France scan flow (`App10.jsx`) stamps
-  `source_channel='diaspora_scan'`
-- ⬜ dashboard section **"Comparaison France Hexagonale"** — match rate, gap by category,
-  coverage by channel, verification-queue count
-- ⬜ verification queue UI (extend `MainlandPriceAdmin` or new sub-tab)
-- ⬜ (stretch) user-facing screenshot upload for diaspora users, not just admin
+#### M4a — schema + coverage + attribution — 🧪 (PR open, `mainland_match_pipeline_migration.sql` pending)
+- 🧪 `mainland_match_pipeline_migration.sql`:
+  - `prices.source_channel text` check-constrained `('martinique_scan','diaspora_scan','chain_app_screenshot','online_capture')` + index; backfilled from `source_type` + `origin_region_code`.
+  - `prices.match_verified boolean` + `match_verified_by uuid` + `match_verified_at timestamptz` (for the M4b queue).
+  - `admin_mainland_match_coverage()` → one row: MTQ-priced products, # also with a France price, match rate %, France-priced products, France-without-MTQ (inverse gap), coverage by channel, **median / avg gap %** (latest MTQ vs latest France, + = MTQ dearer), # MTQ-dearer / -cheaper, unverified-France count. Every classifier uses `coalesce(source_channel, <derive from source_type/origin>)` so it works even before the client stamps the column.
+  - `admin_mainland_gap_by_category()` → per-category matched count + median gap %.
+- ✅ attribution: `MainlandPriceAdmin.jsx` stamps `source_channel='online_capture'`; diaspora hot-path (`priceSubmission.js`) left to the coalesce fallback for now (avoid a deploy-ordering break on the critical submission path) — stamped explicitly in M4b.
+- ✅ dashboard section **"Comparaison France Hexagonale"** — `Meter` match rate + median-gap headline + coverage-by-channel counters + France-without-MTQ / unverified counts; "Détail par catégorie" → `AdminDrillPanel` `mainland` mode (diverging gap bars per category).
+- ✅ build + eslint clean.
+
+#### M4b — screenshot capture + verification queue — ⬜
+- ⬜ `admin_mainland_match_queue(p_limit)` → unverified France rows (product, FR price, MTQ price, gap %, channel, has-evidence) + `admin_verify_mainland_match(p_price_id, p_ok boolean)`.
+- ⬜ **screenshot-upload capture** in `MainlandPriceAdmin.jsx`: "depuis l'app d'une enseigne" source option → screenshot (`evidence_photo_url`, `price-tag-photos`) + chain + `source_channel='chain_app_screenshot'`.
+- ⬜ diaspora-scan attribution stamped explicitly in `priceSubmission.js` (once the column is guaranteed present).
+- ⬜ verification queue UI (extend `MainlandPriceAdmin` or a drill mode with verify/reject).
+- ⬜ (stretch) user-facing screenshot upload for diaspora users.
 
 **PostHog counterpart:** `mainland_screenshot_uploaded`, `mainland_match_verified`,
 France-scan `price_submitted` where `origin_region_code = 'Hexagone'`.
 
-**Effort:** 2 sessions (M4a schema + coverage + attribution / M4b screenshot flow + queue).
+**Effort:** M4a done 2026-09-03 (pending migration apply + verify); M4b = 1 session.
 
 ---
 

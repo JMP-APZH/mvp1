@@ -178,7 +178,9 @@ const AdminDashboard = ({ onClose }) => {
     const [exportState, setExportState] = useState(''); // '' | 'working' | 'error'
     // M3: "Santé des données" snapshot from admin_data_health. null until loaded.
     const [health, setHealth] = useState(null);
-    // M2b: drill-down overlay ('submissions' | 'review' | 'contributors' | 'health')
+    // M4: MTQ↔Hexagone match coverage from admin_mainland_match_coverage.
+    const [mainland, setMainland] = useState(null);
+    // M2b: drill-down overlay ('submissions' | 'review' | 'contributors' | 'health' | 'mainland')
     // + the product card opened from a drill row.
     const [drill, setDrill] = useState(null);
     const [drillProductId, setDrillProductId] = useState(null);
@@ -246,6 +248,16 @@ const AdminDashboard = ({ onClose }) => {
         } catch (err) {
             console.error('admin_data_health failed (migration pending?):', err);
             setHealth(null);
+        }
+
+        // --- M4: MTQ↔Hexagone match coverage ---
+        try {
+            const { data: mRows, error: mErr } = await supabase.rpc('admin_mainland_match_coverage');
+            if (mErr) throw mErr;
+            setMainland(Array.isArray(mRows) ? (mRows[0] || null) : mRows);
+        } catch (err) {
+            console.error('admin_mainland_match_coverage failed (migration pending?):', err);
+            setMainland(null);
         }
 
         // --- sessions / auth (M2b will add a time dimension here) ---
@@ -547,6 +559,65 @@ const AdminDashboard = ({ onClose }) => {
                         )}
                     </div>
                     <Activity className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 rotate-12" />
+                </section>
+
+                {/* M4: Comparaison France Hexagonale -- the flagship vie-chère gap */}
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                            <FlagFrance className="w-5 h-5" /> Comparaison France Hexagonale
+                        </h3>
+                        <button
+                            onClick={() => setDrill('mainland')}
+                            className="text-[11px] font-bold text-red-600 flex items-center gap-1 hover:underline"
+                        >
+                            Détail par catégorie <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                    {!mainland ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-[11px] text-amber-800 leading-relaxed">
+                            Indisponible — la migration <code className="font-mono">mainland_match_pipeline_migration.sql</code> n'est pas encore appliquée.
+                        </div>
+                    ) : (
+                        <div className="bg-white border border-gray-100 rounded-3xl p-5 space-y-4">
+                            <Meter
+                                label="Produits MTQ avec un prix France"
+                                pct={mainland.match_rate_pct}
+                                detail={`${mainland.mtq_with_france_price}/${mainland.mtq_priced_products} produits appariés`}
+                            />
+                            {mainland.median_gap_pct != null && (
+                                <div className="flex items-baseline gap-2">
+                                    <span className={`text-3xl font-black tabular-nums ${Number(mainland.median_gap_pct) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        {Number(mainland.median_gap_pct) > 0 ? '+' : ''}{mainland.median_gap_pct}%
+                                    </span>
+                                    <span className="text-[11px] text-gray-500 leading-tight">
+                                        écart médian MTQ vs France<br />
+                                        <span className="text-gray-400">{mainland.products_mtq_dearer} plus chers · {mainland.products_mtq_cheaper} moins chers en MTQ</span>
+                                    </span>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-3 gap-3 pt-1">
+                                <div>
+                                    <div className="text-lg font-black text-gray-900 tabular-nums">{mainland.cov_diaspora_scan}</div>
+                                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Scans diaspora</p>
+                                </div>
+                                <div>
+                                    <div className="text-lg font-black text-gray-900 tabular-nums">{mainland.cov_online_capture}</div>
+                                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Captures en ligne</p>
+                                </div>
+                                <div>
+                                    <div className="text-lg font-black text-gray-900 tabular-nums">{mainland.cov_chain_app_screenshot}</div>
+                                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Screenshots appli</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500 pt-1 border-t border-gray-50">
+                                <span><span className="font-bold text-gray-900">{mainland.france_without_mtq}</span> produits ont un prix France sans prix MTQ</span>
+                                {mainland.unverified_france_entries > 0 && (
+                                    <span><span className="font-bold text-amber-600">{mainland.unverified_france_entries}</span> entrées France à vérifier (M4b)</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </section>
 
                 {/* M3: Santé des données -- is the catalogue becoming *useful*? */}
