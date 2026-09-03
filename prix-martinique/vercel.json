@@ -4,6 +4,12 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "cleanUrls": true,
+  "build": {
+    "env": {
+      "VITE_POSTHOG_KEY": "phc_n3K7FFkuCsF7CGooUj9tMM4BA8jb2XP5LX2LzJVg4b6D",
+      "VITE_POSTHOG_HOST": "https://eu.i.posthog.com"
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
@@ -20,9 +26,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "VITE_POSTHOG_KEY": "phc_n3K7FFkuCsF7CGooUj9tMM4BA8jb2XP5LX2LzJVg4b6D",
-    "VITE_POSTHOG_HOST": "https://eu.i.posthog.com"
-  }
+  ]
 }
