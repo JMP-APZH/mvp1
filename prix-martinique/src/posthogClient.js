@@ -3,6 +3,14 @@ import posthog from 'posthog-js'
 const posthogKey = import.meta.env.VITE_POSTHOG_KEY
 const posthogHost = import.meta.env.VITE_POSTHOG_HOST
 
+// If VITE_POSTHOG_KEY isn't inlined at build time, init() is skipped and the
+// whole SDK silently no-ops. That's how deployed builds captured nothing for
+// months (the vars were only in vercel.json's runtime `env`, not `build.env`).
+// Warn loudly so a missing/misplaced env var is obvious in the console.
+if (!posthogKey && import.meta.env.PROD) {
+  console.warn('[posthog] VITE_POSTHOG_KEY is not set — analytics disabled for this build.')
+}
+
 if (posthogKey && !posthog.__loaded) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
