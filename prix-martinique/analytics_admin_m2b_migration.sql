@@ -278,17 +278,64 @@ grant execute on function public.admin_contributors(boolean, integer)           
 grant execute on function public.admin_submissions_detail(timestamptz, boolean, integer)                         to authenticated;
 
 -- 3. Sanity checks ---------------------------------------------------------
--- (a) both functions exist + SECURITY DEFINER
+-- NOTE: the functions carry an `auth.uid()` admin guard, so calling them from
+-- the Supabase SQL Editor (no auth context) raises "admin only" (42501) -- that
+-- is expected and does NOT mean the migration failed. Verify with raw queries
+-- against v_admin_prices instead (the editor runs as the view owner).
+
+-- (a) all three functions exist + are SECURITY DEFINER
 select proname, prosecdef
   from pg_proc
  where pronamespace = 'public'::regnamespace
-   and proname in ('admin_submissions_browse', 'admin_contributors');
+   and proname in ('admin_submissions_browse', 'admin_contributors', 'admin_submissions_detail');
 
--- (b) first page of the moderation queue (runs as postgres here -> bypasses the
---     admin guard; eyeball the review_reason column)
-select created_at, product_name, price, store_name, contributor_name, review_reason, total_count
-  from public.admin_submissions_browse(null, true, null, true, 25, 0);
+-- (b) raw preview of the moderation queue -- same logic as admin_submissions_browse,
+--     without the guard. Rows here are what "Modérer Prix" will surface.
+with priced as (
+  select
+    v.id, (v.created_at at time zone 'UTC') as created_ts, v.product_id, v.price,
+    v.store_id, v.channel, v.is_test,
+    coalesce(pr.name, '(produit supprimé)') as product_name,
+    up.created_at as contributor_created_at
+  from public.v_admin_prices v
+  left join public.products      pr on pr.id = v.product_id
+  left join public.user_profiles up on up.id = v.contributor_id
+  where not v.is_internal
+),
+medians as (
+  select product_id, percentile_cont(0.5) within group (order by price) as med, count(*) as n
+  from priced
+  where not is_test and channel in ('martinique_scan', 'diaspora_scan') and price > 0
+  group by product_id
+)
+select
+  p.created_ts, p.product_name, p.price,
+  nullif(concat_ws(', ',
+    case when p.channel in ('martinique_scan','diaspora_scan') and p.store_id is null then 'magasin manquant' end,
+    case when m.n >= 3 and m.med > 0 and (p.price > m.med * 3 or p.price < m.med * 0.34) then 'prix aberrant' end,
+    case when p.contributor_created_at is not null and p.created_ts - p.contributor_created_at < interval '7 days' then 'compte récent' end
+  ), '') as review_reason
+from priced p
+left join medians m on m.product_id = p.product_id
+where nullif(concat_ws(', ',
+    case when p.channel in ('martinique_scan','diaspora_scan') and p.store_id is null then 'x' end,
+    case when m.n >= 3 and m.med > 0 and (p.price > m.med * 3 or p.price < m.med * 0.34) then 'x' end,
+    case when p.contributor_created_at is not null and p.created_ts - p.contributor_created_at < interval '7 days' then 'x' end
+  ), '') is not null
+order by p.created_ts desc
+limit 25;
 
--- (c) contributor roster
-select contributor_name, total_submissions, martinique_scans, diaspora_scans, first_contribution, last_contribution
-  from public.admin_contributors(true, 50);
+-- (c) raw contributor roster
+select
+  coalesce(up.display_name, 'Anonyme')                              as contributor_name,
+  count(*)                                                          as total_submissions,
+  count(*) filter (where v.channel = 'martinique_scan' and not v.is_test) as martinique_scans,
+  count(*) filter (where v.channel = 'diaspora_scan'   and not v.is_test) as diaspora_scans,
+  min(v.created_at)                                                 as first_contribution,
+  max(v.created_at)                                                 as last_contribution
+from public.v_admin_prices v
+left join public.user_profiles up on up.id = v.contributor_id
+where v.contributor_id is not null and not v.is_internal
+group by 1
+order by 2 desc
+limit 50;
