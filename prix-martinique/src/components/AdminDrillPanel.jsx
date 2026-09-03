@@ -259,10 +259,110 @@ const ContributorsView = ({ excludeInternal }) => {
     );
 };
 
+// --- M3: data-health lacunas (category coverage + actionable gaps) ------------
+const GAP_KINDS = {
+    store_stale: { label: 'Magasin sans prix récent', color: 'bg-orange-100 text-orange-700' },
+    demanded_unpriced: { label: 'Demandé, sans prix', color: 'bg-violet-100 text-violet-700' },
+    uncategorized: { label: 'Sans catégorie', color: 'bg-sky-100 text-sky-700' },
+};
+
+const HealthView = () => {
+    const [cats, setCats] = useState([]);
+    const [gaps, setGaps] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setLoading(true);
+            try {
+                const [c, g] = await Promise.all([
+                    supabase.rpc('admin_category_coverage'),
+                    supabase.rpc('admin_coverage_gaps', { p_limit: 80 }),
+                ]);
+                if (c.error) throw c.error;
+                if (g.error) throw g.error;
+                if (!cancelled) { setCats(c.data || []); setGaps(g.data || []); setError(false); }
+            } catch (e) {
+                console.error('admin_data_health drill failed (migration pending?):', e);
+                if (!cancelled) setError(true);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    if (error) return <MigrationNotice />;
+    if (loading) return <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-gray-300" /></div>;
+
+    const grouped = gaps.reduce((acc, row) => {
+        (acc[row.kind] = acc[row.kind] || []).push(row);
+        return acc;
+    }, {});
+
+    return (
+        <div className="p-4 space-y-6">
+            {/* Category coverage */}
+            <section>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Couverture par catégorie</h3>
+                <div className="bg-white border border-gray-100 rounded-3xl p-4 space-y-3">
+                    {cats.length === 0 ? (
+                        <p className="text-sm text-gray-400">Aucune catégorie.</p>
+                    ) : cats.map((c) => {
+                        const p = c.total_products > 0 ? Number(c.pct) : null;
+                        const band = p == null ? 'bg-gray-200' : p >= 75 ? 'bg-green-500' : p >= 40 ? 'bg-amber-500' : 'bg-red-500';
+                        return (
+                            <div key={c.category_id || 'none'}>
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-xs font-bold text-gray-700">{c.icon} {c.category_name}</span>
+                                    <span className="text-[11px] text-gray-500 tabular-nums">
+                                        {c.priced_products}/{c.total_products}{p != null && ` · ${p}%`}
+                                    </span>
+                                </div>
+                                <div className="mt-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                                    <div className={`h-full rounded-full ${band}`} style={{ width: `${p ?? 0}%` }} />
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
+
+            {/* Actionable gaps */}
+            <section>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Lacunes prioritaires</h3>
+                {Object.keys(grouped).length === 0 ? (
+                    <p className="text-sm text-gray-400 bg-white border border-gray-100 rounded-3xl p-4">Aucune lacune détectée. 👍</p>
+                ) : Object.entries(grouped).map(([kind, rows]) => (
+                    <div key={kind} className="mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${GAP_KINDS[kind]?.color || 'bg-gray-100 text-gray-600'}`}>
+                                {GAP_KINDS[kind]?.label || kind}
+                            </span>
+                            <span className="text-[10px] text-gray-400">{rows.length}</span>
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden">
+                            {rows.map((r, i) => (
+                                <div key={r.ref_id + i} className="flex items-start justify-between gap-3 p-3.5 border-b border-gray-50 last:border-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{r.label}</p>
+                                    <span className="text-[11px] text-gray-400 whitespace-nowrap flex-shrink-0">{r.sublabel}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </section>
+        </div>
+    );
+};
+
 const TITLES = {
     submissions: 'Contributions de prix',
     review: 'Modérer les prix',
     contributors: 'Contributeurs',
+    health: 'Santé des données — lacunes',
 };
 
 const AdminDrillPanel = ({ mode, since, rangeLabel, excludeInternal, onClose, onOpenProduct }) => (
@@ -274,7 +374,9 @@ const AdminDrillPanel = ({ mode, since, rangeLabel, excludeInternal, onClose, on
             <h2 className="text-lg font-bold text-gray-900">{TITLES[mode] || 'Détail'}</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
-            {mode === 'contributors' ? (
+            {mode === 'health' ? (
+                <HealthView />
+            ) : mode === 'contributors' ? (
                 <ContributorsView excludeInternal={excludeInternal} />
             ) : (
                 <SubmissionsView

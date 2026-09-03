@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ (verified live, incl. fix1 + fix2). M3 next.
+**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 🧪 (PR open, `analytics_data_health_migration.sql` pending). M4 next.
 
 ---
 
@@ -124,23 +124,22 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 
 ---
 
-### M3 — "Santé des données" section (flywheel health) — ⬜
+### M3 — "Santé des données" section (flywheel health) — 🧪 (PR open, migration pending)
 
 **Why:** tells you whether the app is *becoming useful*, not just *growing*.
 
 **Deliverables**
-- ⬜ `analytics_data_health_migration.sql` (**not yet applied**)
-  - ⬜ `admin_data_health()` → price freshness (% products w/ latest price <30d, median age d),
-    store coverage (# priced <30d, # never priced), category coverage (% products categorized),
-    photo coverage, open `barcode_flags` count, BQP coverage (# `bqp_categories` w/ ≥1 product)
-  - ⬜ `admin_coverage_gaps()` → stores with no recent price, demanded products
-    (`get_product_favorite_counts`) with no price, least-covered categories
-- ⬜ dashboard section **"Santé des données"** — meters + top-gap lists, each drillable
-- ⬜ surface the standing "category coverage" number (currently ~6/23, buried) as a tracked KPI
+- 🧪 `analytics_data_health_migration.sql` (**not yet applied**), all admin-gated `SECURITY DEFINER`, `#variable_conflict use_column`:
+  - `admin_data_health()` → one row: catalogue size, price freshness (% products whose newest real price is <30 d, median latest-price age d), categorisation % (+ N/total categories used), photo % (real price rows with `product_photo_url`), barcode %, magasins actifs 30 j / total, postes BQP couverts / total, open `barcode_flags` (`flagged` + `recapture_requested`). "Real" = `not is_test_data` and `source_type <> 'admin_reference'`.
+  - `admin_category_coverage()` → per-category priced/total/% (+ a "Sans catégorie" row).
+  - `admin_coverage_gaps(p_limit)` → flat list `(kind, ref_id, label, sublabel, weight)`: `store_stale` (no real price in 30 d / ever), `demanded_unpriced` (favourited product, `user_favorites`, with no real price anywhere), `uncategorized` (real-priced product, null category). Sorted by weight.
+- ✅ dashboard section **"Santé des données"** — `Meter` bars (freshness / categorisation / photo / barcode) + magasins/BQP/flags counters + "Voir les lacunes" → `AdminDrillPanel` new `health` mode (category-coverage bars + grouped gap lists).
+- ✅ graceful "migration pending" notice; `admin_data_health` fetched in `fetchAdminStats`.
+- ✅ build + eslint clean.
 
-**PostHog counterpart:** `store_wizard_completed` breakdown by `store_id` vs store coverage.
+**PostHog counterpart:** `store_wizard_completed` breakdown by `store_id` vs magasins actifs.
 
-**Effort:** 1 session.
+**Effort:** 1 session — done 2026-09-03 (pending migration apply + live verify).
 
 ---
 
