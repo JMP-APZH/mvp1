@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 ✅ · M4a ✅ (verified live) · M4b 🧪 (PR open, `mainland_verification_queue_migration.sql` pending). M5 next.
+**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 ✅ · M4a ✅ · M4b ✅ (verified live) · M5 🧪 (PR open, `analytics_value_migration.sql` pending). M6 next.
 
 ---
 
@@ -166,7 +166,10 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 - ✅ dashboard section **"Comparaison France Hexagonale"** — `Meter` match rate + median-gap headline + coverage-by-channel counters + France-without-MTQ / unverified counts; "Détail par catégorie" → `AdminDrillPanel` `mainland` mode (diverging gap bars per category).
 - ✅ build + eslint clean.
 
-#### M4b — screenshot capture + verification queue — 🧪 (PR open, `mainland_verification_queue_migration.sql` pending)
+#### M4b — screenshot capture + verification queue — ✅ (verified live 2026-09-03, PR #43)
+
+**Live check:** "File de vérification" lists the pending France entries (Dosette C.N Corse +63.8%, Cassoulet +73.1%, Huile Olive −25.2% [MTQ cheaper], …) with FR/MTQ prices, gap %, "Trouvé en ligne" badge, evidence thumbnail; ✓ validate removes the row (`admin_verify_mainland_match` 200); the "Trouvé en ligne / Capture appli enseigne" toggle is in the add-price form.
+
 - 🧪 `mainland_verification_queue_migration.sql`: `admin_mainland_match_queue(p_limit)` → unverified France rows (product, FR price, latest MTQ price, gap %, channel, evidence url) + `admin_verify_mainland_match(p_price_id uuid, p_ok boolean)` → `p_ok` true = mark verified (+ `match_verified_by`/`_at`), false = delete the row. Both admin-gated.
 - ✅ **screenshot-upload capture** in `MainlandPriceAdmin.jsx`: "Trouvé en ligne" / "Capture appli enseigne" toggle → the latter sets `source_channel='chain_app_screenshot'`, requires the evidence photo, hides `source_url`.
 - ✅ diaspora-scan attribution stamped explicitly in `priceSubmission.js` (`source_channel='diaspora_scan'`).
@@ -181,19 +184,19 @@ France-scan `price_submitted` where `origin_region_code = 'Hexagone'`.
 
 ---
 
-### M5 — "Valeur livrée" section (mission metrics) — ⬜
+### M5 — "Valeur livrée" section (mission metrics) — 🧪 (PR open, `analytics_value_migration.sql` pending)
 
 **Deliverables**
-- ⬜ `analytics_value_migration.sql` (**not yet applied**)
-  - ⬜ `admin_value_delivered(p_since timestamptz)` → weighted MTQ↔Hexagone gap (overall + by
-    category), # products where MTQ cheaper vs dearer, aggregate savings surfaced (server-side
-    port of `userStats.calculateSavingsBreakdown`), BQP-concern count
-- ⬜ dashboard section **"Valeur livrée"** — the *vie chère* headline gap number, front and centre
-- ⬜ surface the real gap in-app: Community → Impact tab (replace/augment "Score de Souveraineté")
+- 🧪 `analytics_value_migration.sql`:
+  - `admin_value_delivered(p_since timestamptz)` (admin) → one row: matched products, **median + weighted (basket) gap %** (Σ(mtq−fr)/Σ(fr)), # MTQ dearer / cheaper, BQP-matched count + BQP median gap, **community savings €** (Σ over Martinique real rows since `p_since` of `max(0, 365d-product-avg − price)` — the community-wide port of `userStats.calculateSavingsBreakdown`) + # contributions under the average.
+  - `community_mainland_gap()` (**public**, aggregate-only, `anon`-safe) → matched products, median gap %, # dearer / cheaper.
+- ✅ dashboard section **"Valeur livrée"** — red gradient card with the weighted gap headline + median + dearer/cheaper/BQP counters + community-savings line (only rendered when `matched_products > 0`).
+- ✅ in-app: Community → **Impact** tab gets an "L'écart « vie chère »" card from `community_mainland_gap()` (isolated try/catch, hidden if the RPC isn't applied or there are no matched pairs) — sits above "Score de Souveraineté", doesn't replace it.
+- ✅ build + eslint clean.
 
 **PostHog counterpart:** `product_detail_viewed` / `recipe_viewed` / `panier_*` engagement.
 
-**Effort:** 1 session.
+**Effort:** 1 session — done 2026-09-03 (pending migration apply + verify).
 
 ---
 

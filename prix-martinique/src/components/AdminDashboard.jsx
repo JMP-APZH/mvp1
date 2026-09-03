@@ -20,7 +20,8 @@ import {
     Download,
     ChevronRight,
     ShieldAlert,
-    HeartPulse
+    HeartPulse,
+    Target
 } from 'lucide-react';
 
 // --- M2a: date-range control ------------------------------------------------
@@ -180,6 +181,8 @@ const AdminDashboard = ({ onClose }) => {
     const [health, setHealth] = useState(null);
     // M4: MTQ↔Hexagone match coverage from admin_mainland_match_coverage.
     const [mainland, setMainland] = useState(null);
+    // M5: "Valeur livrée" mission snapshot from admin_value_delivered.
+    const [value, setValue] = useState(null);
     // M2b: drill-down overlay ('submissions' | 'review' | 'contributors' | 'health' | 'mainland')
     // + the product card opened from a drill row.
     const [drill, setDrill] = useState(null);
@@ -258,6 +261,16 @@ const AdminDashboard = ({ onClose }) => {
         } catch (err) {
             console.error('admin_mainland_match_coverage failed (migration pending?):', err);
             setMainland(null);
+        }
+
+        // --- M5: "Valeur livrée" mission snapshot ---
+        try {
+            const { data: vRows, error: vErr } = await supabase.rpc('admin_value_delivered', { p_since: sinceIso });
+            if (vErr) throw vErr;
+            setValue(Array.isArray(vRows) ? (vRows[0] || null) : vRows);
+        } catch (err) {
+            console.error('admin_value_delivered failed (migration pending?):', err);
+            setValue(null);
         }
 
         // --- sessions / auth (M2b will add a time dimension here) ---
@@ -535,6 +548,45 @@ const AdminDashboard = ({ onClose }) => {
                         <p className="text-[10px] text-gray-400 mt-0.5">marques distributeur</p>
                     </button>
                 </div>
+
+                {/* M5: Valeur livrée -- the mission headline (vie chère gap + savings) */}
+                {value && value.matched_products > 0 && (
+                    <section className="bg-gradient-to-br from-red-600 to-rose-700 rounded-3xl p-6 text-white shadow-lg">
+                        <h3 className="font-bold flex items-center gap-2 mb-4">
+                            <Target className="w-5 h-5" /> Valeur livrée
+                        </h3>
+                        <div className="flex items-end gap-3">
+                            <span className="text-4xl font-black tabular-nums">
+                                {Number(value.weighted_gap_pct) > 0 ? '+' : ''}{value.weighted_gap_pct}%
+                            </span>
+                            <span className="text-rose-100 text-xs leading-tight pb-1">
+                                panier plus cher en Martinique<br />
+                                <span className="text-rose-200">médiane {value.median_gap_pct}% · {value.matched_products} produits appariés</span>
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/20">
+                            <div>
+                                <div className="text-lg font-black tabular-nums">{value.mtq_dearer}</div>
+                                <p className="text-rose-200 text-[10px] uppercase font-bold tracking-wider">Plus chers ici</p>
+                            </div>
+                            <div>
+                                <div className="text-lg font-black tabular-nums">{value.mtq_cheaper}</div>
+                                <p className="text-rose-200 text-[10px] uppercase font-bold tracking-wider">Moins chers ici</p>
+                            </div>
+                            <div>
+                                <div className="text-lg font-black tabular-nums">{value.bqp_matched_products}</div>
+                                <p className="text-rose-200 text-[10px] uppercase font-bold tracking-wider">Dont BQP {value.bqp_median_gap_pct != null ? `· ${value.bqp_median_gap_pct}%` : ''}</p>
+                            </div>
+                        </div>
+                        {Number(value.community_savings_eur) > 0 && (
+                            <p className="text-rose-100 text-[11px] mt-4">
+                                Économies estimées de la communauté sur la période&nbsp;:
+                                <span className="font-black text-white"> {Number(value.community_savings_eur).toFixed(0)} €</span>
+                                {' '}({value.savings_contributions} contributions sous la moyenne)
+                            </p>
+                        )}
+                    </section>
+                )}
 
                 {/* Diaspora -- scans from France (community), separate from admin reference prices */}
                 <section className="bg-blue-600 rounded-3xl p-6 text-white shadow-lg overflow-hidden relative">
