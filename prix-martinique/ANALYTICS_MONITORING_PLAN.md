@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 code complete, PR open, migration pending.
+**Last updated:** 2026-09-03 — M1 ✅ done & verified live (+ fix1). M2 next.
 
 ---
 
@@ -46,7 +46,7 @@ discrepancy is a signal, not a mystery.
 
 ## Milestones
 
-### M1 — Trustworthy numbers + internal-account exclusion (FOUNDATION) — 🧪
+### M1 — Trustworthy numbers + internal-account exclusion (FOUNDATION) — ✅
 
 **Why first:** every other milestone reads these aggregates; also directly fixes the reported
 "the real amount of scanned products isn't displayed" problem (`Total Scans` = raw
@@ -71,15 +71,20 @@ discrepancy is a signal, not a mystery.
   - ✅ "Exclure les comptes internes" toggle, persisted via `localStorage` (`pm_admin_exclude_internal`)
   - ✅ amber banner + "—" fallback when the migration isn't applied yet
 - ✅ CLAUDE.md entry (Sept 3 (3))
+- ✅ **Applied + verified live 2026-09-03** (PR #29). Reconciles exactly: internal OFF → 61 real
+  + 5 test + 10 réf. = 76 (old raw "Total Scans"); 57 priced + 5 test = 62 catalog. Internal ON
+  → 29 real from 5 external contributors (the real adoption picture). No RPC errors.
+- ✅ **fix1** (`analytics_admin_functions_fix1_migration.sql`): `reference_prices` / `test_submissions`
+  are data-quality context, not adoption — no longer filtered by the internal-accounts toggle
+  (were showing "0 réf." / "4 test" when the toggle was on).
 
 **PostHog counterpart:** `price_submitted` count vs `admin_kpi_overview` submissions-in-window
 (expect PostHog ≤ Supabase — PostHog misses pre-consent + any SDK gap).
 
-**Done when:** migration applied; the 4 headline tiles show real, test-excluded, correctly-labelled
-numbers that reconcile with the `Données test` tab and the leaderboard; no client-side full-table
-fetch remains. **Verify live** as admin after applying.
+**Done when:** ✅ migration applied; tiles show real, test-excluded, correctly-labelled numbers
+that reconcile with the `Données test` tab; no client-side full-table fetch remains.
 
-**Effort:** 1 session. — code done 2026-09-03; awaiting migration + live check.
+**Effort:** 1 session — done 2026-09-03 (+ fix1 follow-up).
 
 ---
 
