@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ verified live. M2a 🧪 (PR open, migration pending).
+**Last updated:** 2026-09-03 — M1 ✅. M2a 🧪 (fix2 migration pending — `timestamp` vs `timestamptz`).
 
 ---
 
@@ -91,7 +91,8 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 ### M2 — Time controls, trends, drill-downs, CSV export
 
 #### M2a — date range + trends + CSV + rich Activité Récente — 🧪
-- 🧪 `analytics_admin_export_migration.sql` (**written — NOT YET APPLIED**): `admin_submissions_detail(p_since, p_exclude_internal, p_limit)` — admin-gated joined rows (date, product, price, store, contributor, channel, is_test) from `v_admin_prices`. One fn for both CSV export + Activité Récente.
+- ✅ `analytics_admin_export_migration.sql` — `admin_submissions_detail(p_since, p_exclude_internal, p_limit)` — admin-gated joined rows (date, product, price, store, contributor, channel, is_test) from `v_admin_prices`. One fn for both CSV export + Activité Récente.
+- 🧪 **fix2** (`analytics_admin_functions_fix2_migration.sql`, **NOT YET APPLIED**): `prices.created_at` is `timestamp` (no tz); `admin_price_timeseries` (never live-tested in M1) and `admin_submissions_detail` declared column 1 as `timestamptz` → PostgREST 400 (42804). Recreated both with `(... at time zone 'UTC')` so the API stays `timestamptz` and JS parses it as UTC. No client change.
 - ✅ date-range segmented control (**7 j / 30 j / 90 j / Tout**), persisted (`pm_admin_range`), drives `admin_kpi_overview` `p_since` + the trend
 - ✅ `Sparkline` (dependency-free inline SVG) on Contributions + Contributeurs tiles, gap-filled daily series from `admin_price_timeseries`
 - ✅ badge → "+N · {range}" (hidden for "Tout")
