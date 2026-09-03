@@ -1,7 +1,7 @@
 # Analytics & Monitoring Overhaul — Milestone Plan
 
 **Status legend:** ⬜ not started · 🔄 in progress · 🧪 in review (PR open / migration pending) · ✅ done
-**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 ✅ (verified live, incl. fix1) · M4a 🧪 (PR open, `mainland_match_pipeline_migration.sql` pending). M4b next.
+**Last updated:** 2026-09-03 — M1 ✅ · M2a ✅ · M2b ✅ · M3 ✅ · M4a ✅ (verified live) · M4b 🧪 (PR open, `mainland_verification_queue_migration.sql` pending). M5 next.
 
 ---
 
@@ -153,7 +153,10 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 2. **Screenshot uploads from chains' own shopping apps** (Carrefour, E.Leclerc, Auchan, Système U) — *new capture path*, distinct from "admin found it on the website"
 3. Admin online capture (`source_type='admin_reference'` + `source_url`) — exists
 
-#### M4a — schema + coverage + attribution — 🧪 (PR open, `mainland_match_pipeline_migration.sql` pending)
+#### M4a — schema + coverage + attribution — ✅ (verified live 2026-09-03, PR #42)
+
+**Live check:** "Comparaison France Hexagonale" section — **17.5%** match rate (10/57), **+45.9% median gap** (MTQ vs France; 9 dearer / 1 cheaper), coverage: 0 diaspora / 10 online / 0 screenshot, 10 entrées à vérifier. Drill by category: Sans catégorie +56.9% · Épicerie Salée +36.9% · Épicerie Sucrée +54.9% · Hygiène +45.9%. The ~+46% median MTQ premium is the headline *vie chère* number.
+
 - 🧪 `mainland_match_pipeline_migration.sql`:
   - `prices.source_channel text` check-constrained `('martinique_scan','diaspora_scan','chain_app_screenshot','online_capture')` + index; backfilled from `source_type` + `origin_region_code`.
   - `prices.match_verified boolean` + `match_verified_by uuid` + `match_verified_at timestamptz` (for the M4b queue).
@@ -163,11 +166,12 @@ that reconcile with the `Données test` tab; no client-side full-table fetch rem
 - ✅ dashboard section **"Comparaison France Hexagonale"** — `Meter` match rate + median-gap headline + coverage-by-channel counters + France-without-MTQ / unverified counts; "Détail par catégorie" → `AdminDrillPanel` `mainland` mode (diverging gap bars per category).
 - ✅ build + eslint clean.
 
-#### M4b — screenshot capture + verification queue — ⬜
-- ⬜ `admin_mainland_match_queue(p_limit)` → unverified France rows (product, FR price, MTQ price, gap %, channel, has-evidence) + `admin_verify_mainland_match(p_price_id, p_ok boolean)`.
-- ⬜ **screenshot-upload capture** in `MainlandPriceAdmin.jsx`: "depuis l'app d'une enseigne" source option → screenshot (`evidence_photo_url`, `price-tag-photos`) + chain + `source_channel='chain_app_screenshot'`.
-- ⬜ diaspora-scan attribution stamped explicitly in `priceSubmission.js` (once the column is guaranteed present).
-- ⬜ verification queue UI (extend `MainlandPriceAdmin` or a drill mode with verify/reject).
+#### M4b — screenshot capture + verification queue — 🧪 (PR open, `mainland_verification_queue_migration.sql` pending)
+- 🧪 `mainland_verification_queue_migration.sql`: `admin_mainland_match_queue(p_limit)` → unverified France rows (product, FR price, latest MTQ price, gap %, channel, evidence url) + `admin_verify_mainland_match(p_price_id uuid, p_ok boolean)` → `p_ok` true = mark verified (+ `match_verified_by`/`_at`), false = delete the row. Both admin-gated.
+- ✅ **screenshot-upload capture** in `MainlandPriceAdmin.jsx`: "Trouvé en ligne" / "Capture appli enseigne" toggle → the latter sets `source_channel='chain_app_screenshot'`, requires the evidence photo, hides `source_url`.
+- ✅ diaspora-scan attribution stamped explicitly in `priceSubmission.js` (`source_channel='diaspora_scan'`).
+- ✅ verification queue UI — `AdminDrillPanel` `mainland` mode now has a "File de vérification" section below the gap chart: per-row FR/MTQ prices + gap %, channel badge, evidence thumbnail, ✓ validate / ✗ reject, row → `ProductDetailModal`.
+- ✅ build + eslint clean.
 - ⬜ (stretch) user-facing screenshot upload for diaspora users.
 
 **PostHog counterpart:** `mainland_screenshot_uploaded`, `mainland_match_verified`,

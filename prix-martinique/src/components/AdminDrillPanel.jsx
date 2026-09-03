@@ -6,6 +6,8 @@ import {
     AlertTriangle,
     Loader2,
     Sparkle,
+    Check,
+    XCircle,
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
@@ -358,65 +360,149 @@ const HealthView = () => {
     );
 };
 
-// --- M4: MTQ ↔ Hexagone gap by category -------------------------------------
-const MainlandView = () => {
-    const [rows, setRows] = useState([]);
+// --- M4: MTQ ↔ Hexagone gap by category + verification queue ----------------
+const CHANNEL_LABELS = {
+    diaspora_scan: 'Scan diaspora',
+    chain_app_screenshot: 'Capture appli',
+    online_capture: 'Trouvé en ligne',
+};
+
+const MainlandView = ({ onOpenProduct }) => {
+    const [cats, setCats] = useState([]);
+    const [queue, setQueue] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [acting, setActing] = useState(null); // price_id being verified/rejected
+
+    const loadQueue = useCallback(async () => {
+        const { data, error: err } = await supabase.rpc('admin_mainland_match_queue', { p_limit: 60 });
+        if (err) throw err;
+        setQueue(data || []);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
         (async () => {
             setLoading(true);
             try {
-                const { data, error: err } = await supabase.rpc('admin_mainland_gap_by_category');
-                if (err) throw err;
-                if (!cancelled) { setRows(data || []); setError(false); }
+                const c = await supabase.rpc('admin_mainland_gap_by_category');
+                if (c.error) throw c.error;
+                if (!cancelled) setCats(c.data || []);
+                await loadQueue();
+                if (!cancelled) setError(false);
             } catch (e) {
-                console.error('admin_mainland_gap_by_category failed (migration pending?):', e);
+                console.error('mainland drill failed (migration pending?):', e);
                 if (!cancelled) setError(true);
             } finally {
                 if (!cancelled) setLoading(false);
             }
         })();
         return () => { cancelled = true; };
-    }, []);
+    }, [loadQueue]);
+
+    const act = async (priceId, ok) => {
+        setActing(priceId);
+        try {
+            const { error: err } = await supabase.rpc('admin_verify_mainland_match', { p_price_id: priceId, p_ok: ok });
+            if (err) throw err;
+            setQueue((q) => q.filter((r) => r.price_id !== priceId));
+        } catch (e) {
+            console.error('admin_verify_mainland_match failed:', e);
+        } finally {
+            setActing(null);
+        }
+    };
 
     if (error) return <MigrationNotice />;
     if (loading) return <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-gray-300" /></div>;
 
-    const maxAbs = Math.max(1, ...rows.map((r) => Math.abs(Number(r.median_gap_pct) || 0)));
+    const maxAbs = Math.max(1, ...cats.map((r) => Math.abs(Number(r.median_gap_pct) || 0)));
 
     return (
-        <div className="p-4 space-y-4">
-            <p className="text-[10px] text-gray-400">
-                Écart médian MTQ vs France par catégorie · positif = plus cher en Martinique · {rows.length} catégorie{rows.length > 1 ? 's' : ''} appariée{rows.length > 1 ? 's' : ''}
-            </p>
-            <div className="bg-white border border-gray-100 rounded-3xl p-4 space-y-3">
-                {rows.length === 0 ? (
-                    <p className="text-sm text-gray-400">Aucune paire MTQ↔France appariée pour l'instant.</p>
-                ) : rows.map((r) => {
-                    const gap = Number(r.median_gap_pct) || 0;
-                    const w = (Math.abs(gap) / maxAbs) * 50; // half-width bar around centre
-                    return (
-                        <div key={r.category_id || 'none'}>
-                            <div className="flex items-baseline justify-between gap-2">
-                                <span className="text-xs font-bold text-gray-700">{r.icon || '❓'} {r.category_name || 'Sans catégorie'}</span>
-                                <span className={`text-xs font-black tabular-nums ${gap > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    {gap > 0 ? '+' : ''}{r.median_gap_pct}% · {r.matched_products}
-                                </span>
+        <div className="p-4 space-y-6">
+            {/* Gap by category */}
+            <section>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                    Écart médian par catégorie · + = plus cher en Martinique
+                </h3>
+                <div className="bg-white border border-gray-100 rounded-3xl p-4 space-y-3">
+                    {cats.length === 0 ? (
+                        <p className="text-sm text-gray-400">Aucune paire MTQ↔France appariée pour l'instant.</p>
+                    ) : cats.map((r) => {
+                        const gap = Number(r.median_gap_pct) || 0;
+                        const w = (Math.abs(gap) / maxAbs) * 50;
+                        return (
+                            <div key={r.category_id || 'none'}>
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-xs font-bold text-gray-700">{r.icon || '❓'} {r.category_name || 'Sans catégorie'}</span>
+                                    <span className={`text-xs font-black tabular-nums ${gap > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        {gap > 0 ? '+' : ''}{r.median_gap_pct}% · {r.matched_products}
+                                    </span>
+                                </div>
+                                <div className="mt-1 h-2 rounded-full bg-gray-100 relative overflow-hidden">
+                                    <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gray-300" />
+                                    <div className={`absolute top-0 bottom-0 ${gap > 0 ? 'bg-red-500 left-1/2' : 'bg-green-500 right-1/2'}`} style={{ width: `${w}%` }} />
+                                </div>
                             </div>
-                            <div className="mt-1 h-2 rounded-full bg-gray-100 relative overflow-hidden">
-                                <div className="absolute top-0 bottom-0 left-1/2 w-px bg-gray-300" />
-                                <div
-                                    className={`absolute top-0 bottom-0 ${gap > 0 ? 'bg-red-500 left-1/2' : 'bg-green-500 right-1/2'}`}
-                                    style={{ width: `${w}%` }}
-                                />
+                        );
+                    })}
+                </div>
+            </section>
+
+            {/* Verification queue */}
+            <section>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                    File de vérification · {queue.length} entrée{queue.length > 1 ? 's' : ''} France non vérifiée{queue.length > 1 ? 's' : ''}
+                </h3>
+                <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden">
+                    {queue.length === 0 ? (
+                        <p className="p-4 text-sm text-gray-400">Rien à vérifier. 👍</p>
+                    ) : queue.map((r) => (
+                        <div key={r.price_id} className="flex items-start gap-3 p-4 border-b border-gray-50 last:border-0">
+                            {r.evidence_photo_url && (
+                                <img src={r.evidence_photo_url} alt="preuve" className="w-10 h-10 rounded object-cover border border-gray-200 flex-shrink-0" />
+                            )}
+                            <button
+                                onClick={() => r.product_id && onOpenProduct(r.product_id)}
+                                className="min-w-0 flex-1 text-left"
+                            >
+                                <p className="text-sm font-bold text-gray-900 truncate">{r.product_name}</p>
+                                <p className="text-[11px] text-gray-500">
+                                    <span className="tabular-nums font-semibold text-gray-700">{Number(r.france_price).toFixed(2)} €</span> {r.mainland_chain || 'France'}
+                                    {r.mtq_price != null && (
+                                        <>
+                                            {' vs '}<span className="tabular-nums">{Number(r.mtq_price).toFixed(2)} € MTQ</span>
+                                            {r.gap_pct != null && <span className={`ml-1 font-bold ${Number(r.gap_pct) > 0 ? 'text-red-600' : 'text-green-600'}`}>({Number(r.gap_pct) > 0 ? '+' : ''}{r.gap_pct}%)</span>}
+                                        </>
+                                    )}
+                                    {r.mtq_price == null && <span className="ml-1 text-amber-600">· pas de prix MTQ</span>}
+                                </p>
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 mt-1 inline-block">
+                                    {CHANNEL_LABELS[r.source_channel] || r.source_channel}
+                                </span>
+                            </button>
+                            <div className="flex gap-1 flex-shrink-0">
+                                <button
+                                    onClick={() => act(r.price_id, true)}
+                                    disabled={acting === r.price_id}
+                                    title="Valider"
+                                    className="p-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-40"
+                                >
+                                    <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => act(r.price_id, false)}
+                                    disabled={acting === r.price_id}
+                                    title="Rejeter (supprime l'entrée)"
+                                    className="p-1.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
+                                >
+                                    <XCircle className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
-                    );
-                })}
-            </div>
+                    ))}
+                </div>
+            </section>
         </div>
     );
 };
@@ -441,7 +527,7 @@ const AdminDrillPanel = ({ mode, since, rangeLabel, excludeInternal, onClose, on
             {mode === 'health' ? (
                 <HealthView />
             ) : mode === 'mainland' ? (
-                <MainlandView />
+                <MainlandView onOpenProduct={onOpenProduct} />
             ) : mode === 'contributors' ? (
                 <ContributorsView excludeInternal={excludeInternal} />
             ) : (
