@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     BarChart3,
     Users,
@@ -7,7 +7,6 @@ import {
     ChevronRight,
     Activity,
     ArrowUpRight,
-    ArrowDownRight,
     ShieldCheck,
     MapPin,
     X,
@@ -69,16 +68,20 @@ const BreakdownBar = ({ title, segments }) => {
 
 const AdminDashboard = ({ onClose }) => {
     const [subTab, setSubTab] = useState('overview'); // 'overview' | 'complete' | 'mainland' | 'recipes' | 'suggestions' | 'testdata'
+
+    // M1: founder / test / family accounts are excluded from adoption metrics by
+    // default. Persisted per admin so the toggle sticks across sessions.
+    const [excludeInternal, setExcludeInternal] = useState(() => {
+        try { return localStorage.getItem('pm_admin_exclude_internal') !== 'false'; } catch { return true; }
+    });
+    // Correctly-scoped headline numbers from the admin_kpi_overview RPC
+    // (analytics_admin_functions_migration.sql). null until loaded; kpiError
+    // means the migration isn't applied yet -- the dashboard still renders,
+    // showing "—" for the filtered figures.
+    const [kpi, setKpi] = useState(null);
+    const [kpiError, setKpiError] = useState(false);
     const [stats, setStats] = useState({
-        totalScans: 0,
-        uniqueUsers: 0,
-        uniqueProducts: 0,
-        diasporaScans: 0,
-        mddProducts: 0,
-        scansThisWeek: 0,
-        activeUsersThisWeek: 0,
-        topStores: [],
-        diasporaRegions: [],
+        catalogProducts: 0,     // count(*) products, all -- context for "produits avec prix"
         recentActivity: [],
         platformCounts: {},
         displayModeCounts: {},
@@ -86,114 +89,70 @@ const AdminDashboard = ({ onClose }) => {
     });
     const [, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchAdminStats();
-    }, []);
-
-    const fetchAdminStats = async () => {
+    const fetchAdminStats = useCallback(async () => {
         setLoading(true);
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        // --- M1: correctly-scoped headline KPIs (server-side, admin-gated RPC) ---
         try {
-            // 1. Total Scans
-            const { count: totalScans } = await supabase
-                .from('prices')
-                .select('*', { count: 'exact', head: true });
+            const { data: kpiRows, error: kErr } = await supabase.rpc('admin_kpi_overview', {
+                p_since: since,
+                p_exclude_internal: excludeInternal,
+            });
+            if (kErr) throw kErr;
+            setKpi(Array.isArray(kpiRows) ? (kpiRows[0] || null) : kpiRows);
+            setKpiError(false);
+        } catch (err) {
+            console.error('admin_kpi_overview failed (migration pending?):', err);
+            setKpi(null);
+            setKpiError(true);
+        }
 
-            // 2. Unique Users (from prices)
-            const { data: userData } = await supabase
-                .from('prices')
-                .select('user_id');
-            const uniqueUsers = new Set(userData?.map(u => u.user_id)).size;
+        // --- concerns M2 will rework (sessions / auth / recent activity) ---
+        try {
+            const { count: catalogProducts } = await supabase
+                .from('products').select('*', { count: 'exact', head: true });
 
-            // 2b. Real weekly activity (replaces hardcoded trend badges)
-            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-            const { data: recentRows } = await supabase
-                .from('prices')
-                .select('user_id')
-                .gte('created_at', sevenDaysAgo);
-            const scansThisWeek = recentRows?.length || 0;
-            const activeUsersThisWeek = new Set((recentRows || []).map(r => r.user_id).filter(Boolean)).size;
-
-            // 3. Unique Products
-            const { count: uniqueProducts } = await supabase
-                .from('products')
-                .select('*', { count: 'exact', head: true });
-
-            // 4. Diaspora Scans
-            const { count: diasporaScans } = await supabase
-                .from('prices')
-                .select('*', { count: 'exact', head: true })
-                .eq('origin_region_code', 'Hexagone');
-
-            // 5. MDD Products
-            const { count: mddProducts } = await supabase
-                .from('products')
-                .select('*', { count: 'exact', head: true })
-                .eq('is_mdd', true);
-
-            // 6. Diaspora Regions (summary of where scans come from)
-            const { data: regionData } = await supabase
-                .from('prices')
-                .select('origin_region_code')
-                .not('origin_region_code', 'is', null);
-
-            const regionCounts = (regionData || []).reduce((acc, curr) => {
-                if (curr.origin_region_code) {
-                    acc[curr.origin_region_code] = (acc[curr.origin_region_code] || 0) + 1;
-                }
-                return acc;
-            }, {});
-
-            // 7. Activity by store
-            const { data: activity } = await supabase
-                .from('prices')
-                .select('stores(name)')
-                .order('created_at', { ascending: false })
-                .limit(5);
-
-            // 8. Device platform + PWA-install breakdown (one row per browser-tab
-            // session, logged by utils/sessionTracking.js on every app load)
             const { data: sessionData } = await supabase
-                .from('app_sessions')
-                .select('device_platform, display_mode');
+                .from('app_sessions').select('device_platform, display_mode');
             const platformCounts = (sessionData || []).reduce((acc, s) => {
-                acc[s.device_platform] = (acc[s.device_platform] || 0) + 1;
-                return acc;
+                acc[s.device_platform] = (acc[s.device_platform] || 0) + 1; return acc;
             }, {});
             const displayModeCounts = (sessionData || []).reduce((acc, s) => {
-                acc[s.display_mode] = (acc[s.display_mode] || 0) + 1;
-                return acc;
+                acc[s.display_mode] = (acc[s.display_mode] || 0) + 1; return acc;
             }, {});
 
-            // 9. Sign-in method breakdown (one row per genuine sign-in, logged by
-            // logAuthEvent() in AuthContext.jsx)
-            const { data: authEventData } = await supabase
-                .from('auth_events')
-                .select('provider');
+            const { data: authEventData } = await supabase.from('auth_events').select('provider');
             const authMethodCounts = (authEventData || []).reduce((acc, a) => {
-                acc[a.provider] = (acc[a.provider] || 0) + 1;
-                return acc;
+                acc[a.provider] = (acc[a.provider] || 0) + 1; return acc;
             }, {});
+
+            const { data: activity } = await supabase
+                .from('prices').select('stores(name)')
+                .order('created_at', { ascending: false }).limit(5);
 
             setStats({
-                totalScans: totalScans || 0,
-                uniqueUsers: uniqueUsers || 0,
-                uniqueProducts: uniqueProducts || 0,
-                diasporaScans: diasporaScans || 0,
-                mddProducts: mddProducts || 0,
-                scansThisWeek,
-                activeUsersThisWeek,
-                topStores: [],
-                diasporaRegions: Object.entries(regionCounts).map(([code, count]) => ({ code, count })),
+                catalogProducts: catalogProducts || 0,
                 recentActivity: activity || [],
-                platformCounts,
-                displayModeCounts,
-                authMethodCounts
+                platformCounts, displayModeCounts, authMethodCounts,
             });
         } catch (err) {
             console.error('Error fetching admin stats:', err);
         } finally {
             setLoading(false);
         }
+    }, [excludeInternal]);
+
+    useEffect(() => {
+        fetchAdminStats();
+    }, [fetchAdminStats]);
+
+    const toggleExcludeInternal = () => {
+        setExcludeInternal(prev => {
+            const next = !prev;
+            try { localStorage.setItem('pm_admin_exclude_internal', String(next)); } catch { /* ignore */ }
+            return next;
+        });
     };
 
     return (
@@ -303,17 +262,43 @@ const AdminDashboard = ({ onClose }) => {
                 </div>
             ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Main KPIs */}
+                {kpiError && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-[11px] text-amber-800 leading-relaxed">
+                        Chiffres filtrés indisponibles — la migration <code className="font-mono">analytics_admin_functions_migration.sql</code> n'est pas encore appliquée.
+                        Les tuiles affichent « — » en attendant. (Onglet « Données test » : {stats.catalogProducts} produits au catalogue.)
+                    </div>
+                )}
+
+                {/* Scope controls */}
+                <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            checked={excludeInternal}
+                            onChange={toggleExcludeInternal}
+                            className="rounded border-gray-300"
+                        />
+                        Exclure les comptes internes (équipe / tests)
+                    </label>
+                    <span className="text-[10px] text-gray-400 uppercase tracking-wider">7 derniers jours</span>
+                </div>
+
+                {/* Main KPIs -- correctly scoped (real user contributions only) */}
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
                         <div className="bg-blue-100 w-10 h-10 rounded-2xl flex items-center justify-center text-blue-600 mb-3">
                             <Activity className="w-5 h-5" />
                         </div>
-                        <div className="text-2xl font-black text-gray-900">{stats.totalScans}</div>
-                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total Scans</p>
-                        {stats.scansThisWeek > 0 && (
+                        <div className="text-2xl font-black text-gray-900">{kpi ? kpi.real_submissions : '—'}</div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Contributions de prix</p>
+                        {kpi && (kpi.test_submissions > 0 || kpi.reference_prices > 0) && (
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                                exclus&nbsp;: {kpi.test_submissions} test · {kpi.reference_prices} réf. en ligne
+                            </p>
+                        )}
+                        {kpi && kpi.submissions_in_window > 0 && (
                             <div className="mt-2 flex items-center gap-1 text-green-600 text-[10px] font-bold">
-                                <ArrowUpRight className="w-3 h-3" /> +{stats.scansThisWeek} cette semaine
+                                <ArrowUpRight className="w-3 h-3" /> +{kpi.submissions_in_window} cette semaine
                             </div>
                         )}
                     </div>
@@ -321,11 +306,12 @@ const AdminDashboard = ({ onClose }) => {
                         <div className="bg-purple-100 w-10 h-10 rounded-2xl flex items-center justify-center text-purple-600 mb-3">
                             <Users className="w-5 h-5" />
                         </div>
-                        <div className="text-2xl font-black text-gray-900">{stats.uniqueUsers}</div>
-                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Utilisateurs Actifs</p>
-                        {stats.activeUsersThisWeek > 0 && (
+                        <div className="text-2xl font-black text-gray-900">{kpi ? kpi.distinct_contributors : '—'}</div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Contributeurs</p>
+                        {excludeInternal && <p className="text-[10px] text-gray-400 mt-0.5">hors équipe</p>}
+                        {kpi && kpi.contributors_in_window > 0 && (
                             <div className="mt-2 flex items-center gap-1 text-green-600 text-[10px] font-bold">
-                                <ArrowUpRight className="w-3 h-3" /> +{stats.activeUsersThisWeek} cette semaine
+                                <ArrowUpRight className="w-3 h-3" /> +{kpi.contributors_in_window} cette semaine
                             </div>
                         )}
                     </div>
@@ -333,43 +319,46 @@ const AdminDashboard = ({ onClose }) => {
                         <div className="bg-green-100 w-10 h-10 rounded-2xl flex items-center justify-center text-green-600 mb-3">
                             <Package className="w-5 h-5" />
                         </div>
-                        <div className="text-2xl font-black text-gray-900">{stats.uniqueProducts}</div>
-                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Produits Uniques</p>
+                        <div className="text-2xl font-black text-gray-900">{kpi ? kpi.real_products_priced : '—'}</div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Produits avec prix</p>
+                        {kpi && (
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                                {stats.catalogProducts} au catalogue · {kpi.test_products} test
+                            </p>
+                        )}
                     </div>
                     <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
                         <div className="bg-orange-100 w-10 h-10 rounded-2xl flex items-center justify-center text-orange-600 mb-3">
                             <Store className="w-5 h-5" />
                         </div>
-                        <div className="text-2xl font-black text-gray-900">{stats.mddProducts}</div>
-                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Produits MDD</p>
+                        <div className="text-2xl font-black text-gray-900">{kpi ? kpi.mdd_priced_products : '—'}</div>
+                        <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Produits MDD avec prix</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">marques distributeur</p>
                     </div>
                 </div>
 
-                {/* Diaspora Watch */}
+                {/* Diaspora -- scans from France (community), separate from admin reference prices */}
                 <section className="bg-blue-600 rounded-3xl p-6 text-white shadow-lg overflow-hidden relative">
                     <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold flex items-center gap-2">
-                                <MapPin className="w-5 h-5" /> Diaspora Watch
-                            </h3>
-                            <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Live Tracking</span>
-                        </div>
+                        <h3 className="font-bold flex items-center gap-2 mb-4">
+                            <MapPin className="w-5 h-5" /> Diaspora — scans depuis la France
+                        </h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <div className="text-3xl font-black">{stats.diasporaScans}</div>
-                                <p className="text-blue-100 text-[10px] uppercase font-bold tracking-widest mt-1">Total Scans Diaspora</p>
+                                <div className="text-3xl font-black">{kpi ? kpi.diaspora_scan_submissions : '—'}</div>
+                                <p className="text-blue-100 text-[10px] uppercase font-bold tracking-widest mt-1">Scans communauté diaspora</p>
                             </div>
-                            <div className="space-y-2">
-                                {stats.diasporaRegions.slice(0, 3).map((reg, i) => (
-                                    <div key={i} className="flex items-center justify-between text-[10px]">
-                                        <span className="font-bold opacity-80">{reg.code === 'Hexagone' ? 'France Hex.' : reg.code}</span>
-                                        <span className="bg-white/20 px-2 rounded-full font-black">{reg.count}</span>
-                                    </div>
-                                ))}
+                            <div>
+                                <div className="text-3xl font-black">{kpi ? kpi.diaspora_contributors : '—'}</div>
+                                <p className="text-blue-100 text-[10px] uppercase font-bold tracking-widest mt-1">Contributeurs diaspora</p>
                             </div>
                         </div>
+                        {kpi && kpi.reference_prices > 0 && (
+                            <p className="text-blue-100 text-[10px] mt-4 leading-relaxed">
+                                + {kpi.reference_prices} prix de référence France saisis manuellement (hors scans) — voir l'onglet « Prix France Hexagonale ».
+                            </p>
+                        )}
                     </div>
-                    {/* Decorative Map Pattern could go here */}
                     <Activity className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 rotate-12" />
                 </section>
 

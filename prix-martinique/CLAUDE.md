@@ -768,6 +768,16 @@ PR #26 (cookieless) merged and auto-deployed — then the post-deploy capture ch
 - **If `build.env` still doesn't take** (Vercel can be finicky): add `VITE_POSTHOG_KEY` + `VITE_POSTHOG_HOST` as Vercel **Dashboard** → Environment Variables (Production + Preview), exactly like the Supabase vars, and drop the `vercel.json` block. Verify post-deploy by grepping the built bundle for `phc_`.
 - **Verified live 2026-09-03** (PR #27 merged + auto-deployed): production bundle now contains `phc_…` + `eu.i.posthog.com`; `posthog.init()` runs (loads remote config + exception-autocapture); events POST to `/i/v0/e/` (HTTP 200) and land in the raw `events` table — `$pageview`, `$pageleave`, `$autocapture`, `store_wizard_step_viewed`, all `host = prix-martinique.org`. Cookieless confirmed (no cookies, no `__ph_*` localStorage). **First production capture in the project's history.** `build.env` worked — the Dashboard fallback wasn't needed.
 
+### Sept 3, 2026 (3) — Analytics & Monitoring Overhaul (multi-milestone; plan tracked in `ANALYTICS_MONITORING_PLAN.md`)
+Strategic review of the Admin Dashboard + PostHog after the launch-stats work. Findings and the 6-milestone plan live in **`ANALYTICS_MONITORING_PLAN.md`** (checkbox-tracked). Headline problem: `AdminDashboard.jsx`'s `fetchAdminStats()` reports **raw `count(*)`** with no scoping — "Total Scans" (76) mixes real user submissions + test data (`products.is_test_data`) + admin-entered France Hexagonale reference prices (`source_type='admin_reference'`) + legacy null-user rows, so it isn't "real prices from real users". Also: it counts `user_id` (client-set, spoofable, null for legacy) instead of the server-stamped `submitted_by`; 6 derived stats `.select()` full tables client-side and silently cap at Supabase's 1000-row default; the app shows users a *different* filtered number ("N prix partagés"). Guiding principle for the overhaul: **Admin Dashboard = exact business + data-health truth (Supabase, consent-independent); PostHog = behavioral depth + independent cross-check** — and because PostHog is now cookieless (`person_profiles: 'never'`), all user-level retention/cohort analysis is **Supabase-only**.
+
+- **M1 (foundation, in progress)** — `analytics_admin_functions_migration.sql` (admin-gated `SECURITY DEFINER` RPCs for every KPI, correctly scoped: `is_test_data=false`, `scan` vs `admin_reference` split, `coalesce(submitted_by,user_id)`, exclude-internal toggle) + `AdminDashboard.jsx` rework (relabel "Contributions de prix" / "Contributeurs", real/test/reference sub-lines, fix Diaspora Watch, kill client-side full-table fetches).
+- **M2** date-range + trends + drill-downs + wire the dead "Exporter CSV" / "Modérer Prix" buttons + upgrade "Activité Récente".
+- **M3** "Santé des données" section (freshness, store/category/BQP coverage, gaps).
+- **M4** Martinique ↔ France Hexagonale matching pipeline — coverage tracker + **screenshot-upload capture from chains' own apps** (`source_channel='chain_app_screenshot'`) alongside diaspora real scans + admin online capture; verification queue.
+- **M5** "Valeur livrée" section — the *vie chère* headline gap (MTQ↔Hexagone), aggregate savings.
+- **M6** PostHog ↔ Admin cross-check layer — instrumentation gaps, `METRIC_CATALOG.md`, curated PostHog dashboards (928161 / 862895) so each admin KPI has a PostHog counterpart.
+
 ---
 
 ## Open Items
@@ -804,8 +814,11 @@ _Refreshed 2026-09-01. Ordered roughly by urgency given the Sept 1, 2026 launch.
 8. **Quagga → `@ericblade/quagga2`** — CVE mitigation / potential scanner rework. Requires physical iOS testing. Direction TBD. See "Accepted Risks & Frozen Dependencies" above.
 9. **Panier `products.category_id` write RLS** — resolved empirically as "no new policy needed" (Aug 5), only tested against one account (`JMP2_972`). Confirm from a second ordinary account if it looks flaky.
 
+### In progress (multi-milestone)
+10. **Analytics & Monitoring Overhaul** — Admin Dashboard + PostHog made accurate and cross-checking. 6 milestones, checkbox-tracked in **`ANALYTICS_MONITORING_PLAN.md`**. M1 (trustworthy numbers + server-side RPCs + internal-account exclusion) in progress. See the Sept 3 (3) changelog entry.
+
 ### Migration-header reconciliation (bookkeeping)
-10. Two `.sql` file headers disagree with this changelog's body — reconcile when convenient:
+11. Two `.sql` file headers disagree with this changelog's body — reconcile when convenient:
     - `product_test_flag_migration.sql` header says "NOT YET APPLIED (2026-07-28)"; the Jul 28 entry documents it applied the same day. **Body is believed correct (applied).**
     - `product_favorite_counts_migration.sql` header says "APPLIED … 2026-07-28"; the Jul 28 "Prix Recherchés" entry calls it "not yet applied". **Header is believed correct (applied)** — confirm and update the entry's inline note.
 
