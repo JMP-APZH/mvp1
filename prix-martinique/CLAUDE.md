@@ -766,7 +766,7 @@ PR #26 (cookieless) merged and auto-deployed — then the post-deploy capture ch
 - **Why**: `vercel.json`'s top-level `"env"` block injects vars into **Serverless Function runtime**, not the **build**. Vite inlines `import.meta.env.VITE_*` at *build* time from `process.env`, so `VITE_POSTHOG_KEY` was never available when `vite build` ran. It's been in the wrong place since it was added (Jul 26). **This — not the consent gate — is the primary reason PostHog captured nothing from any deployed domain, ever.** (The Aug 29 consent gate would also have blocked it; removing it in PR #26 was still correct, just insufficient alone.)
 - **Fix** (branch `fix/posthog-env-build`): moved the two vars from `"env"` to `"build": { "env": {...} }` in `vercel.json` (the PostHog project key is a public, write-only client token — safe to commit, and it already was). Added a `console.warn` in `posthogClient.js` when `VITE_POSTHOG_KEY` is missing in a `PROD` build, so this failure mode is never silent again.
 - **If `build.env` still doesn't take** (Vercel can be finicky): add `VITE_POSTHOG_KEY` + `VITE_POSTHOG_HOST` as Vercel **Dashboard** → Environment Variables (Production + Preview), exactly like the Supabase vars, and drop the `vercel.json` block. Verify post-deploy by grepping the built bundle for `phc_`.
-- **Still to do after this deploys**: re-run the capture check (bundle contains `phc_`, an event lands in the raw `events` table).
+- **Verified live 2026-09-03** (PR #27 merged + auto-deployed): production bundle now contains `phc_…` + `eu.i.posthog.com`; `posthog.init()` runs (loads remote config + exception-autocapture); events POST to `/i/v0/e/` (HTTP 200) and land in the raw `events` table — `$pageview`, `$pageleave`, `$autocapture`, `store_wizard_step_viewed`, all `host = prix-martinique.org`. Cookieless confirmed (no cookies, no `__ph_*` localStorage). **First production capture in the project's history.** `build.env` worked — the Dashboard fallback wasn't needed.
 
 ---
 
@@ -786,30 +786,30 @@ _Refreshed 2026-09-01. Ordered roughly by urgency given the Sept 1, 2026 launch.
 - ✅ **Repo cleanup** — stray `nul` deleted; `.gitignore` ignores `*.pdf` + `nul`.
 - ✅ **All three pending migrations applied** (`recipes_photo_urls`, `display_name_google_oauth_fix`, `analytics_tracking`) + both QA cleanup rows.
 - ✅ **Supabase Pro** active (automated backups on). Headroom checked — comfortable for a launch spike.
-- ✅ **`dev` → `main` current** through PR #23 (Sept 1). Aug work via PRs #14–#20; this session's via #21, #20, #22, #23.
+- ✅ **`dev` → `main` current** through PR #27 (Sept 3). Aug work via PRs #14–#20; this session's via #21, #20, #22, #23, #26 (cookieless), #27 (env-var build fix).
+- ✅ **PostHog captures on production — verified live 2026-09-03** (Sept 3 + Sept 3 (2) entries). Was blind for 14 months: the Aug 29 consent gate **and** `VITE_POSTHOG_KEY` never reaching the Vite build. Both fixed (PRs #26 + #27); events now land in the raw `events` table from `prix-martinique.org`. Cookieless / consent-exempt. Launch dashboard: PostHog project 232864, dashboard **928161** ("Product Analytics" companion: **862895**). Aug 31 → Sept 3 is an unrecoverable gap in PostHog (nothing was ever emitted); that window lives in Supabase `app_sessions` / `auth_events` (Console Admin → "Appareils & Connexion").
 
 ### Launch-blocking / do before the announcement
-1. **Confirm PostHog captures on production.** Two causes found and fixed: the Aug 29 consent gate (removed in PR #26, cookieless, Sept 3) **and** — the real one — `VITE_POSTHOG_KEY` never reaching the Vite build, so `posthog.init()` has never run in production (`fix/posthog-env-build`, Sept 3 (2): moved to `vercel.json` `build.env`). After that PR deploys: grep the built `/assets/index-*.js` for `phc_` (must be present), then load `prix-martinique.org`, take an action, confirm an event lands in the raw `events` table (first real production capture this project will have). Consent-independent signup/session data still lives in Supabase `auth_events` / `app_sessions` (Console Admin → "Appareils & Connexion"). Launch monitoring dashboard: PostHog project 232864, dashboard **928161** ("Product Analytics" companion: **862895**).
-2. **One real end-to-end auth pass on `prix-martinique.org`** — Google sign-in, email/password sign-in, password-reset (confirm the reset link lands on the apex, not `*.vercel.app`).
+1. **One real end-to-end auth pass on `prix-martinique.org`** — Google sign-in, email/password sign-in, password-reset (confirm the reset link lands on the apex, not `*.vercel.app`).
 
 ### Hardening / follow-through (launch week, not hard blockers)
-3. **CSP enforce.** Fonts allowance done; still need one real iOS Safari test with the scanner running (camera + WASM + Quagga workers), then flip off `Report-Only`.
-4. **Storage RLS** (optional — not touched on launch day). Both buckets have a `public` INSERT policy (anonymous direct uploads, bypassing the app's sign-in gate) and a broad SELECT policy (anyone can enumerate every file). The app only uploads as an authenticated user and reads by known URL, so tightening INSERT → `authenticated` and dropping the list policy is safe. Jean-Marie's call.
-5. **Realtime 500-connection ceiling.** The live price feed opens a realtime channel per visitor; at ~500 simultaneous users new subs are refused and the feed stops live-updating (page still works). Watch during a big RPPRAC push.
-6. **`delete-user-account` Edge Function** — deployed live Aug 29 (2), not tracked/reproducible from this repo (no Supabase CLI here). Source at `supabase/functions/delete-user-account/index.ts`; keep in sync if the deletion flow changes.
+2. **CSP enforce.** Fonts allowance done; still need one real iOS Safari test with the scanner running (camera + WASM + Quagga workers), then flip off `Report-Only`.
+3. **Storage RLS** (optional — not touched on launch day). Both buckets have a `public` INSERT policy (anonymous direct uploads, bypassing the app's sign-in gate) and a broad SELECT policy (anyone can enumerate every file). The app only uploads as an authenticated user and reads by known URL, so tightening INSERT → `authenticated` and dropping the list policy is safe. Jean-Marie's call.
+4. **Realtime 500-connection ceiling.** The live price feed opens a realtime channel per visitor; at ~500 simultaneous users new subs are refused and the feed stops live-updating (page still works). Watch during a big RPPRAC push.
+5. **`delete-user-account` Edge Function** — deployed live Aug 29 (2), not tracked/reproducible from this repo (no Supabase CLI here). Source at `supabase/functions/delete-user-account/index.ts`; keep in sync if the deletion flow changes.
 
 ### Known bugs / deferred, no fix in progress
-7. **iOS camera re-prompt on every scan.** The duplicate-mount fix (Aug 28 (6)) needs a real-device re-test. The larger fix — keeping the camera stream alive across scan-close/reopen cycles — is still not attempted (fragile, hard-won scanner pipeline; also a UX/privacy tradeoff).
-8. **Second geolocation prompt after the OAuth full-page redirect.** The persist/resume fix (Aug 28 (2)) mitigates the lost-submission symptom but `StoreSelectionWizard` still mounts for one render before restore. Possibly compounded by an iOS PWA cold-launch quirk. Re-check on the next real-device pass.
-9. **Quagga → `@ericblade/quagga2`** — CVE mitigation / potential scanner rework. Requires physical iOS testing. Direction TBD. See "Accepted Risks & Frozen Dependencies" above.
-10. **Panier `products.category_id` write RLS** — resolved empirically as "no new policy needed" (Aug 5), only tested against one account (`JMP2_972`). Confirm from a second ordinary account if it looks flaky.
+6. **iOS camera re-prompt on every scan.** The duplicate-mount fix (Aug 28 (6)) needs a real-device re-test. The larger fix — keeping the camera stream alive across scan-close/reopen cycles — is still not attempted (fragile, hard-won scanner pipeline; also a UX/privacy tradeoff).
+7. **Second geolocation prompt after the OAuth full-page redirect.** The persist/resume fix (Aug 28 (2)) mitigates the lost-submission symptom but `StoreSelectionWizard` still mounts for one render before restore. Possibly compounded by an iOS PWA cold-launch quirk. Re-check on the next real-device pass.
+8. **Quagga → `@ericblade/quagga2`** — CVE mitigation / potential scanner rework. Requires physical iOS testing. Direction TBD. See "Accepted Risks & Frozen Dependencies" above.
+9. **Panier `products.category_id` write RLS** — resolved empirically as "no new policy needed" (Aug 5), only tested against one account (`JMP2_972`). Confirm from a second ordinary account if it looks flaky.
 
 ### Migration-header reconciliation (bookkeeping)
-11. Two `.sql` file headers disagree with this changelog's body — reconcile when convenient:
+10. Two `.sql` file headers disagree with this changelog's body — reconcile when convenient:
     - `product_test_flag_migration.sql` header says "NOT YET APPLIED (2026-07-28)"; the Jul 28 entry documents it applied the same day. **Body is believed correct (applied).**
     - `product_favorite_counts_migration.sql` header says "APPLIED … 2026-07-28"; the Jul 28 "Prix Recherchés" entry calls it "not yet applied". **Header is believed correct (applied)** — confirm and update the entry's inline note.
 
 ---
 **Last Updated**: 2026-09-03
 **Current Version**: MVP v1.5 (App10)
-**Status**: Launched (Sept 1, 2026). Live on `https://prix-martinique.org`; Google sign-in branded + verified; `/privacy` + `/terms` live; submission rate-limiting + storage limits in place. `main` current through PR #23; `feat/posthog-cookieless` (Sept 3, cookieless analytics) awaiting PR. Before the RPPRAC announcement: confirm PostHog captures on prod once that deploys + one real end-to-end auth pass (Open Items #1–2).
+**Status**: Launched (Sept 1, 2026). Live on `https://prix-martinique.org`; Google sign-in branded + verified; `/privacy` + `/terms` live; submission rate-limiting + storage limits in place. **PostHog now captures on production** (cookieless / consent-exempt — PRs #26 + #27, verified Sept 3). `main` current through PR #27. Before the RPPRAC announcement: one real end-to-end auth pass on the apex (Open Item #1).
