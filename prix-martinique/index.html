@@ -1,9 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- The app is French. Browser auto-translate (Chrome "Translate this page")
+         rewrites text nodes out from under React, which then crashes on
+         insertBefore/removeChild ("node ... is not a child of this node") and
+         white-screens behind the error boundary — seen in production on Chrome.
+         Opt the whole document out of machine translation. -->
+    <meta name="google" content="notranslate" />
 
     <!-- Added for the PWA icon - Start -->
     <link rel="manifest" href="/manifest.json" />
@@ -23,7 +30,7 @@
     <title>Prix Martinique</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" translate="no" class="notranslate"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

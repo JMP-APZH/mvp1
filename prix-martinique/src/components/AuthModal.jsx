@@ -14,16 +14,20 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [errorKind, setErrorKind] = useState(null); // null | 'unconfirmed' | 'credentials'
+  const [resendLoading, setResendLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
   const [legalModal, setLegalModal] = useState(null); // null | 'privacy' | 'legal'
 
-  const { signIn, signUp, signInWithGoogle, resetPasswordForEmail, updatePassword } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPasswordForEmail, resendConfirmation, updatePassword } = useAuth();
+
+  const clearError = () => { setError(null); setErrorKind(null); };
 
   // Sync mode when modal is opened with a specific initialMode (e.g. password recovery)
   useEffect(() => {
     if (isOpen) {
       setMode(initialMode);
-      setError(null);
+      clearError();
       setSuccessMessage(null);
     }
   }, [isOpen, initialMode]);
@@ -35,7 +39,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
     setDisplayName('');
     setRegionCode('972');
     setCity('');
-    setError(null);
+    clearError();
     setSuccessMessage(null);
   };
 
@@ -47,7 +51,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    clearError();
     setSuccessMessage(null);
 
     try {
@@ -92,24 +96,48 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
       console.error('Auth error:', err);
       // Translate common Supabase errors to French
       let errorMessage = err.message;
+      let kind = null;
       if (err.message.includes('Invalid login credentials')) {
         errorMessage = 'Email ou mot de passe incorrect';
+        kind = 'credentials';
       } else if (err.message.includes('Email not confirmed')) {
         errorMessage = 'Veuillez confirmer votre email avant de vous connecter';
+        kind = 'unconfirmed';
       } else if (err.message.includes('User already registered')) {
         errorMessage = 'Un compte existe deja avec cet email';
       } else if (err.message.includes('Password should be at least')) {
         errorMessage = 'Le mot de passe doit contenir au moins 6 caracteres';
       }
       setError(errorMessage);
+      setErrorKind(kind);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleResendConfirmation = async () => {
+    setResendLoading(true);
+    try {
+      const { error } = await resendConfirmation(email);
+      if (error) throw error;
+      clearError();
+      setSuccessMessage(`Un nouvel email de confirmation a été envoyé à ${email}. Pensez à vérifier vos spams.`);
+    } catch (err) {
+      console.error('Resend confirmation error:', err);
+      setError(
+        err.message?.includes('rate limit') || err.message?.includes('security purposes')
+          ? 'Trop de tentatives. Patientez quelques minutes avant de réessayer.'
+          : "Impossible d'envoyer l'email pour le moment. Réessayez plus tard."
+      );
+      setErrorKind(null);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
       const { error } = await signInWithGoogle();
       if (error) throw error;
@@ -155,7 +183,28 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{error}</p>
+              <div className="text-sm text-red-700">
+                <p>{error}</p>
+                {errorKind === 'unconfirmed' && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={resendLoading || !email}
+                    className="mt-2 font-medium text-red-800 underline disabled:opacity-50 disabled:no-underline"
+                  >
+                    {resendLoading ? 'Envoi…' : "Renvoyer l'email de confirmation"}
+                  </button>
+                )}
+                {errorKind === 'credentials' && (
+                  <button
+                    type="button"
+                    onClick={() => { setMode('forgot_password'); clearError(); setSuccessMessage(null); }}
+                    className="mt-2 font-medium text-red-800 underline"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -313,7 +362,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
                   <div className="text-right mt-1">
                     <button
                       type="button"
-                      onClick={() => { setMode('forgot_password'); setError(null); setSuccessMessage(null); }}
+                      onClick={() => { setMode('forgot_password'); clearError(); setSuccessMessage(null); }}
                       className="text-sm text-orange-600 hover:underline py-2 px-1 min-h-[44px] inline-flex items-center"
                     >
                       Mot de passe oublié ?
@@ -380,7 +429,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
               <>
                 Pas encore de compte?{' '}
                 <button
-                  onClick={() => { setMode('signup'); setError(null); setSuccessMessage(null); }}
+                  onClick={() => { setMode('signup'); clearError(); setSuccessMessage(null); }}
                   className="text-orange-600 font-medium hover:underline"
                 >
                   Creer un compte
@@ -390,7 +439,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
               <>
                 Deja un compte?{' '}
                 <button
-                  onClick={() => { setMode('signin'); setError(null); setSuccessMessage(null); }}
+                  onClick={() => { setMode('signin'); clearError(); setSuccessMessage(null); }}
                   className="text-orange-600 font-medium hover:underline"
                 >
                   Se connecter
@@ -398,7 +447,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signin' }) => {
               </>
             ) : (mode === 'forgot_password' || mode === 'set_password') ? (
               <button
-                onClick={() => { setMode('signin'); setError(null); setSuccessMessage(null); }}
+                onClick={() => { setMode('signin'); clearError(); setSuccessMessage(null); }}
                 className="text-orange-600 font-medium hover:underline"
               >
                 ← Retour à la connexion
