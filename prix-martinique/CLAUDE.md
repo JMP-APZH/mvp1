@@ -817,7 +817,23 @@ Two user asks on top of the profile-card slice (`feat/user-profile-card`, PR #47
   - `Leaderboard.jsx`: podium circles + list rows show the contributor's avatar/initial; level is always a labelled **"Niv. N"** orange chip (`LevelChip`); rank is an **ordinal** — `1re / 2e / 3e` on the podium step, `4e / 5e / …` next to the medal in the list. Podium spots are now tappable (open the contributor card, like the rows already were). Query gained `avatar_url`.
   - Same avatar-not-number fix propagated to `UserMenu.jsx` (button + dropdown header — the dropdown already labels level via the title + "Niveau N → N+1" bar, so no extra chip), `HunterDetailModal.jsx` (header avatar fallback + a new "Niv. N" chip in the chip row), and `PersoStats.jsx` (was a 👤 emoji, now the shared component).
   - **Verified live** (Communauté → Classement): podium shows avatars/initials + "NIV. N" chips + "1re/2e/3e" steps; list shows per-row avatars + "Ne" ordinals + "NIV. N" chips. Reads unambiguously now.
-- **`profile_reports` INSERT still `42501` after the user re-ran `profile_card_migration.sql`.** Re-running did **not** fix it — so the `create policy … for insert` either isn't applying or genuinely doesn't match, even though `deletion_requests` (same `(select auth.uid()) = <col>` form) and `user_favorites` both accept an own-row insert from the same account. **Changed the migration's INSERT policy to `for insert to authenticated with check (auth.uid() = reporter_id)`** (bare `auth.uid()`, explicit role — matching the confirmed-working `user_favorites` policy). **Still needs**: run the diagnostic `select policyname, cmd, roles::text, with_check::text from pg_policies where schemaname='public' and tablename='profile_reports';` and, if the INSERT row is missing/wrong, the standalone `drop policy if exists "Users can file a profile report" on public.profile_reports; create policy "Users can file a profile report" on public.profile_reports for insert to authenticated with check (auth.uid() = reporter_id);` — then re-test "Signaler". `submitReport` already surfaces the failure (inline "Envoi impossible", `7a48db6`).
+- **`profile_reports` INSERT — root cause found 2026-09-04: a rogue RESTRICTIVE policy keyed on `reported_user_id`.** After the user ran the standalone `create policy … for insert to authenticated with check (auth.uid() = reporter_id)`, the insert **still** 403'd `42501` — BUT a probe revealed the real shape: **reporting yourself (`reported_user_id = auth.uid()`) SUCCEEDS (201); reporting anyone else FAILS (`42501`).** Since multiple *permissive* INSERT policies are OR'd, a legit `reporter_id`-only policy passing means the row should be allowed — so a **RESTRICTIVE** policy with check `reported_user_id = auth.uid()` (or equivalent) must exist on the table. It is **not** in `profile_card_migration.sql` (which only ever had permissive policies keyed on `reporter_id`) — it came from an earlier manual attempt / a mis-pasted statement / a policy meant for another table. **Fix — run this in the SQL Editor** (drops every policy on the table, rebuilds the correct 3):
+  ```sql
+  select policyname, cmd, permissive, roles::text, with_check::text, qual::text
+  from pg_policies where schemaname='public' and tablename='profile_reports';   -- see the rogue one
+
+  do $$ declare p record; begin
+    for p in select policyname from pg_policies where schemaname='public' and tablename='profile_reports'
+    loop execute format('drop policy %I on public.profile_reports', p.policyname); end loop;
+  end $$;
+  create policy "Users can file a profile report" on public.profile_reports
+    for insert to authenticated with check (auth.uid() = reporter_id);
+  create policy "Admins can view profile reports" on public.profile_reports
+    for select to authenticated using (exists (select 1 from public.user_roles where user_id = auth.uid() and role = 'admin'));
+  create policy "Admins can update profile reports" on public.profile_reports
+    for update to authenticated using (exists (select 1 from public.user_roles where user_id = auth.uid() and role = 'admin'));
+  ```
+  Then re-test "Signaler". `submitReport` already surfaces the failure (inline "Envoi impossible", `7a48db6`). **Leftover test row**: a self-report (`reported_user_id = reporter_id = a774f544-…`, reason `other`) landed during the probe — `delete from profile_reports where details is null and reported_user_id = reporter_id;` or just clear all `TEST QA` + probe rows.
 - `eslint src/` + `vite build` clean. Commits `f8f38ec` (this pass), `7a48db6` (report-error hardening), `8dc769c` (QA notes). PR #47 now has 7 commits.
 
 ---
