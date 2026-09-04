@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/useAuth';
+import Avatar from './Avatar';
 import { calculateSavings } from '../utils/userStats';
 import { exportUserData, downloadUserDataAsJson } from '../utils/dataExport';
 import { requestAccountDeletion, getMyDeletionRequest } from '../utils/accountDeletion';
@@ -157,11 +158,14 @@ const PersoStats = ({ onClose }) => {
                 {/* Banner Section */}
                 <div className="bg-gradient-to-br from-orange-500 to-red-600 px-6 py-8 text-white">
                     <div className="flex items-center gap-4 mb-6">
-                        <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
-                            {userProfile?.avatar_url ? (
-                                <img src={userProfile.avatar_url} className="w-full h-full rounded-2xl object-cover" />
-                            ) : "👤"}
-                        </div>
+                        <Avatar
+                            src={userProfile?.avatar_url}
+                            name={userProfile?.display_name}
+                            size={64}
+                            rounded="rounded-2xl"
+                            fallbackClassName="bg-white/20 text-white"
+                            className="shadow-inner"
+                        />
                         <div>
                             <p className="text-orange-100 text-sm font-medium">Contributeur depuis</p>
                             <h3 className="text-lg font-bold">{formatDate(stats.firstScan)}</h3>

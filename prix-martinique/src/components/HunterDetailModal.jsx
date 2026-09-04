@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/useAuth';
 import { posthog } from '../posthogClient';
 import ProductDetailModal from './ProductDetailModal';
 import FlagFrance from './flags/FlagFrance';
+import Avatar from './Avatar';
 
 const REPORT_REASONS = [
     { value: 'impersonation', label: 'Usurpation d’identité' },
@@ -195,13 +196,13 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                         <X className="w-6 h-6" />
                     </button>
                     <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-white/20 flex-shrink-0 overflow-hidden flex items-center justify-center text-2xl font-bold">
-                            {showAvatar ? (
-                                <img src={profile.avatar_url} alt={profile.display_name} className="w-full h-full object-cover" />
-                            ) : (
-                                profile?.level || 1
-                            )}
-                        </div>
+                        <Avatar
+                            src={showAvatar ? profile.avatar_url : null}
+                            name={profile?.display_name || 'Chasseur'}
+                            size={64}
+                            rounded="rounded-2xl"
+                            fallbackClassName="bg-white/20 text-white"
+                        />
                         <div className="min-w-0">
                             <h2 className="text-lg font-bold leading-tight truncate">
                                 {profile?.display_name || 'Chasseur'}
@@ -209,6 +210,9 @@ const HunterDetailModal = ({ userId, onClose, onRequireAuth }) => {
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 <span className="text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full flex items-center gap-1">
                                     <Star className="w-3 h-3" /> {profile?.points ?? 0} pts
+                                </span>
+                                <span className="text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
+                                    Niv.&nbsp;{profile?.level || 1}
                                 </span>
                                 {profile?.city && (
                                     <span className="text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full flex items-center gap-1">
