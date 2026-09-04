@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Camera, Loader2, Eye, EyeOff, Check } from 'lucide-react';
+import { X, Camera, Loader2, Eye, EyeOff, Check, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import { supabase } from '../supabaseClient';
 import { posthog } from '../posthogClient';
@@ -30,6 +30,7 @@ const ProfileEditModal = ({ onClose }) => {
   const [isPublic, setIsPublic] = useState(userProfile?.is_profile_public !== false);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(userProfile?.avatar_url || null);
+  const [removeAvatar, setRemoveAvatar] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -50,7 +51,16 @@ const ProfileEditModal = ({ onClose }) => {
     }
     setError(null);
     setAvatarFile(file);
+    setRemoveAvatar(false);
     setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveAvatar = () => {
+    setError(null);
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setRemoveAvatar(true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const validateName = (name) => {
@@ -74,6 +84,18 @@ const ProfileEditModal = ({ onClose }) => {
       let avatarUrl = userProfile?.avatar_url || null;
       if (avatarFile) {
         avatarUrl = await uploadAvatar(user.id, avatarFile);
+      } else if (removeAvatar) {
+        avatarUrl = null;
+        // Best-effort cleanup of the old object so removed photos don't linger
+        // in storage. `avatar_url` is `<origin>/storage/v1/object/public/avatars/<path>`.
+        const oldPath = userProfile?.avatar_url?.split('/avatars/')[1];
+        if (oldPath) {
+          try {
+            await supabase.storage.from('avatars').remove([decodeURIComponent(oldPath)]);
+          } catch (rmErr) {
+            console.error('Old avatar cleanup failed (non-blocking):', rmErr);
+          }
+        }
       }
 
       const trimmedName = displayName.trim();
@@ -119,7 +141,8 @@ const ProfileEditModal = ({ onClose }) => {
 
       posthog.capture('profile_edited', {
         name_changed: nameChanged,
-        avatar_changed: !!avatarFile,
+        avatar_changed: !!avatarFile || removeAvatar,
+        avatar_removed: removeAvatar,
         has_bio: !!bio.trim(),
         has_status: !!statusText.trim(),
         is_public: isPublic,
@@ -167,13 +190,27 @@ const ProfileEditModal = ({ onClose }) => {
               )}
             </div>
             <div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold px-3 py-2 rounded-lg transition-colors"
-              >
-                <Camera className="w-4 h-4" /> {avatarPreview ? 'Changer la photo' : 'Ajouter une photo'}
-              </button>
-              <p className="text-[10px] text-gray-400 mt-1">JPEG, PNG ou WebP · 5 Mo max</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold px-3 py-2 rounded-lg transition-colors"
+                >
+                  <Camera className="w-4 h-4" /> {avatarPreview ? 'Changer la photo' : 'Ajouter une photo'}
+                </button>
+                {avatarPreview && (
+                  <button
+                    onClick={handleRemoveAvatar}
+                    className="flex items-center gap-1.5 text-red-600 hover:bg-red-50 text-sm font-bold px-2.5 py-2 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" /> Retirer
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">
+                {removeAvatar
+                  ? 'La photo sera retirée — votre initiale sera affichée.'
+                  : 'JPEG, PNG ou WebP · 5 Mo max'}
+              </p>
               <input
                 ref={fileInputRef}
                 type="file"

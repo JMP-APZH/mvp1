@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/useAuth';
 import { supabase } from '../supabaseClient';
 import { calculateSavings } from '../utils/userStats';
 import { getWantedScans } from '../utils/scanRequests';
+import Avatar from './Avatar';
 
 const CHAIN_ICONS = {
   'Carrefour': '🔵',
@@ -222,17 +223,13 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
       >
         {/* Avatar */}
         <div className="relative">
-          {userProfile?.avatar_url ? (
-            <img
-              src={userProfile.avatar_url}
-              alt={displayName}
-              className="w-8 h-8 rounded-full object-cover border-2 border-white/30"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-sm font-bold">
-              {userProfile?.level || 1}
-            </div>
-          )}
+          <Avatar
+            src={userProfile?.avatar_url}
+            name={displayName}
+            size={32}
+            fallbackClassName="bg-white/30 text-white"
+            className="border-2 border-white/30"
+          />
           {userBadges.length > 0 && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
               <Award className="w-2.5 h-2.5 text-yellow-800" />
@@ -258,17 +255,13 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
           {/* User info header */}
           <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 p-4 text-white">
             <div className="flex items-center gap-3">
-              {userProfile?.avatar_url ? (
-                <img
-                  src={userProfile.avatar_url}
-                  alt={displayName}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-white/30"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center text-xl font-bold">
-                  {userProfile?.level || 1}
-                </div>
-              )}
+              <Avatar
+                src={userProfile?.avatar_url}
+                name={displayName}
+                size={48}
+                fallbackClassName="bg-white/30 text-white"
+                className="border-2 border-white/30"
+              />
               <div>
                 <p className="font-semibold">{displayName}</p>
                 <p className="text-sm text-orange-100">

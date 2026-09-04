@@ -112,9 +112,14 @@ alter table public.profile_reports enable row level security;
 
 -- Any signed-in user can file a report as themselves (append-only, no read-back --
 -- same fire-and-forget shape as barcode_flags / feature_request_comments inserts).
+-- Scoped `to authenticated` with a bare `auth.uid()` (matching user_favorites,
+-- which is confirmed working) rather than the `(select auth.uid())` subquery form --
+-- a re-run of this migration where that form was used left the INSERT blocked
+-- with 42501 for a legitimate own-row insert (2026-09-04 QA).
 drop policy if exists "Users can file a profile report" on public.profile_reports;
 create policy "Users can file a profile report" on public.profile_reports
-  for insert with check ((select auth.uid()) = reporter_id);
+  for insert to authenticated
+  with check (auth.uid() = reporter_id);
 
 drop policy if exists "Admins can view profile reports" on public.profile_reports;
 create policy "Admins can view profile reports" on public.profile_reports

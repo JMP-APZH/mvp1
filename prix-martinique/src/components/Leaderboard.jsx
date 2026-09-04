@@ -3,6 +3,18 @@ import { Trophy, Medal, Star, TrendingUp, Crown } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/useAuth';
 import HunterDetailModal from './HunterDetailModal';
+import Avatar from './Avatar';
+
+// Rank position, rendered so it never reads as a level number: an ordinal.
+const ordinal = (n) => (n === 1 ? '1re' : `${n}e`);
+
+// Small labelled chip for the gamification level -- "Niv. 3" -- so the bare
+// number is never shown on its own next to a ranking position.
+const LevelChip = ({ level, className = '' }) => (
+  <span className={`inline-flex items-center rounded-full bg-orange-100 text-orange-700 font-bold uppercase tracking-wide ${className}`}>
+    Niv.&nbsp;{level || 1}
+  </span>
+);
 
 const Leaderboard = ({ city, onRequireAuth }) => {
   const [leaders, setLeaders] = useState([]);
@@ -16,7 +28,7 @@ const Leaderboard = ({ city, onRequireAuth }) => {
     try {
       let query = supabase
         .from('user_profiles')
-        .select('id, display_name, points, level, total_contributions, city')
+        .select('id, display_name, avatar_url, points, level, total_contributions, city')
         .order('points', { ascending: false })
         .limit(10);
 
@@ -48,7 +60,7 @@ const Leaderboard = ({ city, onRequireAuth }) => {
       case 3:
         return <Medal className="w-6 h-6 text-amber-600" />;
       default:
-        return <span className="w-6 h-6 flex items-center justify-center text-gray-500 font-bold">{rank}</span>;
+        return <span className="w-6 h-6 flex items-center justify-center text-gray-500 font-bold text-sm">{rank}<sup className="text-[9px]">e</sup></span>;
     }
   };
 
@@ -122,57 +134,61 @@ const Leaderboard = ({ city, onRequireAuth }) => {
         </div> */}
       </div>
 
-      {/* Top 3 podium */}
+      {/* Top 3 podium -- the circle is the contributor (photo / initial), the
+          step is the ranking position (ordinal), and the level is a labelled
+          chip. Previously the circle held the bare level number, which read as
+          a second, conflicting rank. */}
       {leaders.length >= 3 && (
-        <div className="flex items-end justify-center gap-2 py-4">
-          {/* 2nd place */}
-          <div className="flex flex-col items-center">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-xl font-bold text-gray-600 border-4 border-gray-300">
-              {leaders[1]?.level || 1}
-            </div>
-            <div className="mt-2 text-center">
-              <p className="text-xs font-medium text-gray-700 truncate max-w-16">
-                {leaders[1]?.display_name?.split(' ')[0] || 'Anon'}
+        <div className="flex items-end justify-center gap-3 py-4">
+          {[
+            { leader: leaders[1], rank: 2 },
+            { leader: leaders[0], rank: 1 },
+            { leader: leaders[2], rank: 3 },
+          ].map(({ leader, rank }) => (
+            <button
+              key={leader?.id || rank}
+              onClick={() => leader && setSelectedHunterId(leader.id)}
+              className={`flex flex-col items-center ${rank === 1 ? '-mt-4' : ''}`}
+            >
+              {rank === 1 && <Crown className="w-8 h-8 text-yellow-500 mb-1" />}
+              <div
+                className={`rounded-full overflow-hidden bg-white ${rank === 1
+                  ? 'border-4 border-yellow-400 shadow-lg'
+                  : rank === 2
+                    ? 'border-4 border-gray-300'
+                    : 'border-4 border-orange-300'
+                  }`}
+              >
+                <Avatar
+                  src={leader?.avatar_url}
+                  name={leader?.display_name}
+                  size={rank === 1 ? 60 : 52}
+                  fallbackClassName={rank === 1
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : rank === 2
+                      ? 'bg-gray-100 text-gray-600'
+                      : 'bg-orange-100 text-orange-700'}
+                />
+              </div>
+              <p className={`mt-2 text-center text-gray-800 truncate ${rank === 1 ? 'text-sm font-semibold max-w-24' : 'text-xs font-medium max-w-16'}`}>
+                {leader?.display_name?.split(' ')[0] || 'Anon'}
               </p>
-              <p className="text-xs text-gray-500">{leaders[1]?.points} pts</p>
-            </div>
-            <div className="w-16 h-16 bg-gradient-to-t from-gray-300 to-gray-200 rounded-t-lg mt-2 flex items-center justify-center">
-              <span className="text-2xl font-bold text-gray-500">2</span>
-            </div>
-          </div>
-
-          {/* 1st place */}
-          <div className="flex flex-col items-center -mt-4">
-            <Crown className="w-8 h-8 text-yellow-500 mb-1" />
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-2xl font-bold text-yellow-800 border-4 border-yellow-400 shadow-lg">
-              {leaders[0]?.level || 1}
-            </div>
-            <div className="mt-2 text-center">
-              <p className="text-sm font-semibold text-gray-800 truncate max-w-20">
-                {leaders[0]?.display_name?.split(' ')[0] || 'Anon'}
+              <p className={`text-xs font-medium ${rank === 1 ? 'text-yellow-600' : 'text-gray-500'}`}>
+                {leader?.points ?? 0} pts
               </p>
-              <p className="text-xs text-yellow-600 font-medium">{leaders[0]?.points} pts</p>
-            </div>
-            <div className="w-20 h-24 bg-gradient-to-t from-yellow-400 to-yellow-300 rounded-t-lg mt-2 flex items-center justify-center">
-              <span className="text-3xl font-bold text-yellow-700">1</span>
-            </div>
-          </div>
-
-          {/* 3rd place */}
-          <div className="flex flex-col items-center">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-200 to-orange-400 flex items-center justify-center text-xl font-bold text-orange-700 border-4 border-orange-300">
-              {leaders[2]?.level || 1}
-            </div>
-            <div className="mt-2 text-center">
-              <p className="text-xs font-medium text-gray-700 truncate max-w-16">
-                {leaders[2]?.display_name?.split(' ')[0] || 'Anon'}
-              </p>
-              <p className="text-xs text-gray-500">{leaders[2]?.points} pts</p>
-            </div>
-            <div className="w-16 h-12 bg-gradient-to-t from-orange-400 to-orange-300 rounded-t-lg mt-2 flex items-center justify-center">
-              <span className="text-2xl font-bold text-orange-600">3</span>
-            </div>
-          </div>
+              <LevelChip level={leader?.level} className="mt-1 text-[9px] px-1.5 py-0.5" />
+              <div
+                className={`mt-2 rounded-t-lg bg-gradient-to-t flex items-center justify-center font-bold ${rank === 1
+                  ? 'w-20 h-24 from-yellow-400 to-yellow-300 text-yellow-800 text-2xl'
+                  : rank === 2
+                    ? 'w-16 h-16 from-gray-300 to-gray-200 text-gray-600 text-lg'
+                    : 'w-16 h-12 from-orange-400 to-orange-300 text-orange-700 text-lg'
+                  }`}
+              >
+                {ordinal(rank)}
+              </div>
+            </button>
+          ))}
         </div>
       )}
 
@@ -189,10 +205,18 @@ const Leaderboard = ({ city, onRequireAuth }) => {
               className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:shadow-md active:scale-[0.99] transition-all ${getRankBackground(rank)} ${isCurrentUser ? 'ring-2 ring-orange-400' : ''
                 }`}
             >
-              {/* Rank */}
+              {/* Rank position */}
               <div className="flex-shrink-0 w-8">
                 {getRankIcon(rank)}
               </div>
+
+              {/* Contributor */}
+              <Avatar
+                src={leader.avatar_url}
+                name={leader.display_name}
+                size={36}
+                fallbackClassName="bg-orange-100 text-orange-600"
+              />
 
               {/* User info */}
               <div className="flex-1 min-w-0">
@@ -203,9 +227,7 @@ const Leaderboard = ({ city, onRequireAuth }) => {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className="bg-gray-100 px-1.5 py-0.5 rounded">
-                    Niv.{leader.level || 1}
-                  </span>
+                  <LevelChip level={leader.level} className="text-[10px] px-1.5 py-0.5" />
                   <span>{leader.total_contributions || 0} prix</span>
                 </div>
               </div>
