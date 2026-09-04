@@ -21,6 +21,36 @@ const isFreshSignIn = (authUser) => {
   return Math.abs(Date.now() - new Date(authUser.last_sign_in_at).getTime()) < 15000;
 };
 
+// Auth errors that are the user's problem to fix (wrong password, unconfirmed
+// email, rate limit, stale reset link), not a bug. The AuthModal already shows
+// a French message for each; sending them to PostHog error tracking as well
+// just buries the real exceptions. In production 5/6 of the "auth" exceptions
+// hitting the funnel were these. Match on message text because supabase-js
+// collapses most of them into a plain AuthApiError.
+const EXPECTED_AUTH_ERROR_SNIPPETS = [
+  'invalid login credentials',
+  'email not confirmed',
+  'user already registered',
+  'password should be at least',
+  'email rate limit exceeded',
+  'over_email_send_rate_limit',
+  'for security purposes', // "...you can only request this after N seconds"
+  'email link is invalid or has expired',
+  'token has expired or is invalid',
+  'new password should be different from the old password',
+  'same_password',
+  'weak_password',
+];
+
+const isExpectedAuthError = (error) => {
+  if (!error) return false;
+  const msg = (error.message || error.error_description || '').toLowerCase();
+  if (EXPECTED_AUTH_ERROR_SNIPPETS.some((s) => msg.includes(s))) return true;
+  // supabase-js sets a numeric status; 4xx auth codes are user-facing, 5xx/0 aren't
+  const status = error.status ?? error.code;
+  return status === 400 || status === 422 || status === 429;
+};
+
 const logAuthEvent = async (authUser) => {
   if (!isFreshSignIn(authUser)) return;
   const provider = authUser.app_metadata?.provider === 'google' ? 'google' : 'email';
@@ -311,7 +341,7 @@ export const AuthProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       console.error('Sign up error:', error);
-      posthog.captureException(error, { context: 'sign_up' });
+      if (!isExpectedAuthError(error)) posthog.captureException(error, { context: 'sign_up' });
       return { data: null, error };
     }
   };
@@ -328,7 +358,7 @@ export const AuthProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       console.error('Sign in error:', error);
-      posthog.captureException(error, { context: 'sign_in' });
+      if (!isExpectedAuthError(error)) posthog.captureException(error, { context: 'sign_in' });
       return { data: null, error };
     }
   };
@@ -354,7 +384,7 @@ export const AuthProvider = ({ children }) => {
       return { data, error: null };
     } catch (error) {
       console.error('Google sign in error:', error);
-      posthog.captureException(error, { context: 'sign_in_google' });
+      if (!isExpectedAuthError(error)) posthog.captureException(error, { context: 'sign_in_google' });
       return { data: null, error };
     }
   };
@@ -388,7 +418,26 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Reset password error:', error);
-      posthog.captureException(error, { context: 'reset_password' });
+      if (!isExpectedAuthError(error)) posthog.captureException(error, { context: 'reset_password' });
+      return { error };
+    }
+  };
+
+  // Re-send the signup confirmation email. Offered inline in the AuthModal when
+  // a sign-in fails with "Email not confirmed" -- the original email is easily
+  // lost or expired and there was no way to ask for another.
+  const resendConfirmation = async (email) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      console.error('Resend confirmation error:', error);
+      if (!isExpectedAuthError(error)) posthog.captureException(error, { context: 'resend_confirmation' });
       return { error };
     }
   };
@@ -402,7 +451,7 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Update password error:', error);
-      posthog.captureException(error, { context: 'update_password' });
+      if (!isExpectedAuthError(error)) posthog.captureException(error, { context: 'update_password' });
       return { error };
     }
   };
@@ -558,6 +607,7 @@ export const AuthProvider = ({ children }) => {
     signInWithGoogle,
     signOut,
     resetPasswordForEmail,
+    resendConfirmation,
     updatePassword,
     passwordRecoveryMode,
     awardPoints,

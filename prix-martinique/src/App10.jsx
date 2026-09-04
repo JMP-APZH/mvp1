@@ -39,6 +39,7 @@ import {
     savePendingAuthSubmission, getPendingAuthSubmission, clearPendingAuthSubmission
 } from './utils/offlineDb';
 import { logAppSessionOnce } from './utils/sessionTracking';
+import { isNetworkError, retryAsync } from './utils/network';
 
 const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     const [loaded, setLoaded] = useState(false);
@@ -268,17 +269,23 @@ const App10 = () => {
             // shape -- keyed together by id in the same offline store, an offline
             // put from whichever loader runs second must not clobber fields (e.g.
             // `city`) the other one's cached read depends on.
-            const { data, error } = await supabase
-                .from('stores')
-                .select('*')
-                .order('name', { ascending: true });
+            const { data, error } = await retryAsync(async () => {
+                const res = await supabase
+                    .from('stores')
+                    .select('*')
+                    .order('name', { ascending: true });
+                if (res.error) throw res.error; // let retryAsync see network failures
+                return res;
+            });
 
             if (error) throw error;
             setStores(data || []);
             cacheStores(data || []); // write-through so the picker still works offline later
         } catch (err) {
             console.error('Error loading stores:', err);
-            posthog.captureException(err, { context: 'load_stores' });
+            // A transient network failure isn't a bug -- retryAsync already tried
+            // twice; don't bury real exceptions under "Load failed" noise.
+            if (!isNetworkError(err)) posthog.captureException(err, { context: 'load_stores' });
             // Offline (or otherwise unreachable): fall back to the last cached list
             // instead of leaving the store picker empty.
             const cached = await getCachedStores();

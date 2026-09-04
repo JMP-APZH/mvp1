@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { detectUserLocation, getCityList, getPostalCode, getStoresSortedByDistance } from '../utils/geocoding';
 import { posthog } from '../posthogClient';
 import { cacheStores, getCachedStores } from '../utils/offlineDb';
+import { isNetworkError, retryAsync } from '../utils/network';
 
 const STEP_NAMES = { 1: 'city', 2: 'chain', 3: 'store' };
 
@@ -51,6 +52,7 @@ export default function StoreSelectionWizard({
     const [stores, setStores] = useState([]);
     const [cities, setCities] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
 
     // Search state
     const [citySearch, setCitySearch] = useState('');
@@ -106,24 +108,35 @@ export default function StoreSelectionWizard({
     }, [supabase]);
 
     const loadStores = useCallback(async () => {
+        setLoading(true);
+        setLoadError(false);
         try {
-            const { data, error } = await supabase
-                .from('stores')
-                .select('*')
-                .eq('is_active', true)
-                .order('popularity_score', { ascending: false });
+            const { data, error } = await retryAsync(async () => {
+                const res = await supabase
+                    .from('stores')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('popularity_score', { ascending: false });
+                if (res.error) throw res.error; // let retryAsync see network failures
+                return res;
+            });
 
             if (error) throw error;
             setStores(data || []);
             cacheStores(data || []); // write-through so this wizard still works offline later
-            setLoading(false);
         } catch (err) {
             console.error('Error loading stores:', err);
+            if (!isNetworkError(err)) posthog.captureException(err, { context: 'store_wizard_load_stores' });
             // Offline (or otherwise unreachable): fall back to the last cached list
             // rather than stranding the user on an empty store picker -- this wizard
             // is the gate before any submission, online or queued-offline.
             const cached = await getCachedStores();
-            setStores([...cached].sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0)));
+            const sorted = [...cached].sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0));
+            setStores(sorted);
+            // Only surface the error state if we have nothing to show at all --
+            // a stale cached list is still usable, a blank picker is a dead end.
+            if (sorted.length === 0) setLoadError(true);
+        } finally {
             setLoading(false);
         }
     }, [supabase]);
@@ -295,6 +308,22 @@ export default function StoreSelectionWizard({
             <div className={`animate-pulse ${className}`}>
                 <div className="h-12 bg-gray-200 rounded-lg mb-3"></div>
                 <div className="h-12 bg-gray-200 rounded-lg"></div>
+            </div>
+        );
+    }
+
+    if (loadError && stores.length === 0) {
+        return (
+            <div className={`text-center py-8 px-4 ${className}`}>
+                <p className="text-sm text-gray-700 mb-1">Impossible de charger la liste des magasins.</p>
+                <p className="text-xs text-gray-500 mb-4">Vérifiez votre connexion internet.</p>
+                <button
+                    type="button"
+                    onClick={loadStores}
+                    className="px-5 py-2.5 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                    Réessayer
+                </button>
             </div>
         );
     }
