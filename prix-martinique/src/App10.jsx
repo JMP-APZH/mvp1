@@ -26,6 +26,8 @@ import MyScansModal from './components/MyScansModal';
 import WantedScansModal from './components/WantedScansModal';
 import AdminDashboard from './components/AdminDashboard';
 import ProfileEditModal from './components/ProfileEditModal';
+import PendingPriceProductsModal from './components/PendingPriceProductsModal';
+import MessagesInboxModal from './components/MessagesInboxModal';
 import HunterDetailModal from './components/HunterDetailModal';
 import PriceDuel from './components/PriceDuel';
 import { ToastContainer } from './components/Toast';
@@ -60,6 +62,43 @@ const ImageWithSkeleton = ({ src, alt, className, ...props }) => {
     );
 };
 
+// One required product-identification photo (front or back). Shared between
+// the full in-store form and the "je ne suis pas en magasin" mini-form so the
+// capture/preview/remove UI can't drift between the two.
+const ProductPhotoField = ({ label, photo, onCapture, onRemove, inputRef, onChange }) => (
+    <div>
+        <p className="text-xs text-gray-600 mb-2">{label}</p>
+        {!photo ? (
+            <button
+                type="button"
+                onClick={onCapture}
+                className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
+            >
+                <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
+                <p className="text-sm text-orange-600">Prendre la photo</p>
+            </button>
+        ) : (
+            <div className="relative">
+                <img src={photo} alt={label} className="w-full h-40 object-cover rounded-lg" />
+                <button
+                    onClick={onRemove}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                >
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+        )}
+        <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onChange}
+            className="hidden"
+        />
+    </div>
+);
+
 const App10 = () => {
 
     const [activeTab, setActiveTab] = useState('scan');
@@ -92,6 +131,8 @@ const App10 = () => {
     const [myScansFilter, setMyScansFilter] = useState('all');
     const [showWantedScans, setShowWantedScans] = useState(false);
     const [showProfileEdit, setShowProfileEdit] = useState(false);
+    const [showPendingProducts, setShowPendingProducts] = useState(false);
+    const [showMessagesInbox, setShowMessagesInbox] = useState(false);
     const [selectedHunterId, setSelectedHunterId] = useState(null);
     const [bqpVoteStats, setBqpVoteStats] = useState({ upvotes: 0, downvotes: 0, userVote: 0 }); // userVote: 1 (up), -1 (down), 0 (none)
     const [priceHistory, setPriceHistory] = useState([]);
@@ -114,12 +155,26 @@ const App10 = () => {
         isMainland: false,
         mainlandChain: '',
         userName: '',
-        productPhoto: null,
+        // Front (brand/name) + back (barcode side) are the two product-identification
+        // photos -- both mandatory (see product_completion_and_messaging_migration.sql).
+        // They live on `products`, not `prices`, precisely so they can be captured
+        // without a price/store yet (productOnly mode below).
+        productPhotoFront: null,
+        productPhotoBack: null,
         priceTagPhoto: null,
         isDeclaredBqp: false,
         categoryId: null,
         isLocal: false,
-        isMdd: false
+        isMdd: false,
+        // True while the "je ne suis pas en magasin" mini-form is active: only
+        // front+back photos + name are required, no price/store row is created.
+        productOnly: false,
+        // Set when the form was opened from the "Produits à compléter" picker
+        // (PendingPriceProductsModal): front/back photos already exist on the
+        // product, shown read-only instead of upload buttons.
+        completingProductId: null,
+        pendingFrontUrl: null,
+        pendingBackUrl: null,
     });
     const [categories, setCategories] = useState([]);
     const [imageViewer, setImageViewer] = useState(null); // { images: string[], index: number, labels: string[] } | null
@@ -153,7 +208,8 @@ const App10 = () => {
     const [showStorePicker, setShowStorePicker] = useState(false);
     const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('welcome_v1_shown'));
 
-    const productPhotoInputRef = useRef(null);
+    const productPhotoFrontInputRef = useRef(null);
+    const productPhotoBackInputRef = useRef(null);
     const priceTagPhotoInputRef = useRef(null);
 
     // Toast notifications
@@ -720,11 +776,19 @@ const App10 = () => {
     };
 
     const handlePhotoCapture = (photoType) => {
-        if (photoType === 'product') {
-            productPhotoInputRef.current?.click();
+        if (photoType === 'productFront') {
+            productPhotoFrontInputRef.current?.click();
+        } else if (photoType === 'productBack') {
+            productPhotoBackInputRef.current?.click();
         } else {
             priceTagPhotoInputRef.current?.click();
         }
+    };
+
+    const PHOTO_FIELD_BY_TYPE = {
+        productFront: 'productPhotoFront',
+        productBack: 'productPhotoBack',
+        priceTag: 'priceTagPhoto',
     };
 
     const handlePhotoChange = (e, photoType) => {
@@ -732,22 +796,14 @@ const App10 = () => {
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                if (photoType === 'product') {
-                    setManualEntry(prev => ({ ...prev, productPhoto: reader.result }));
-                } else {
-                    setManualEntry(prev => ({ ...prev, priceTagPhoto: reader.result }));
-                }
+                setManualEntry(prev => ({ ...prev, [PHOTO_FIELD_BY_TYPE[photoType]]: reader.result }));
             };
             reader.readAsDataURL(file);
         }
     };
 
     const removePhoto = (photoType) => {
-        if (photoType === 'product') {
-            setManualEntry(prev => ({ ...prev, productPhoto: null }));
-        } else {
-            setManualEntry(prev => ({ ...prev, priceTagPhoto: null }));
-        }
+        setManualEntry(prev => ({ ...prev, [PHOTO_FIELD_BY_TYPE[photoType]]: null }));
     };
 
     // Helper to toggle favorites
@@ -824,9 +880,36 @@ const App10 = () => {
             productName: item.name,
             barcode: '',
             price: '',
-            productPhoto: null,
+            productPhotoFront: null,
+            productPhotoBack: null,
             priceTagPhoto: null,
+            productOnly: false,
+            completingProductId: null,
+            pendingFrontUrl: null,
+            pendingBackUrl: null,
         }));
+        setActiveTab('scan');
+    };
+
+    // "Produits à compléter" picker (PendingPriceProductsModal): the product was
+    // already registered (front+back photos exist, no price yet) by this user or
+    // someone else -- pre-fill name/barcode and the existing photos (shown
+    // read-only), so completing it only requires store + price + price-tag photo.
+    const prefillPendingProductCompletion = (product) => {
+        setManualEntry(prev => ({
+            ...prev,
+            productName: product.name,
+            barcode: product.barcode || '',
+            price: '',
+            productPhotoFront: null,
+            productPhotoBack: null,
+            priceTagPhoto: null,
+            productOnly: false,
+            completingProductId: product.id,
+            pendingFrontUrl: product.photo_front_url || null,
+            pendingBackUrl: product.photo_back_url || null,
+        }));
+        setShowPendingProducts(false);
         setActiveTab('scan');
     };
 
@@ -843,8 +926,13 @@ const App10 = () => {
             productName: item.productName,
             barcode: '',
             price: '',
-            productPhoto: null,
+            productPhotoFront: null,
+            productPhotoBack: null,
             priceTagPhoto: null,
+            productOnly: false,
+            completingProductId: null,
+            pendingFrontUrl: null,
+            pendingBackUrl: null,
             isMainland: wantsMainland,
             mainlandChain: chain,
             storeId: wantsMainland ? '' : prev.storeId,
@@ -877,9 +965,24 @@ const App10 = () => {
             return;
         }
 
-        const hasLocation = manualEntry.isMainland ? manualEntry.mainlandChain : manualEntry.storeId;
-        if (!manualEntry.productName || !manualEntry.price || !hasLocation) {
-            toast.error('Veuillez remplir tous les champs obligatoires (produit, prix, magasin)');
+        // Photo requirements (2026-09-05: made mandatory -- see
+        // product_completion_and_messaging_migration.sql's header for why a
+        // product added with zero photos was possible until now). Front+back
+        // aren't re-required when completing an already-registered pending
+        // product (photos already exist on it, shown read-only in the form).
+        if (!manualEntry.completingProductId && (!manualEntry.productPhotoFront || !manualEntry.productPhotoBack)) {
+            toast.error("Merci d'ajouter une photo du produit (face avant) et une photo du dos (code-barres)");
+            return;
+        }
+
+        if (!manualEntry.productOnly) {
+            const hasLocation = manualEntry.isMainland ? manualEntry.mainlandChain : manualEntry.storeId;
+            if (!manualEntry.productName || !manualEntry.price || !hasLocation || !manualEntry.priceTagPhoto) {
+                toast.error("Veuillez remplir tous les champs obligatoires (produit, prix, magasin, photo de l'étiquette)");
+                return;
+            }
+        } else if (!manualEntry.productName) {
+            toast.error('Veuillez indiquer le nom du produit');
             return;
         }
 
@@ -891,13 +994,16 @@ const App10 = () => {
             isMainland: manualEntry.isMainland,
             mainlandChain: manualEntry.mainlandChain,
             userName: manualEntry.userName,
-            productPhoto: manualEntry.productPhoto,
+            productPhotoFront: manualEntry.productPhotoFront,
+            productPhotoBack: manualEntry.productPhotoBack,
             priceTagPhoto: manualEntry.priceTagPhoto,
             isDeclaredBqp: manualEntry.isDeclaredBqp,
             categoryId: manualEntry.categoryId,
             isLocal: manualEntry.isLocal,
             isMdd: manualEntry.isMdd,
             submissionMethod: 'manual_entry',
+            productOnly: manualEntry.productOnly,
+            existingProductId: manualEntry.completingProductId,
         };
 
         const resetForm = () => {
@@ -909,12 +1015,17 @@ const App10 = () => {
                 isMainland: prev.isMainland, // Keep region/chain selection persistent!
                 mainlandChain: prev.mainlandChain,
                 userName: userProfile?.display_name || prev.userName, // Keep username
-                productPhoto: null,
+                productPhotoFront: null,
+                productPhotoBack: null,
                 priceTagPhoto: null,
                 isDeclaredBqp: false,
                 categoryId: null,
                 isLocal: false,
-                isMdd: false
+                isMdd: false,
+                productOnly: false,
+                completingProductId: null,
+                pendingFrontUrl: null,
+                pendingBackUrl: null,
             }));
         };
 
@@ -922,7 +1033,7 @@ const App10 = () => {
             await enqueuePriceSubmission(payload);
             toast.info(infoMessage);
             // No points shown -- they aren't awarded until this syncs for real.
-            setScanCelebration({ queued: true, productName: manualEntry.productName });
+            setScanCelebration({ queued: true, productName: manualEntry.productName, productOnly: manualEntry.productOnly });
             resetForm();
             setBqpCheckResult(null);
         };
@@ -930,7 +1041,9 @@ const App10 = () => {
         if (!isOnline) {
             setLoading(true);
             try {
-                await queueOffline('Hors ligne — prix enregistré, il sera envoyé automatiquement dès que vous serez en ligne.');
+                await queueOffline(manualEntry.productOnly
+                    ? 'Hors ligne — produit enregistré, il sera envoyé automatiquement dès que vous serez en ligne.'
+                    : 'Hors ligne — prix enregistré, il sera envoyé automatiquement dès que vous serez en ligne.');
             } finally {
                 setLoading(false);
             }
@@ -941,19 +1054,21 @@ const App10 = () => {
             setLoading(true);
             setError(null);
 
-            const { pointsAwarded, bqpPrompt, photosDropped } = await performPriceSubmission({
+            const { pointsAwarded, bqpPrompt, photosDropped, productOnly } = await performPriceSubmission({
                 supabase, awardPoints, user, userProfile, payload,
             });
 
-            toast.success(`Prix enregistré avec succès! +${pointsAwarded} points`);
+            toast.success(productOnly
+                ? `Produit enregistré ! Le prix pourra être ajouté plus tard. +${pointsAwarded} points`
+                : `Prix enregistré avec succès! +${pointsAwarded} points`);
             // Upload failures don't block the price from saving (by design), but
             // silently dropping a photo the user just took is exactly the kind of
             // surprise reported live (Aug 28, 2026: a product ended up with no
             // photos and nothing ever said why) -- surface it instead.
             if (photosDropped?.length > 0) {
-                toast.info('Le prix est enregistré, mais une photo n\'a pas pu être envoyée (connexion lente ?). Vous pouvez la rajouter plus tard.');
+                toast.info('Une photo n\'a pas pu être envoyée (connexion lente ?). Vous pouvez la rajouter plus tard.');
             }
-            setScanCelebration({ points: pointsAwarded, productName: manualEntry.productName });
+            setScanCelebration({ points: pointsAwarded, productName: manualEntry.productName, productOnly });
             resetForm();
 
             if (bqpPrompt) {
@@ -1021,7 +1136,9 @@ const App10 = () => {
     // above (which would still see the pre-restore, empty form).
     useEffect(() => {
         if (!pendingAutoSubmit || !user) return;
-        if (!manualEntry.productName || !manualEntry.price) return;
+        if (!manualEntry.productName) return;
+        // A productOnly submission never has a price -- don't wait for one.
+        if (!manualEntry.productOnly && !manualEntry.price) return;
         setPendingAutoSubmit(false);
         submitPrice();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1089,6 +1206,8 @@ const App10 = () => {
                         onOpenMyScans={(filter) => { setMyScansFilter(filter || 'all'); setShowMyScans(true); }}
                         onOpenWantedScans={() => setShowWantedScans(true)}
                         onOpenProfile={() => setShowProfileEdit(true)}
+                        onOpenPendingProducts={() => setShowPendingProducts(true)}
+                        onOpenMessages={() => setShowMessagesInbox(true)}
                         stores={stores}
                     />
                 </div>
@@ -1116,6 +1235,22 @@ const App10 = () => {
 
                 {/* Profile editor ("Mon profil") */}
                 {showProfileEdit && <ProfileEditModal onClose={() => setShowProfileEdit(false)} />}
+
+                {/* Produits à compléter (registered with photos, no price yet) */}
+                {showPendingProducts && (
+                    <PendingPriceProductsModal
+                        onClose={() => setShowPendingProducts(false)}
+                        onSelectProduct={prefillPendingProductCompletion}
+                    />
+                )}
+
+                {/* Messages (admin -> user inbox) */}
+                {showMessagesInbox && (
+                    <MessagesInboxModal
+                        onClose={() => setShowMessagesInbox(false)}
+                        onSelectProduct={(productId) => { setShowMessagesInbox(false); setSelectedProductId(productId); }}
+                    />
+                )}
 
                 {/* Points / Level (logged-in users) + community contribution count (everyone) */}
                 <div className="mt-3 flex items-center gap-2 text-sm flex-wrap">
@@ -1349,6 +1484,99 @@ const App10 = () => {
                             </div>
                         )}
 
+                        {/* "Je ne suis pas en magasin" toggle: registers a product's front/back
+                            photos (mandatory) without a price/store, for someone (this user or
+                            another contributor) to complete later via "Produits à compléter".
+                            Hidden while completing an already-pending product -- that flow
+                            always needs the full price+store+price-tag path. */}
+                        {!manualEntry.completingProductId && (
+                            <button
+                                type="button"
+                                onClick={() => setManualEntry(prev => ({ ...prev, productOnly: !prev.productOnly }))}
+                                className={`w-full text-left rounded-lg p-3 border text-sm font-medium transition-colors flex items-center gap-2 ${manualEntry.productOnly
+                                    ? 'bg-orange-50 border-orange-300 text-orange-700'
+                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <ImageIcon className="w-4 h-4 flex-shrink-0" />
+                                {manualEntry.productOnly
+                                    ? '← Je suis en magasin (ajouter un prix)'
+                                    : "Je ne suis pas encore en magasin — j'ajoute juste un produit, le prix suivra"}
+                            </button>
+                        )}
+
+                        {manualEntry.productOnly ? (
+                            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                                <p className="text-xs text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                                    Enregistrez le produit avec ses photos maintenant ; vous ou un autre contributeur pourrez ajouter le prix plus tard, depuis "Produits à compléter".
+                                </p>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nom du produit *</label>
+                                    <input
+                                        type="text"
+                                        value={manualEntry.productName}
+                                        onChange={(e) => setManualEntry({ ...manualEntry, productName: e.target.value })}
+                                        placeholder="Ex: Lait Lactel 1L"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Code-barres (optionnel)</label>
+                                    <input
+                                        type="text"
+                                        value={manualEntry.barcode}
+                                        onChange={(e) => setManualEntry({ ...manualEntry, barcode: e.target.value })}
+                                        placeholder="Ex: 3254567890123"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <ProductPhotoField
+                                    label="Photo du produit (face avant) *"
+                                    photo={manualEntry.productPhotoFront}
+                                    onCapture={() => handlePhotoCapture('productFront')}
+                                    onRemove={() => removePhoto('productFront')}
+                                    inputRef={productPhotoFrontInputRef}
+                                    onChange={(e) => handlePhotoChange(e, 'productFront')}
+                                />
+                                <ProductPhotoField
+                                    label="Photo du dos du produit (code-barres) *"
+                                    photo={manualEntry.productPhotoBack}
+                                    onCapture={() => handlePhotoCapture('productBack')}
+                                    onRemove={() => removePhoto('productBack')}
+                                    inputRef={productPhotoBackInputRef}
+                                    onChange={(e) => handlePhotoChange(e, 'productBack')}
+                                />
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Catégorie</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {categories.map((cat) => (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => setManualEntry({ ...manualEntry, categoryId: cat.id })}
+                                                className={`p-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors border min-h-[80px] ${manualEntry.categoryId === cat.id
+                                                    ? 'bg-orange-100 border-orange-500 ring-2 ring-orange-200'
+                                                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                <span className="text-2xl" role="img" aria-label={cat.name}>{cat.icon}</span>
+                                                <span className="text-xs text-center leading-tight text-gray-700">{cat.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={submitPrice}
+                                    disabled={loading}
+                                    className={`w-full py-3 rounded-lg font-medium transition-all shadow-md ${loading
+                                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-600 hover:to-red-700 active:scale-[0.98]'
+                                        }`}
+                                >
+                                    {loading ? 'Enregistrement...' : user ? 'Enregistrer le produit (+5 pts)' : 'Enregistrer le produit'}
+                                </button>
+                            </div>
+                        ) : (
+                        <>
                         {/* Pending price-confirmation deep-link (Panier's "Prix à confirmer"):
                             manualEntry.productName is pre-filled but a store must still be
                             chosen first -- without this, that pre-fill is invisible and the
@@ -1741,85 +1969,57 @@ const App10 = () => {
                                         />
                                     </div>
 
-                                    {/* Photo Upload Section */}
+                                    {/* Photo Upload Section -- 3 photos mandatory (2026-09-05):
+                                        front (brand/name), back (barcode, cross-checked by
+                                        ProductCompletion.jsx), and the price tag. Front/back are
+                                        skipped here (shown read-only instead) when completing an
+                                        already-registered pending product -- those photos already
+                                        exist on it. */}
                                     <div className="space-y-3 pt-2 border-t">
                                         <label className="block text-sm font-medium text-gray-700">
-                                            Photos (optionnel)
+                                            Photos (obligatoires)
                                         </label>
 
-                                        {/* Product Photo */}
-                                        <div>
-                                            <p className="text-xs text-gray-600 mb-2">Photo du produit</p>
-                                            {!manualEntry.productPhoto ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePhotoCapture('product')}
-                                                    className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
-                                                >
-                                                    <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                                                    <p className="text-sm text-orange-600">Ajouter une photo du produit</p>
-                                                </button>
-                                            ) : (
-                                                <div className="relative">
-                                                    <img
-                                                        src={manualEntry.productPhoto}
-                                                        alt="Produit"
-                                                        className="w-full h-40 object-cover rounded-lg"
-                                                    />
-                                                    <button
-                                                        onClick={() => removePhoto('product')}
-                                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
+                                        {manualEntry.completingProductId ? (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <p className="text-xs text-gray-600 mb-2">Photo du produit (déjà enregistrée)</p>
+                                                    <img src={manualEntry.pendingFrontUrl} alt="Face avant" className="w-full h-32 object-cover rounded-lg opacity-90" />
                                                 </div>
-                                            )}
-                                            <input
-                                                ref={productPhotoInputRef}
-                                                type="file"
-                                                accept="image/*"
-                                                capture="environment"
-                                                onChange={(e) => handlePhotoChange(e, 'product')}
-                                                className="hidden"
-                                            />
-                                        </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-600 mb-2">Photo du dos (déjà enregistrée)</p>
+                                                    <img src={manualEntry.pendingBackUrl} alt="Dos / code-barres" className="w-full h-32 object-cover rounded-lg opacity-90" />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <ProductPhotoField
+                                                    label="Photo du produit (face avant) *"
+                                                    photo={manualEntry.productPhotoFront}
+                                                    onCapture={() => handlePhotoCapture('productFront')}
+                                                    onRemove={() => removePhoto('productFront')}
+                                                    inputRef={productPhotoFrontInputRef}
+                                                    onChange={(e) => handlePhotoChange(e, 'productFront')}
+                                                />
+                                                <ProductPhotoField
+                                                    label="Photo du dos du produit (code-barres) *"
+                                                    photo={manualEntry.productPhotoBack}
+                                                    onCapture={() => handlePhotoCapture('productBack')}
+                                                    onRemove={() => removePhoto('productBack')}
+                                                    inputRef={productPhotoBackInputRef}
+                                                    onChange={(e) => handlePhotoChange(e, 'productBack')}
+                                                />
+                                            </>
+                                        )}
 
-                                        {/* Price Tag Photo */}
-                                        <div>
-                                            <p className="text-xs text-gray-600 mb-2">Photo de l'étiquette de prix</p>
-                                            {!manualEntry.priceTagPhoto ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePhotoCapture('priceTag')}
-                                                    className="w-full border-2 border-dashed border-orange-300 rounded-lg p-4 hover:border-orange-500 transition-colors bg-orange-50"
-                                                >
-                                                    <ImageIcon className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                                                    <p className="text-sm text-orange-600">Ajouter une photo de l'étiquette (incluant le code barres et son numéro lisible)</p>
-                                                </button>
-                                            ) : (
-                                                <div className="relative">
-                                                    <img
-                                                        src={manualEntry.priceTagPhoto}
-                                                        alt="Etiquette de prix"
-                                                        className="w-full h-40 object-cover rounded-lg"
-                                                    />
-                                                    <button
-                                                        onClick={() => removePhoto('priceTag')}
-                                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                            <input
-                                                ref={priceTagPhotoInputRef}
-                                                type="file"
-                                                accept="image/*"
-                                                capture="environment"
-                                                onChange={(e) => handlePhotoChange(e, 'priceTag')}
-                                                className="hidden"
-                                            />
-                                        </div>
+                                        <ProductPhotoField
+                                            label="Photo de l'étiquette de prix *"
+                                            photo={manualEntry.priceTagPhoto}
+                                            onCapture={() => handlePhotoCapture('priceTag')}
+                                            onRemove={() => removePhoto('priceTag')}
+                                            inputRef={priceTagPhotoInputRef}
+                                            onChange={(e) => handlePhotoChange(e, 'priceTag')}
+                                        />
                                     </div>
 
                                     {/* Category Selector */}
@@ -1947,6 +2147,8 @@ const App10 = () => {
                                     </button>
                                 </div>
                             </div>
+                        )}
+                        </>
                         )}
                     </div>
                 )}
@@ -2383,8 +2585,15 @@ const App10 = () => {
                             <PartyPopper className="w-8 h-8 text-green-600" />
                         </div>
                         <h3 className="font-bold text-gray-900 text-lg">
-                            {scanCelebration.queued ? 'Prix enregistré (hors ligne) !' : 'Prix enregistré !'}
+                            {scanCelebration.queued
+                                ? (scanCelebration.productOnly ? 'Produit enregistré (hors ligne) !' : 'Prix enregistré (hors ligne) !')
+                                : (scanCelebration.productOnly ? 'Produit enregistré !' : 'Prix enregistré !')}
                         </h3>
+                        {scanCelebration.productOnly && !scanCelebration.queued && (
+                            <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-1.5 mt-2">
+                                Le prix pourra être ajouté plus tard, par vous ou un autre contributeur, depuis "Produits à compléter".
+                            </p>
+                        )}
                         <p className="text-sm text-gray-500 mt-1 truncate">{scanCelebration.productName}</p>
                         {scanCelebration.queued ? (
                             <p className="text-sm text-gray-500 mt-2">Sera envoyé automatiquement dès que vous serez en ligne. Les points seront attribués à ce moment-là.</p>

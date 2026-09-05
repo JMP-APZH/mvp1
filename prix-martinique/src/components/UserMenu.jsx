@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock, ScanLine, Info, Target } from 'lucide-react';
+import { User, LogOut, Trophy, Star, ChevronDown, Award, Wallet, MapPin, Store, Plus, Search, Settings, TrendingUp, ChevronRight, X, ShieldCheck, BarChart3, Lock, ScanLine, Info, Target, PackageSearch, Inbox } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import { supabase } from '../supabaseClient';
 import { calculateSavings } from '../utils/userStats';
@@ -22,11 +22,13 @@ const CHAIN_ICONS = {
   'Carrefour Express': '🔵',
 };
 
-const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOpenWantedScans, onOpenProfile, stores }) => {
+const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOpenWantedScans, onOpenProfile, onOpenPendingProducts, onOpenMessages, stores }) => {
   const { user, userProfile, userBadges, userRoles, loading, signOut, updateProfile, updatePassword, userFavoriteStores, toggleFavoriteStore } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [savings, setSavings] = useState(null);
   const [wantedCount, setWantedCount] = useState(null);
+  const [pendingProductCount, setPendingProductCount] = useState(null);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(null);
   const scrollRef = useRef(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
   const [isUpdatingCity, setIsUpdatingCity] = useState(false);
@@ -87,6 +89,17 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
     if (isOpen && user) {
       calculateSavings(supabase, user.id).then(setSavings);
       getWantedScans(supabase, [...(userFavoriteStores || [])]).then(results => setWantedCount(results.length));
+
+      // Both counts degrade to null (badge simply hidden) if their migration
+      // hasn't been applied yet -- same tolerant pattern used throughout this
+      // codebase for not-yet-applied schema changes.
+      supabase.from('products').select('id', { count: 'exact', head: true })
+        .eq('has_price', false).eq('is_test_data', false)
+        .then(({ count, error }) => { if (!error) setPendingProductCount(count || 0); });
+
+      supabase.from('user_messages').select('id', { count: 'exact', head: true })
+        .eq('recipient_id', user.id).eq('is_read', false)
+        .then(({ count, error }) => { if (!error) setUnreadMessageCount(count || 0); });
     }
   }, [isOpen, user, userFavoriteStores]);
 
@@ -379,6 +392,58 @@ const UserMenu = ({ onSignInClick, onOpenStats, onOpenAdmin, onOpenMyScans, onOp
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-blue-300" />
+            </button>
+          </div>
+
+          <div className="p-2 border-b border-gray-100">
+            <button
+              onClick={() => {
+                onOpenPendingProducts();
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center justify-between p-3 bg-amber-50 hover:bg-amber-100 rounded-xl transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-amber-500 p-2 rounded-lg text-white shadow-sm group-hover:scale-110 transition-transform relative">
+                  <PackageSearch className="w-5 h-5" />
+                  {pendingProductCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                      {pendingProductCount}
+                    </span>
+                  )}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-900">Produits à compléter</p>
+                  <p className="text-[10px] text-amber-600 font-medium tracking-tight">Photographiés, prix à ajouter</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-amber-300" />
+            </button>
+          </div>
+
+          <div className="p-2 border-b border-gray-100">
+            <button
+              onClick={() => {
+                onOpenMessages();
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-gray-700 p-2 rounded-lg text-white shadow-sm group-hover:scale-110 transition-transform relative">
+                  <Inbox className="w-5 h-5" />
+                  {unreadMessageCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                      {unreadMessageCount}
+                    </span>
+                  )}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-gray-900">Messages</p>
+                  <p className="text-[10px] text-gray-500 font-medium tracking-tight">Notifications de l'équipe</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-300" />
             </button>
           </div>
 

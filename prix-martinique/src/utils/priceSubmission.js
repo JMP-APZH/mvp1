@@ -15,16 +15,23 @@ function base64ToBlob(dataUrl) {
 }
 
 // payload shape: { productName, barcode, price, storeId, isMainland, mainlandChain,
-//   userName, productPhoto (base64 data URL | null), priceTagPhoto (base64 data URL | null),
-//   isDeclaredBqp, categoryId, isLocal, isMdd, submissionMethod, queuedOffline }
+//   userName, productPhotoFront, productPhotoBack (base64 data URL | null, product-
+//   identification photos -- persisted on `products`, not `prices`),
+//   priceTagPhoto (base64 data URL | null), isDeclaredBqp, categoryId, isLocal, isMdd,
+//   submissionMethod, queuedOffline, productOnly (bool -- register a product's
+//   front/back photos with no price/store, see product_completion_and_messaging_migration.sql),
+//   existingProductId (set when completing an already-registered pending product:
+//   skips find-or-create and the front/back upload, since those photos already exist) }
 export async function performPriceSubmission({ supabase, awardPoints, user, userProfile, payload }) {
     // Step 1: find-or-create product. Deliberately re-resolved here every time
     // (even on a queued/offline-drafted submission) rather than trusting a
     // client-resolved productId, so a barcode added by someone else in the
-    // meantime still matches instead of creating a duplicate.
-    let productId;
+    // meantime still matches instead of creating a duplicate. Skipped entirely
+    // when completing a known pending product (existingProductId already
+    // identifies it).
+    let productId = payload.existingProductId || null;
 
-    if (payload.barcode) {
+    if (!productId && payload.barcode) {
         const { data: existingProduct } = await supabase
             .from('products')
             .select('id')
@@ -61,7 +68,9 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         productId = newProduct.id;
     }
 
-    // Step 2: upload photos if present
+    // Step 2: upload the front/back product-identification photos, unless
+    // we're completing an already-registered pending product -- those photos
+    // were captured at registration time and already live on `products`.
     // Upload failures here were previously silent -- caught, logged to
     // PostHog, but never surfaced to the caller, so a user could get a normal
     // "Prix enregistré !" success with a photo they'd just taken quietly
@@ -70,24 +79,76 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
     // tracks which ones failed so submitPrice can warn instead of staying
     // silent, without changing the fact that a failed upload still shouldn't
     // block the price itself from saving.
-    let productPhotoUrl = null;
-    let priceTagPhotoUrl = null;
     const photosDropped = [];
+    let frontUrl = null;
+    let backUrl = null;
 
-    if (payload.productPhoto) {
-        const fileName = `${Date.now()}_${productId}_product.jpg`;
-        const blob = base64ToBlob(payload.productPhoto);
-        const { error: uploadError } = await supabase.storage.from('product-photos').upload(fileName, blob);
-        if (uploadError) {
-            console.error('Product photo upload error:', uploadError);
-            posthog.captureException(uploadError, { context: 'product_photo_upload' });
-            photosDropped.push('product');
-        } else {
-            const { data: urlData } = supabase.storage.from('product-photos').getPublicUrl(fileName);
-            productPhotoUrl = urlData.publicUrl;
+    if (!payload.existingProductId) {
+        if (payload.productPhotoFront) {
+            const fileName = `${Date.now()}_${productId}_front.jpg`;
+            const blob = base64ToBlob(payload.productPhotoFront);
+            const { error: uploadError } = await supabase.storage.from('product-photos').upload(fileName, blob);
+            if (uploadError) {
+                console.error('Product front photo upload error:', uploadError);
+                posthog.captureException(uploadError, { context: 'product_photo_front_upload' });
+                photosDropped.push('product_front');
+            } else {
+                const { data: urlData } = supabase.storage.from('product-photos').getPublicUrl(fileName);
+                frontUrl = urlData.publicUrl;
+            }
+        }
+
+        if (payload.productPhotoBack) {
+            const fileName = `${Date.now()}_${productId}_back.jpg`;
+            const blob = base64ToBlob(payload.productPhotoBack);
+            const { error: uploadError } = await supabase.storage.from('product-photos').upload(fileName, blob);
+            if (uploadError) {
+                console.error('Product back photo upload error:', uploadError);
+                posthog.captureException(uploadError, { context: 'product_photo_back_upload' });
+                photosDropped.push('product_back');
+            } else {
+                const { data: urlData } = supabase.storage.from('product-photos').getPublicUrl(fileName);
+                backUrl = urlData.publicUrl;
+            }
+        }
+
+        if (frontUrl || backUrl) {
+            await supabase.from('products').update({
+                ...(frontUrl && { photo_front_url: frontUrl }),
+                ...(backUrl && { photo_back_url: backUrl }),
+                photo_registered_by: user?.id || null,
+                photo_registered_at: new Date().toISOString(),
+            }).eq('id', productId);
         }
     }
 
+    // Product-only registration: no price/store, no prices row -- the product
+    // just enters the "pending price" pool (products.has_price stays false
+    // until someone completes it, see PendingPriceProductsModal.jsx).
+    if (payload.productOnly) {
+        posthog.capture('product_registered', {
+            product_id: productId,
+            has_front_photo: !!frontUrl,
+            has_back_photo: !!backUrl,
+        });
+
+        let pointsAwarded = 0;
+        if (user) {
+            const { error: pointsError } = await awardPoints(
+                'product_registered',
+                5,
+                `Produit enregistré: ${payload.productName}`
+            );
+            if (!pointsError) pointsAwarded = 5;
+        }
+
+        return { productId, pointsAwarded, bqpPrompt: null, photosDropped, productOnly: true };
+    }
+
+    // Step 3: price tag photo (always required for a real price submission --
+    // validated client-side in submitPrice, but re-checked here isn't needed
+    // since an absent one simply uploads nothing, same tolerant pattern as before).
+    let priceTagPhotoUrl = null;
     if (payload.priceTagPhoto) {
         const fileName = `${Date.now()}_${productId}_pricetag.jpg`;
         const blob = base64ToBlob(payload.priceTagPhoto);
@@ -102,7 +163,18 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         }
     }
 
-    // Step 3: insert the price row
+    // `prices.product_photo_url` stays populated with the front photo (most
+    // consumers -- the Comparer feed, ProductDetailModal, TestDataAdmin --
+    // already read this column and don't need to change). When completing a
+    // pending product there's no fresh front upload this call, so fall back
+    // to whatever's already on the product.
+    let feedPhotoUrl = frontUrl;
+    if (!feedPhotoUrl) {
+        const { data: prod } = await supabase.from('products').select('photo_front_url').eq('id', productId).single();
+        feedPhotoUrl = prod?.photo_front_url || null;
+    }
+
+    // Step 4: insert the price row
     // user_name must never read "Anonyme" for a row that actually has a real
     // user_id attached -- that mismatch is exactly what undermines being able
     // to trace a submission back to a real account (confirmed live, Aug 28,
@@ -121,7 +193,7 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         store_id: payload.isMainland ? null : payload.storeId,
         price: parseFloat(payload.price),
         user_name: resolvedUserName,
-        product_photo_url: productPhotoUrl,
+        product_photo_url: feedPhotoUrl,
         price_tag_photo_url: priceTagPhotoUrl,
     };
 
@@ -151,10 +223,11 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         price: priceData.price,
         store_id: priceData.store_id,
         is_mainland: !!payload.isMainland,
-        has_product_photo: !!productPhotoUrl,
+        has_product_photo: !!feedPhotoUrl,
         has_price_tag_photo: !!priceTagPhotoUrl,
         authenticated: !!user,
         synced_from_offline_queue: !!payload.queuedOffline,
+        completed_pending_product: !!payload.existingProductId,
     });
 
     if (!localStorage.getItem('ph_first_contribution_done')) {
@@ -162,7 +235,7 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         posthog.capture('first_contribution_completed');
     }
 
-    // Step 4: award points if authenticated
+    // Step 5: award points if authenticated
     let pointsAwarded = 0;
     if (user) {
         const { error: pointsError } = await awardPoints(
@@ -186,5 +259,5 @@ export async function performPriceSubmission({ supabase, awardPoints, user, user
         bqpPrompt = p || null;
     }
 
-    return { productId, pointsAwarded, bqpPrompt, photosDropped };
+    return { productId, pointsAwarded, bqpPrompt, photosDropped, productOnly: false };
 }
