@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import BQPVerifier from './components/BQPVerifier';
 import FlagMartinique from './components/flags/FlagMartinique';
 import FlagFrance from './components/flags/FlagFrance';
+import PendingMatchesModal from './components/PendingMatchesModal';
 import PriceHistoryChart from './components/PriceHistoryChart';
 import ProductDetailModal from './components/ProductDetailModal';
 import RecipeDetailModal from './components/RecipeDetailModal';
@@ -68,6 +69,8 @@ const App10 = () => {
     // Honest community-contribution total for the header pill. `recentPrices` is
     // only the capped 50-row feed, so its length under-counts and stays flat.
     const [communityCount, setCommunityCount] = useState(null);
+    const [pendingMatchCount, setPendingMatchCount] = useState(null);
+    const [showPendingMatches, setShowPendingMatches] = useState(false);
     const [mainlandByProduct, setMainlandByProduct] = useState({});
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -399,6 +402,18 @@ const App10 = () => {
                 if (typeof cCount === 'number') setCommunityCount(cCount);
             } catch (cErr) {
                 console.error('community_price_count failed (migration pending?):', cErr);
+            }
+
+            // Pending Martinique<->France match count, for the header pill's
+            // clickable indicator (pending_match_migration.sql). Isolated the
+            // same way -- a missing RPC just leaves the indicator hidden.
+            try {
+                const { data: pCounts, error: pErr } = await supabase.rpc('public_pending_match_counts');
+                if (pErr) throw pErr;
+                const row = Array.isArray(pCounts) ? pCounts[0] : pCounts;
+                if (row) setPendingMatchCount((row.mtq_to_france || 0) + (row.france_to_mtq || 0));
+            } catch (pErr) {
+                console.error('public_pending_match_counts failed (migration pending?):', pErr);
             }
 
             // At-a-glance France Hexagonale diff badge on each card: cheapest
@@ -815,6 +830,29 @@ const App10 = () => {
         setActiveTab('scan');
     };
 
+    // Same idea as prefillPriceSubmission, from the "Prix en attente de
+    // comparaison" modal (PendingMatchesModal.jsx). Also pre-selects the
+    // target region -- and, for the MTQ->France direction, the suggested
+    // chain -- since the whole point of that list is telling the user
+    // exactly where to scan, not just what.
+    const prefillPendingMatchSubmission = (item, direction) => {
+        const wantsMainland = direction === 'mtq_to_france';
+        const chain = wantsMainland && item.chain && item.chain !== 'Autre' ? item.chain : '';
+        setManualEntry(prev => ({
+            ...prev,
+            productName: item.productName,
+            barcode: '',
+            price: '',
+            productPhoto: null,
+            priceTagPhoto: null,
+            isMainland: wantsMainland,
+            mainlandChain: chain,
+            storeId: wantsMainland ? '' : prev.storeId,
+        }));
+        setShowPendingMatches(false);
+        setActiveTab('scan');
+    };
+
     // Thin wrapper: validate → build payload → either submit live (online) or queue
     // it (offline / connection lost mid-request). The actual find-or-create-product /
     // photo-upload / price-insert / award-points work lives in performPriceSubmission
@@ -1092,12 +1130,31 @@ const App10 = () => {
                             </div>
                         </>
                     )}
-                    <div className="bg-white/20 rounded-full px-3 py-1 flex items-center gap-1">
+                    <button
+                        onClick={() => setShowPendingMatches(true)}
+                        className="bg-white/20 hover:bg-white/30 active:scale-95 rounded-full px-3 py-1 flex items-center gap-1 transition-colors"
+                        title="Voir les prix en attente de comparaison Martinique / France Hexagonale"
+                    >
                         <Users className="w-4 h-4" />
                         <span>{communityCount ?? recentPrices.length} prix partagés</span>
-                    </div>
+                        {pendingMatchCount > 0 && (
+                            <span className="bg-white text-orange-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5">
+                                {pendingMatchCount} à comparer
+                            </span>
+                        )}
+                        <ChevronRight className="w-3.5 h-3.5 opacity-80" />
+                    </button>
                 </div>
             </div>
+
+            {/* Pending Martinique <-> France Hexagonale price-match queue */}
+            {showPendingMatches && (
+                <PendingMatchesModal
+                    onClose={() => setShowPendingMatches(false)}
+                    categories={categories}
+                    onScanRequest={prefillPendingMatchSubmission}
+                />
+            )}
 
             {/* Auth Modal */}
             <AuthModal
