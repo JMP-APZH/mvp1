@@ -12,13 +12,22 @@ const CHANNEL_LABELS = {
     online_capture: 'Trouvé en ligne',
 };
 
+// Gap vs. the existing France Hexagonale reference, same convention as
+// PriceDuel / ProductDetailModal: positive (red) = Martinique dearer.
+const computeGap = (mtqPrice, referencePrice) => {
+    if (!referencePrice) return null;
+    const amount = mtqPrice - referencePrice;
+    const pct = (amount / referencePrice) * 100;
+    return { amount, pct };
+};
+
 const DIRECTIONS = {
     mtq_to_france: {
         label: 'À scanner en France',
         rpc: 'public_pending_mtq_to_france',
         emptyTitle: 'Tout est comparé !',
         emptyBody: 'Aucun produit martiniquais n\'attend un prix France Hexagonale pour ce filtre.',
-        banner: "Ces produits ont un prix en Martinique mais aucun prix France Hexagonale. Si vous (ou un proche) êtes en France, scannez-les -- idéalement dans la même enseigne -- pour compléter la comparaison.",
+        banner: "Ces produits ont un prix en Martinique mais aucun scan confirmé en France Hexagonale. Certains ont déjà un prix de référence (capture app enseigne ou en ligne) à confirmer -- ceux-là sont listés en premier, avec l'écart déjà calculé.",
     },
     france_to_mtq: {
         label: 'À scanner en Martinique',
@@ -43,6 +52,13 @@ const normalize = (row, direction) => direction === 'mtq_to_france'
         chain: row.suggested_chain,
         contextLabel: row.store_name ? `Vu à ${row.store_name}` : null,
         date: row.scanned_at,
+        // Existing France Hexagonale reference (admin online capture or chain-app
+        // screenshot) still awaiting a real diaspora confirmation scan -- not a
+        // full match yet, but enough to show the gap and prioritize the visit.
+        referencePrice: row.reference_price,
+        referenceChain: row.reference_chain,
+        referenceChannel: row.reference_channel,
+        referencePhotoUrl: row.reference_photo_url,
     }
     : {
         productId: row.product_id,
@@ -94,18 +110,29 @@ const PendingMatchesModal = ({ onClose, categories, onScanRequest }) => {
         return () => { cancelled = true; };
     }, [direction]);
 
+    // A chain filter matches either where the item was found (chain) or,
+    // for mtq_to_france items with an existing reference, where that
+    // reference price was captured (referenceChain) -- so filtering to
+    // "Leclerc" surfaces both "go price this at Leclerc" and "confirm this
+    // Leclerc reference" items.
+    const matchesChain = (item, chain) => !chain || item.chain === chain || item.referenceChain === chain;
+
     const filtered = useMemo(() => items.filter(i =>
         (!categoryFilter || i.categoryId === categoryFilter) &&
-        (!chainFilter || i.chain === chainFilter)
+        matchesChain(i, chainFilter)
     ), [items, categoryFilter, chainFilter]);
 
     const pickerCategories = useMemo(() => {
-        const ids = new Set(items.filter(i => !chainFilter || i.chain === chainFilter).map(i => i.categoryId).filter(Boolean));
+        const ids = new Set(items.filter(i => matchesChain(i, chainFilter)).map(i => i.categoryId).filter(Boolean));
         return (categories || []).filter(c => ids.has(c.id));
     }, [items, categories, chainFilter]);
 
     const pickerChains = useMemo(() => {
-        const present = new Set(items.filter(i => !categoryFilter || i.categoryId === categoryFilter).map(i => i.chain).filter(Boolean));
+        const present = new Set();
+        items.filter(i => !categoryFilter || i.categoryId === categoryFilter).forEach(i => {
+            if (i.chain) present.add(i.chain);
+            if (i.referenceChain) present.add(i.referenceChain);
+        });
         return MAINLAND_CHAINS.filter(c => present.has(c));
     }, [items, categoryFilter]);
 
@@ -254,40 +281,61 @@ const PendingMatchesModal = ({ onClose, categories, onScanRequest }) => {
                     </div>
                 ) : (
                     <div className="flex-1 overflow-y-auto p-4 pt-3 space-y-2">
-                        {filtered.map(item => (
-                            <div key={item.productId} className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3">
-                                {item.photoUrl ? (
-                                    <img src={item.photoUrl} alt={item.productName} className="w-14 h-14 rounded-lg object-cover border border-gray-100 flex-shrink-0" />
-                                ) : (
-                                    <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-xl">
-                                        {item.categoryIcon || '📦'}
-                                    </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-gray-900 truncate">{item.productName}</p>
-                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                        <span className="text-xs font-bold text-gray-900 tabular-nums">{Number(item.price).toFixed(2)}€</span>
-                                        {item.chain && (
-                                            <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{item.chain}</span>
+                        {filtered.map(item => {
+                            const hasReference = direction === 'mtq_to_france' && item.referencePrice != null;
+                            const gap = hasReference ? computeGap(item.price, item.referencePrice) : null;
+                            return (
+                                <div key={item.productId} className="flex items-center gap-3 bg-gray-50 rounded-2xl p-3">
+                                    {item.photoUrl ? (
+                                        <img src={item.photoUrl} alt={item.productName} className="w-14 h-14 rounded-lg object-cover border border-gray-100 flex-shrink-0" />
+                                    ) : (
+                                        <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-xl">
+                                            {item.categoryIcon || '📦'}
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-gray-900 truncate">{item.productName}</p>
+                                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                            <span className="text-xs font-bold text-gray-900 tabular-nums">{Number(item.price).toFixed(2)}€</span>
+                                            {item.chain && (
+                                                <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{item.chain}</span>
+                                            )}
+                                        </div>
+                                        {item.contextLabel && (
+                                            <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                                                <MapPin className="w-2.5 h-2.5" /> {item.contextLabel}
+                                            </p>
+                                        )}
+                                        {hasReference && (
+                                            <div className="mt-1.5 pt-1.5 border-t border-gray-200 flex items-center gap-1.5 flex-wrap">
+                                                <FlagFrance className="w-3 h-3 flex-shrink-0" />
+                                                <span className="text-[10px] font-bold text-gray-700 tabular-nums">
+                                                    {Number(item.referencePrice).toFixed(2)}€
+                                                </span>
+                                                {item.referenceChain && (
+                                                    <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full">{item.referenceChain}</span>
+                                                )}
+                                                {gap && (
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${gap.amount > 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                                        {gap.amount > 0 ? '+' : ''}{gap.amount.toFixed(2)}€ ({gap.pct > 0 ? '+' : ''}{gap.pct.toFixed(0)}%)
+                                                    </span>
+                                                )}
+                                                <span className="text-[9px] text-gray-400">{CHANNEL_LABELS[item.referenceChannel]}</span>
+                                            </div>
                                         )}
                                     </div>
-                                    {item.contextLabel && (
-                                        <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
-                                            <MapPin className="w-2.5 h-2.5" /> {item.contextLabel}
-                                        </p>
+                                    {onScanRequest && (
+                                        <button
+                                            onClick={() => onScanRequest(item, direction)}
+                                            className={`flex-shrink-0 p-2.5 rounded-full transition-colors ${hasReference ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'}`}
+                                            title={hasReference ? 'Confirmer ce prix par un scan' : 'Scanner ce produit'}
+                                        >
+                                            <ScanLine className="w-4 h-4" />
+                                        </button>
                                     )}
                                 </div>
-                                {onScanRequest && (
-                                    <button
-                                        onClick={() => onScanRequest(item, direction)}
-                                        className="flex-shrink-0 p-2.5 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
-                                        title="Scanner ce produit"
-                                    >
-                                        <ScanLine className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
